@@ -24,7 +24,7 @@ export default function ChatPage() {
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder=Tell me what you're craving...
+              placeholder="Tell me what you're craving..."
               className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary"
               disabled
             />
