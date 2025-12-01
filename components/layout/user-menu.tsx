@@ -18,7 +18,10 @@ export function UserMenu() {
     router.refresh();
   };
 
-  if (!user) return null;
+  // Don't render anything if no user, but keep hooks above
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="relative">
