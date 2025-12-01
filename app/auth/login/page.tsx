@@ -52,33 +52,33 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-screen flex items-center justify-center px-6 overflow-hidden relative" style={{ background: 'linear-gradient(to bottom right, #C5459C, #C5459C, #932B74)' }}>
+    <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 overflow-y-auto relative" style={{ background: 'linear-gradient(to bottom right, #C5459C, #C5459C, #932B74)' }}>
       {/* Decorative circles */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32 blur-3xl"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/10 rounded-full translate-y-32 -translate-x-32 blur-3xl"></div>
       
-      <div className="w-full max-w-[400px] relative z-10">
+      <div className="w-full max-w-[400px] relative z-10 my-auto">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-6xl font-black text-white mb-2 drop-shadow-lg">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-5xl sm:text-6xl font-black text-white mb-2 drop-shadow-lg">
             Pachu
           </h1>
           <p className="text-sm text-white/90 font-medium">Your Personal Taste Recommender</p>
         </div>
 
         {/* Login Form */}
-        <div className="bg-white rounded-3xl p-7 shadow-2xl">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Welcome Back! 👋</h2>
+        <div className="bg-white rounded-3xl p-5 sm:p-7 shadow-2xl">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 text-center">Welcome Back! 👋</h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs">
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleEmailLogin} className="space-y-3.5">
+          <form onSubmit={handleEmailLogin} className="space-y-3">
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label htmlFor="email" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                 Email
               </label>
               <input
@@ -86,7 +86,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
                 placeholder="you@example.com"
                 required
                 disabled={loading}
@@ -94,7 +94,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label htmlFor="password" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">
                 Password
               </label>
               <input
@@ -102,40 +102,42 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
                 placeholder="••••••••"
                 required
                 disabled={loading}
               />
             </div>
 
-            <div className="text-right">
-              <Link href="/auth/forgot-password" className="text-xs text-primary hover:text-primary-700 font-semibold transition-colors">
-                Forgot Password?
-              </Link>
-            </div>
-
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-primary to-primary-600 text-white rounded-xl font-bold text-sm hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-1 shadow-md"
+              style={{ backgroundColor: '#C5459C', borderColor: '#C5459C' }}
+              className="w-full py-2.5 sm:py-3 rounded-xl font-semibold text-white hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm mt-4 border-2"
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
 
+          {/* Forgot Password Link */}
+          <div className="text-center mt-3">
+            <Link href="/auth/forgot-password" className="text-xs text-gray-600 hover:text-primary font-semibold transition-colors">
+              Forgot Password?
+            </Link>
+          </div>
+
           {/* Divider */}
-          <div className="my-5 flex items-center">
+          <div className="my-4 sm:my-5 flex items-center">
             <div className="flex-1 border-t border-gray-300"></div>
             <span className="px-3 text-xs text-gray-500">Or continue with</span>
             <div className="flex-1 border-t border-gray-300"></div>
           </div>
 
           {/* OAuth Buttons */}
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             <button
               onClick={() => handleOAuthLogin('google')}
-              className="w-full py-3 bg-gray-50 border-2 border-gray-200 rounded-xl font-semibold hover:bg-white hover:border-primary/30 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-gray-700 text-sm"
+              className="w-full py-2.5 sm:py-3 bg-gray-50 border-2 border-gray-200 rounded-xl font-semibold hover:bg-white hover:border-primary/30 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-gray-700 text-sm"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
@@ -160,7 +162,7 @@ export default function LoginPage() {
 
             <button
               onClick={() => handleOAuthLogin('facebook')}
-              className="w-full py-3 bg-gray-50 border-2 border-gray-200 rounded-xl font-semibold hover:bg-white hover:border-primary/30 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-gray-700 text-sm"
+              className="w-full py-2.5 sm:py-3 bg-gray-50 border-2 border-gray-200 rounded-xl font-semibold hover:bg-white hover:border-primary/30 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-gray-700 text-sm"
             >
               <svg className="w-4 h-4" fill="#1877F2" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
@@ -170,7 +172,7 @@ export default function LoginPage() {
           </div>
 
           {/* Sign Up Link */}
-          <div className="mt-5 text-center">
+          <div className="mt-4 sm:mt-5 text-center">
             <p className="text-gray-600 text-xs">
               Don't have an account?{' '}
               <Link href="/auth/signup" className="text-primary font-bold hover:text-primary-700 transition-colors">
