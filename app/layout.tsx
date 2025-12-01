@@ -15,6 +15,13 @@ export const metadata: Metadata = {
     userScalable: false,
   },
   themeColor: '#C5459C',
+  icons: {
+    icon: [
+      { url: '/icon' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon',
+  },
 };
 
 export default function RootLayout({
