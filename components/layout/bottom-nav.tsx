@@ -42,8 +42,8 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-200 z-50">
-      <div className="flex items-center justify-around h-full px-2">
+    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-200 z-50 shadow-lg">
+      <div className="flex items-center justify-between h-full px-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -53,28 +53,31 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center flex-1 h-full transition-colors relative",
-                item.isCenter && "flex-initial"
+                "flex flex-col items-center justify-center transition-colors relative",
+                item.isCenter ? "flex-initial px-2" : "flex-1"
               )}
             >
               {item.isCenter ? (
                 // Center button with special styling
-                <div className="absolute -top-5 flex items-center justify-center w-14 h-14 rounded-full bg-primary shadow-lg hover:bg-primary-600 transition-colors">
-                  <Icon className="w-6 h-6 text-white" strokeWidth={2} />
+                <div 
+                  style={{ backgroundColor: '#C5459C' }}
+                  className="flex items-center justify-center w-14 h-14 rounded-2xl shadow-xl hover:opacity-90 transition-all -mt-8 border-4 border-white"
+                >
+                  <Icon className="w-7 h-7 text-white" strokeWidth={2.5} />
                 </div>
               ) : (
                 <>
                   <Icon
                     className={cn(
-                      "w-6 h-6 transition-colors",
+                      "w-6 h-6 transition-colors mb-1",
                       active ? "text-primary" : "text-gray-500"
                     )}
                     strokeWidth={active ? 2.5 : 2}
                   />
                   <span
                     className={cn(
-                      "text-xs mt-1 transition-colors",
-                      active ? "text-primary font-semibold" : "text-gray-500"
+                      "text-[10px] transition-colors",
+                      active ? "text-primary font-semibold" : "text-gray-500 font-medium"
                     )}
                   >
                     {item.name}
