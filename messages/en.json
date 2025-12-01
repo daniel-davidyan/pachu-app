@@ -1,0 +1,71 @@
+{
+  "common": {
+    "appName": "Pachu",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "search": "Search",
+    "submit": "Submit"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "orContinueWith": "Or continue with",
+    "google": "Google",
+    "facebook": "Facebook",
+    "microsoft": "Microsoft",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?"
+  },
+  "nav": {
+    "feed": "Feed",
+    "map": "Map",
+    "chat": "Chat",
+    "wishlist": "Wishlist",
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "settings": "Settings"
+  },
+  "profile": {
+    "myProfile": "My Profile",
+    "editProfile": "Edit Profile",
+    "followers": "Followers",
+    "following": "Following",
+    "reviews": "Reviews"
+  },
+  "restaurant": {
+    "restaurants": "Restaurants",
+    "hotels": "Hotels",
+    "movies": "Movies",
+    "books": "Books",
+    "professionals": "Professionals",
+    "comingSoon": "Coming Soon",
+    "addReview": "Add Review",
+    "rating": "Rating",
+    "review": "Review",
+    "photos": "Photos"
+  },
+  "chat": {
+    "title": "AI Recommender",
+    "placeholder": "Tell me what you're craving...",
+    "recommendations": "Recommendations"
+  },
+  "wishlist": {
+    "title": "My Wishlist",
+    "addToWishlist": "Add to Wishlist",
+    "removeFromWishlist": "Remove from Wishlist"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "followedYou": "followed you",
+    "likedYourReview": "liked your review"
+  }
+}
+

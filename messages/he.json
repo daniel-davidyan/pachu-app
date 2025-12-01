@@ -1,0 +1,71 @@
+{
+  "common": {
+    "appName": "פאצ'ו",
+    "loading": "טוען...",
+    "save": "שמור",
+    "cancel": "ביטול",
+    "delete": "מחק",
+    "edit": "ערוך",
+    "close": "סגור",
+    "search": "חיפוש",
+    "submit": "שלח"
+  },
+  "auth": {
+    "signIn": "התחבר",
+    "signUp": "הרשם",
+    "signOut": "התנתק",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "forgotPassword": "שכחת סיסמה?",
+    "orContinueWith": "או המשך עם",
+    "google": "גוגל",
+    "facebook": "פייסבוק",
+    "microsoft": "מיקרוסופט",
+    "alreadyHaveAccount": "כבר יש לך חשבון?",
+    "dontHaveAccount": "אין לך חשבון?"
+  },
+  "nav": {
+    "feed": "פיד",
+    "map": "מפה",
+    "chat": "צ'אט",
+    "wishlist": "רשימת משאלות",
+    "profile": "פרופיל",
+    "notifications": "התראות",
+    "settings": "הגדרות"
+  },
+  "profile": {
+    "myProfile": "הפרופיל שלי",
+    "editProfile": "ערוך פרופיל",
+    "followers": "עוקבים",
+    "following": "עוקב",
+    "reviews": "ביקורות"
+  },
+  "restaurant": {
+    "restaurants": "מסעדות",
+    "hotels": "מלונות",
+    "movies": "סרטים",
+    "books": "ספרים",
+    "professionals": "אנשי מקצוע",
+    "comingSoon": "בקרוב",
+    "addReview": "הוסף ביקורת",
+    "rating": "דירוג",
+    "review": "ביקורת",
+    "photos": "תמונות"
+  },
+  "chat": {
+    "title": "ממליץ AI",
+    "placeholder": "ספר לי למה אתה מתאווה...",
+    "recommendations": "המלצות"
+  },
+  "wishlist": {
+    "title": "רשימת המשאלות שלי",
+    "addToWishlist": "הוסף לרשימת משאלות",
+    "removeFromWishlist": "הסר מרשימת משאלות"
+  },
+  "notifications": {
+    "title": "התראות",
+    "followedYou": "עקב אחריך",
+    "likedYourReview": "אהב את הביקורת שלך"
+  }
+}
+
