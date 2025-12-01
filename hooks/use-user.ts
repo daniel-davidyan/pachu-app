@@ -39,7 +39,8 @@ export function useUser() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [router, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return { user, loading };
 }
