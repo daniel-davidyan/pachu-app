@@ -8,7 +8,7 @@ export default function MapPage() {
     <MainLayout>
       <div className="container mx-auto px-4 py-6">
         {/* Category Icons */}
-        <div className="flex gap-4 mb-6 justify-center items-center">
+        <div className="flex gap-4 mb-6 justify-center items-start">
           {/* Restaurants - Active */}
           <div className="flex flex-col items-center">
             <button 
@@ -18,6 +18,7 @@ export default function MapPage() {
             >
               <UtensilsCrossed className="w-6 h-6 text-white" strokeWidth={2.5} />
             </button>
+            <div className="h-4"></div>
           </div>
 
           {/* Hotels - Disabled */}
