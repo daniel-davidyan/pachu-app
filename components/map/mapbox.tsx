@@ -1,8 +1,7 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import Map, { MapRef } from 'react-map-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface MapboxProps {
   accessToken: string;
