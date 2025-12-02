@@ -1,8 +1,20 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { MainLayout } from '@/components/layout/main-layout';
-import { Mapbox } from '@/components/map/mapbox';
 import { UtensilsCrossed, Hotel, Briefcase } from 'lucide-react';
+
+// Dynamically import Mapbox with no SSR to avoid build issues
+const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.Mapbox), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white rounded-lg shadow h-full flex items-center justify-center text-gray-500">
+      <div className="text-center">
+        <p>Loading map...</p>
+      </div>
+    </div>
+  )
+});
 
 export default function MapPage() {
   // You'll need to add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env.local file
