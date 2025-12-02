@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import Map, { MapRef } from 'react-map-gl';
+import { useRef, useEffect } from 'react';
+import mapboxgl from 'mapbox-gl';
 
 interface MapboxProps {
   accessToken: string;
@@ -20,20 +20,35 @@ export function Mapbox({
     zoom: 12
   }
 }: MapboxProps) {
-  const mapRef = useRef<MapRef>(null);
-  const [viewState, setViewState] = useState(initialViewState);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+
+  useEffect(() => {
+    if (map.current || !mapContainer.current) return; // initialize map only once
+    
+    mapboxgl.accessToken = accessToken;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [initialViewState.longitude, initialViewState.latitude],
+      zoom: initialViewState.zoom
+    });
+
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    return () => {
+      map.current?.remove();
+    };
+  }, [accessToken, initialViewState]);
 
   return (
-    <div className="w-full h-full rounded-lg overflow-hidden">
-      <Map
-        ref={mapRef}
-        {...viewState}
-        onMove={evt => setViewState(evt.viewState)}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
-        mapboxAccessToken={accessToken}
-        style={{ width: '100%', height: '100%' }}
-      />
-    </div>
+    <div 
+      ref={mapContainer} 
+      className="w-full h-full rounded-lg overflow-hidden"
+      style={{ width: '100%', height: '100%' }}
+    />
   );
 }
 
