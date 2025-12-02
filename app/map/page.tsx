@@ -17,8 +17,8 @@ const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.M
 });
 
 export default function MapPage() {
-  // You'll need to add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env.local file
-  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+  // You'll need to add NEXT_PUBLIC_MAPBOX_TOKEN to your .env.local file
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
   return (
     <MainLayout>
