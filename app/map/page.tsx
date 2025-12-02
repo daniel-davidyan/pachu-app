@@ -1,9 +1,13 @@
 'use client';
 
 import { MainLayout } from '@/components/layout/main-layout';
+import { Mapbox } from '@/components/map/mapbox';
 import { UtensilsCrossed, Hotel, Briefcase } from 'lucide-react';
 
 export default function MapPage() {
+  // You'll need to add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env.local file
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-6">
@@ -47,11 +51,24 @@ export default function MapPage() {
         </div>
 
         {/* Map Content */}
-        <div className="bg-white rounded-lg shadow h-[calc(100vh-220px)] flex items-center justify-center text-gray-500">
-          <div className="text-center">
-            <p>Map view coming soon...</p>
-            <p className="text-sm mt-2">This is where you'll see restaurants on a map</p>
-          </div>
+        <div className="h-[calc(100vh-220px)]">
+          {mapboxToken ? (
+            <Mapbox 
+              accessToken={mapboxToken}
+              initialViewState={{
+                longitude: -122.4,
+                latitude: 37.8,
+                zoom: 12
+              }}
+            />
+          ) : (
+            <div className="bg-white rounded-lg shadow h-full flex items-center justify-center text-gray-500">
+              <div className="text-center">
+                <p className="font-semibold">Mapbox token not found</p>
+                <p className="text-sm mt-2">Please add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env.local file</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </MainLayout>
