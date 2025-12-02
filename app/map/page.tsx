@@ -54,10 +54,14 @@ export default function MapPage() {
     const fetchRestaurants = async () => {
       setLoading(true);
       try {
+        console.log('📍 User location:', userLocation);
+        
         // Fetch friends' reviews first
         const friendsResponse = await fetch('/api/restaurants/friends-reviews');
         const friendsData = await friendsResponse.json();
         const friendsRestaurants = friendsData.restaurants || [];
+        
+        console.log('👥 Friends restaurants:', friendsRestaurants.length);
 
         // If user has friends with reviews, prioritize them
         if (friendsRestaurants.length > 0) {
@@ -67,15 +71,26 @@ export default function MapPage() {
         }
 
         // Otherwise, fetch Google Places restaurants
-        const googleResponse = await fetch(
-          `/api/restaurants/nearby?latitude=${userLocation.lat}&longitude=${userLocation.lng}&radius=2000`
-        );
+        const googleUrl = `/api/restaurants/nearby?latitude=${userLocation.lat}&longitude=${userLocation.lng}&radius=2000`;
+        console.log('🔍 Fetching from:', googleUrl);
+        
+        const googleResponse = await fetch(googleUrl);
         const googleData = await googleResponse.json();
+        
+        console.log('📊 Google API response:', googleData);
+        
+        if (googleData.error) {
+          console.error('❌ Google API error:', googleData.error);
+          alert(`Error loading restaurants: ${googleData.error}\n\nPlease check:\n1. Google Places API is enabled\n2. Billing is enabled in Google Cloud\n3. API key has no restrictions`);
+        }
+        
         const googleRestaurants = googleData.restaurants || [];
+        console.log('🍽️ Google restaurants found:', googleRestaurants.length);
 
         setRestaurants(googleRestaurants);
       } catch (error) {
-        console.error('Error fetching restaurants:', error);
+        console.error('❌ Error fetching restaurants:', error);
+        alert('Failed to load restaurants. Check browser console for details.');
       } finally {
         setLoading(false);
       }

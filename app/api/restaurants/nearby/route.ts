@@ -26,13 +26,19 @@ export async function GET(request: NextRequest) {
     // Use Google Places Nearby Search API
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=restaurant&key=${apiKey}`;
     
+    console.log('🔍 Calling Google Places API:', { latitude, longitude, radius });
+    
     const response = await fetch(url);
     const data = await response.json();
 
+    console.log('📊 Google Places API status:', data.status);
+    console.log('📊 Google Places API results count:', data.results?.length || 0);
+
     if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      console.error('Google Places API error:', data);
+      console.error('❌ Google Places API error:', data);
+      console.error('Error message:', data.error_message);
       return NextResponse.json(
-        { error: `Google Places API error: ${data.status}` },
+        { error: `Google Places API error: ${data.status} - ${data.error_message || 'Unknown error'}` },
         { status: 500 }
       );
     }
