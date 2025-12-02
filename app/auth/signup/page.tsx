@@ -52,11 +52,12 @@ export default function SignUpPage() {
 
   const handleOAuthSignUp = async (provider: 'google' | 'facebook' | 'azure') => {
     try {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      // Use current origin for redirect (works for both localhost and production)
+      const redirectUrl = `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${siteUrl}/auth/callback`,
+          redirectTo: redirectUrl,
         },
       });
 

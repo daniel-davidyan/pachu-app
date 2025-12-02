@@ -1,30 +1,39 @@
 'use client';
 
 import { MainLayout } from '@/components/layout/main-layout';
-
+import { UtensilsCrossed, Hotel, Briefcase } from 'lucide-react';
 
 export default function MapPage() {
-  
-
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-6">
-        {/* Category Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          <button className="px-4 py-2 bg-primary text-white rounded-full font-medium whitespace-nowrap">
-            Restaurants
+        {/* Category Icons */}
+        <div className="flex gap-3 mb-6 justify-center">
+          {/* Restaurants - Active */}
+          <button 
+            style={{ backgroundColor: '#C5459C' }}
+            className="flex items-center justify-center w-14 h-14 rounded-2xl shadow-lg transition-all"
+            aria-label="Restaurants"
+          >
+            <UtensilsCrossed className="w-6 h-6 text-white" strokeWidth={2.5} />
           </button>
-          <button className="px-4 py-2 bg-gray-200 text-gray-400 rounded-full font-medium whitespace-nowrap cursor-not-allowed" disabled>
-            Hotels (Coming Soon)
+
+          {/* Hotels - Disabled */}
+          <button 
+            disabled
+            className="flex items-center justify-center w-14 h-14 bg-gray-200 rounded-2xl shadow-sm opacity-50 cursor-not-allowed"
+            aria-label="Hotels (Coming Soon)"
+          >
+            <Hotel className="w-6 h-6 text-gray-400" strokeWidth={2} />
           </button>
-          <button className="px-4 py-2 bg-gray-200 text-gray-400 rounded-full font-medium whitespace-nowrap cursor-not-allowed" disabled>
-            Movies (Coming Soon)
-          </button>
-          <button className="px-4 py-2 bg-gray-200 text-gray-400 rounded-full font-medium whitespace-nowrap cursor-not-allowed" disabled>
-            Books (Coming Soon)
-          </button>
-          <button className="px-4 py-2 bg-gray-200 text-gray-400 rounded-full font-medium whitespace-nowrap cursor-not-allowed" disabled>
-            Professionals (Coming Soon)
+
+          {/* Business - Disabled */}
+          <button 
+            disabled
+            className="flex items-center justify-center w-14 h-14 bg-gray-200 rounded-2xl shadow-sm opacity-50 cursor-not-allowed"
+            aria-label="Business (Coming Soon)"
+          >
+            <Briefcase className="w-6 h-6 text-gray-400" strokeWidth={2} />
           </button>
         </div>
 
