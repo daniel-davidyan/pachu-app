@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
   try {
     const { message, conversationHistory } = await request.json();
@@ -18,10 +14,15 @@ export async function POST(request: NextRequest) {
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your environment variables.' },
         { status: 500 }
       );
     }
+
+    // Initialize OpenAI client inside the request handler
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
     // System prompt for restaurant recommendations
     const systemPrompt = `You are Pachu, a friendly and knowledgeable restaurant recommendation AI assistant. Your goal is to help users discover amazing restaurants based on their preferences, mood, and cravings.
