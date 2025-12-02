@@ -39,6 +39,9 @@ export default function LoginPage() {
     try {
       // Use current origin for redirect (works for both localhost and production)
       const redirectUrl = `${window.location.origin}/auth/callback`;
+      console.log('🔗 OAuth Redirect URL:', redirectUrl);
+      console.log('📍 Current Origin:', window.location.origin);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
