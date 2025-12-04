@@ -131,11 +131,17 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       const data = await response.json();
 
       if (data.error) {
-        alert(data.error);
+        alert(`Error: ${data.error}`);
+        return;
+      }
+
+      if (!data.success) {
+        alert('Failed to submit review. Please try again.');
         return;
       }
 
       // Success
+      alert('Review posted successfully! 🎉');
       onSuccess?.();
       onClose();
       

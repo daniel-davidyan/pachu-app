@@ -38,19 +38,42 @@ export async function POST(request: NextRequest) {
       if (existingRestaurant) {
         restaurantId = existingRestaurant.id;
       } else {
-        // Create new restaurant
+        // Create new restaurant (location can be added later via SQL if needed)
         const { data: newRestaurant, error: createError } = await supabase
           .from('restaurants')
           .insert({
             google_place_id: restaurant.googlePlaceId,
             name: restaurant.name,
             address: restaurant.address,
-            location: `POINT(${restaurant.longitude} ${restaurant.latitude})`,
             image_url: restaurant.photoUrl,
             created_by: user.id,
           })
           .select('id')
           .single();
+
+        if (createError) {
+          console.error('Error creating restaurant:', createError);
+          return NextResponse.json(
+            { error: `Failed to create restaurant: ${createError.message}. Please check your database schema.` },
+            { status: 500 }
+          );
+        }
+
+        restaurantId = newRestaurant.id;
+        
+        // Update location separately using SQL if PostGIS is set up
+        if (restaurant.latitude && restaurant.longitude) {
+          try {
+            await supabase.rpc('update_restaurant_location', {
+              p_restaurant_id: restaurantId,
+              p_longitude: restaurant.longitude,
+              p_latitude: restaurant.latitude,
+            });
+          } catch (e) {
+            // Location update is optional, continue without it
+            console.log('Location update skipped (PostGIS function may not exist)');
+          }
+        }
 
         if (createError) {
           console.error('Error creating restaurant:', createError);

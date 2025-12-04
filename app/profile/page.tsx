@@ -22,17 +22,34 @@ interface Stats {
   wishlist: number;
 }
 
+interface Review {
+  id: string;
+  rating: number;
+  content: string;
+  created_at: string;
+  restaurants: {
+    id: string;
+    name: string;
+    address: string;
+    image_url?: string;
+  };
+  review_photos: Array<{ photo_url: string }>;
+}
+
 export default function ProfilePage() {
   const { user } = useUser();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ reviews: 0, friends: 0, wishlist: 0 });
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingReviews, setLoadingReviews] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     if (user) {
       fetchProfile();
       fetchStats();
+      fetchReviews();
     }
   }, [user]);
 
@@ -55,9 +72,48 @@ export default function ProfilePage() {
 
   const fetchStats = async () => {
     try {
-      setStats({ reviews: 0, friends: 0, wishlist: 0 });
+      if (!user?.id) return;
+
+      // Get review count
+      const { count: reviewsCount } = await supabase
+        .from('reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      // Get friends count (following)
+      const { count: friendsCount } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', user.id);
+
+      // Get wishlist count
+      const { count: wishlistCount } = await supabase
+        .from('wishlist')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      setStats({
+        reviews: reviewsCount || 0,
+        friends: friendsCount || 0,
+        wishlist: wishlistCount || 0,
+      });
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchReviews = async () => {
+    if (!user?.id) return;
+    
+    setLoadingReviews(true);
+    try {
+      const response = await fetch(`/api/reviews?userId=${user.id}`);
+      const data = await response.json();
+      setReviews(data.reviews || []);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    } finally {
+      setLoadingReviews(false);
     }
   };
 
@@ -186,6 +242,82 @@ export default function ProfilePage() {
               </div>
             </button>
           </div>
+        </div>
+
+        {/* My Reviews Section */}
+        <div className="px-4 mt-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">My Reviews</h2>
+          
+          {loadingReviews ? (
+            <div className="text-center py-8">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : reviews.length > 0 ? (
+            <div className="space-y-3">
+              {reviews.map((review) => (
+                <div key={review.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  {/* Restaurant Header */}
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0">
+                      {review.restaurants.image_url ? (
+                        <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xl">🍽️</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">{review.restaurants.name}</h3>
+                      <p className="text-xs text-gray-500 truncate">{review.restaurants.address}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-semibold text-sm">{review.rating}</span>
+                    </div>
+                  </div>
+
+                  {/* Review Photos */}
+                  {review.review_photos && review.review_photos.length > 0 && (
+                    <div className="px-4 pb-2">
+                      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                        {review.review_photos.map((photo, index) => (
+                          <img
+                            key={index}
+                            src={photo.photo_url}
+                            alt=""
+                            className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Review Text */}
+                  {review.content && (
+                    <div className="px-4 pb-4">
+                      <p className="text-sm text-gray-700">{review.content}</p>
+                    </div>
+                  )}
+
+                  {/* Date */}
+                  <div className="px-4 pb-4">
+                    <p className="text-xs text-gray-400">
+                      {new Date(review.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+              <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No reviews yet</p>
+              <p className="text-sm text-gray-400 mt-1">Start sharing your restaurant experiences!</p>
+            </div>
+          )}
         </div>
 
         {/* Menu Items */}

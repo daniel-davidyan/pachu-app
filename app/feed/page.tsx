@@ -110,7 +110,7 @@ export default function FeedPage() {
         {/* Header */}
         <div className="px-4 pt-2 pb-3 bg-white -mx-0 mb-2">
           <h1 className="text-xl font-bold text-gray-900">Feed</h1>
-        </div>
+          </div>
 
         {/* Category Carousel */}
         <div className="px-4 mb-4">
@@ -121,7 +121,7 @@ export default function FeedPage() {
               const isDisabled = !cat.active;
               
               return (
-                <button
+            <button 
                   key={cat.id}
                   onClick={() => cat.active && setActiveCategory(cat.id)}
                   disabled={isDisabled}
@@ -135,13 +135,13 @@ export default function FeedPage() {
                         : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                     }
                   `}
-                >
+            >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : ''}`} strokeWidth={2} />
                   <span>{cat.name}</span>
                   {isDisabled && (
                     <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full">Soon</span>
                   )}
-                </button>
+            </button>
               );
             })}
           </div>
@@ -234,7 +234,13 @@ export default function FeedPage() {
                   <Heart className={`w-5 h-5 ${likedReviews.has(review.id) ? 'fill-current' : ''}`} />
                   <span className="text-xs font-medium">Like</span>
                 </button>
-                <button className="flex items-center gap-1.5 text-gray-500 hover:text-primary transition-colors">
+                <button 
+                  onClick={() => {
+                    // TODO: Open comment modal/section
+                    alert('Comments coming soon!');
+                  }}
+                  className="flex items-center gap-1.5 text-gray-500 hover:text-primary transition-colors"
+                >
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-xs font-medium">Comment</span>
                 </button>
@@ -253,7 +259,7 @@ export default function FeedPage() {
               </div>
               <p className="text-gray-500 font-medium">No reviews yet</p>
               <p className="text-sm text-gray-400 mt-1">Be the first to share a review!</p>
-            </div>
+          </div>
           )}
         </div>
       </div>

@@ -1,14 +1,89 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
-import { Search, MapPin, User, Star } from 'lucide-react';
+import { Search, MapPin, User, Star, Loader2 } from 'lucide-react';
 
 type SearchTab = 'places' | 'users';
+
+interface PlaceResult {
+  googlePlaceId: string;
+  name: string;
+  address: string;
+  rating: number;
+  photoUrl?: string;
+}
+
+interface UserResult {
+  id: string;
+  username: string;
+  full_name: string;
+  avatar_url?: string;
+}
 
 export default function SearchPage() {
   const [activeTab, setActiveTab] = useState<SearchTab>('places');
   const [searchQuery, setSearchQuery] = useState('');
+  const [placesResults, setPlacesResults] = useState<PlaceResult[]>([]);
+  const [usersResults, setUsersResults] = useState<UserResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  // Search for places
+  useEffect(() => {
+    if (!searchQuery.trim() || activeTab !== 'places') {
+      setPlacesResults([]);
+      return;
+    }
+
+    const searchPlaces = async () => {
+      setSearching(true);
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        }).catch(() => ({ coords: { latitude: 32.0853, longitude: 34.7818 } } as GeolocationPosition));
+
+        const response = await fetch(
+          `/api/restaurants/search?query=${encodeURIComponent(searchQuery)}&latitude=${position.coords.latitude}&longitude=${position.coords.longitude}`
+        );
+        const data = await response.json();
+        setPlacesResults(data.restaurants || []);
+      } catch (error) {
+        console.error('Search error:', error);
+        setPlacesResults([]);
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    // Debounce search
+    const timeoutId = setTimeout(searchPlaces, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, activeTab]);
+
+  // Search for users
+  useEffect(() => {
+    if (!searchQuery.trim() || activeTab !== 'users') {
+      setUsersResults([]);
+      return;
+    }
+
+    const searchUsers = async () => {
+      setSearching(true);
+      try {
+        const response = await fetch(`/api/users/search?query=${encodeURIComponent(searchQuery)}`);
+        const data = await response.json();
+        setUsersResults(data.users || []);
+      } catch (error) {
+        console.error('User search error:', error);
+        setUsersResults([]);
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    const timeoutId = setTimeout(searchUsers, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, activeTab]);
 
   return (
     <MainLayout>
@@ -62,11 +137,44 @@ export default function SearchPage() {
             <>
               {/* Places Results */}
               {searchQuery ? (
-                <div className="text-center py-12 text-gray-500">
-                  <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Search for restaurants and places</p>
-                  <p className="text-sm mt-1">Results will appear here</p>
-                </div>
+                <>
+                  {searching ? (
+                    <div className="text-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+                      <p className="text-gray-500">Searching...</p>
+                    </div>
+                  ) : placesResults.length > 0 ? (
+                    <div className="space-y-3">
+                      {placesResults.map((place, index) => (
+                        <div key={place.googlePlaceId || index} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+                          <div className="w-16 h-16 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0">
+                            {place.photoUrl ? (
+                              <img src={place.photoUrl} alt={place.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900">{place.name}</h3>
+                            <p className="text-sm text-gray-500 truncate">{place.address}</p>
+                            {place.rating > 0 && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-medium">{place.rating.toFixed(1)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>No places found</p>
+                      <p className="text-sm mt-1">Try a different search term</p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <>
                   {/* Popular/Trending Section */}
@@ -121,11 +229,41 @@ export default function SearchPage() {
             <>
               {/* Users Results */}
               {searchQuery ? (
-                <div className="text-center py-12 text-gray-500">
-                  <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Search for users</p>
-                  <p className="text-sm mt-1">Find friends and foodies</p>
-                </div>
+                <>
+                  {searching ? (
+                    <div className="text-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+                      <p className="text-gray-500">Searching...</p>
+                    </div>
+                  ) : usersResults.length > 0 ? (
+                    <div className="space-y-3">
+                      {usersResults.map((user) => (
+                        <div key={user.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+                          <div className="w-14 h-14 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt={user.username} className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                              <span>{(user.full_name || user.username).charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900">{user.full_name || user.username}</h3>
+                            <p className="text-sm text-gray-500">@{user.username}</p>
+                          </div>
+                          <button className="px-4 py-2 bg-primary text-white rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
+                            Follow
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>No users found</p>
+                      <p className="text-sm mt-1">Try a different search term</p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <>
                   {/* Suggested Users Section */}
