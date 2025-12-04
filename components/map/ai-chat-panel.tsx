@@ -208,21 +208,20 @@ export function AIChatPanel({ onFilterChange, matchedCount = 0 }: AIChatPanelPro
   return (
     <div 
       ref={panelRef}
-      className="fixed bottom-[72px] left-3 right-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.1)] border border-gray-200/50 z-40 transition-all duration-100"
+      className="fixed bottom-[72px] left-3 right-3 bg-white rounded-3xl shadow-xl border border-gray-100 z-40 transition-all duration-150"
       style={{ height: panelHeight }}
     >
       {/* Drag Handle */}
       <div 
-        className="flex justify-center py-3 cursor-grab active:cursor-grabbing touch-none"
+        className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing touch-none"
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
       >
-        <div className="flex items-center gap-2">
-          <GripHorizontal className="w-6 h-6 text-gray-400" />
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
           {matchedCount > 0 && (
-            <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-              <MapPin className="w-3 h-3 inline mr-1" />
-              {matchedCount} places
+            <span className="text-xs font-medium text-gray-600">
+              {matchedCount} places nearby
             </span>
           )}
         </div>
@@ -280,20 +279,20 @@ export function AIChatPanel({ onFilterChange, matchedCount = 0 }: AIChatPanelPro
         </div>
 
         {/* Input */}
-        <div className="px-4 pb-3">
-          <div className="flex items-center gap-2 bg-gray-100 rounded-full px-4 py-2">
+        <div className="px-3 pb-3">
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
               placeholder="What are you craving?"
-              className="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-500"
+              className="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-400 text-sm"
             />
             <button
               onClick={() => handleSend()}
               disabled={!inputValue.trim() || isLoading}
-              className="w-9 h-9 flex items-center justify-center bg-primary text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+              className="w-8 h-8 flex items-center justify-center bg-primary text-white rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-all active:scale-95"
             >
               <Send className="w-4 h-4" />
             </button>

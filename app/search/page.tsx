@@ -34,24 +34,24 @@ export default function SearchPage() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab('places')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-full font-medium transition-all ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-full font-semibold transition-all border-2 ${
               activeTab === 'places'
-                ? 'bg-primary text-white shadow-lg shadow-primary/30'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-primary/10 text-primary border-primary'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
             }`}
           >
-            <MapPin className="w-4 h-4" />
+            <MapPin className={`w-4 h-4 ${activeTab === 'places' ? 'text-primary' : ''}`} />
             Places
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-full font-medium transition-all ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-full font-semibold transition-all border-2 ${
               activeTab === 'users'
-                ? 'bg-primary text-white shadow-lg shadow-primary/30'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-primary/10 text-primary border-primary'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
             }`}
           >
-            <User className="w-4 h-4" />
+            <User className={`w-4 h-4 ${activeTab === 'users' ? 'text-primary' : ''}`} />
             Users
           </button>
         </div>

@@ -161,20 +161,20 @@ export default function MapPage() {
                 onClick={() => cat.active && setActiveCategory(cat.id)}
                 disabled={isDisabled}
                 className={`
-                  flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium
-                  whitespace-nowrap transition-all duration-200 flex-shrink-0
+                  flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold
+                  whitespace-nowrap transition-all duration-200 flex-shrink-0 shadow-lg border-2
                   ${isActive 
-                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                    ? 'bg-primary/10 text-primary border-primary' 
                     : isDisabled
-                      ? 'bg-white/60 text-gray-400 cursor-not-allowed'
-                      : 'bg-white/90 text-gray-700 shadow-sm hover:bg-white hover:shadow-md'
+                      ? 'bg-white/90 text-gray-400 border-transparent cursor-not-allowed'
+                      : 'bg-white text-gray-700 border-transparent hover:bg-gray-50'
                   }
                 `}
               >
-                <Icon className="w-3.5 h-3.5" strokeWidth={2} />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : ''}`} strokeWidth={2} />
                 <span>{cat.name}</span>
                 {isDisabled && (
-                  <span className="text-[9px] bg-gray-200 text-gray-500 px-1 rounded">Soon</span>
+                  <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full">Soon</span>
                 )}
               </button>
             );
