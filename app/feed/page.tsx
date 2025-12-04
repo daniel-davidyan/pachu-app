@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
-import { WriteReviewModal } from '@/components/review/write-review-modal';
-import { UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, Star, Heart, MessageCircle, Share2, MapPin, Loader2, Users, Plus } from 'lucide-react';
+import { UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, Star, Heart, MessageCircle, Share2, MapPin, Loader2, Users } from 'lucide-react';
 
 interface Review {
   id: string;
@@ -31,7 +30,6 @@ export default function FeedPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [likedReviews, setLikedReviews] = useState<Set<string>>(new Set());
-  const [showWriteReview, setShowWriteReview] = useState(false);
 
   // Fetch reviews (friends first, then Google for cold start)
   useEffect(() => {
@@ -263,23 +261,6 @@ export default function FeedPage() {
           )}
         </div>
       </div>
-      {/* Floating Write Review Button */}
-      <button
-        onClick={() => setShowWriteReview(true)}
-        className="fixed bottom-24 right-4 w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:bg-primary/90 transition-all active:scale-95 z-40"
-      >
-        <Plus className="w-7 h-7" />
-      </button>
-
-      {/* Write Review Modal */}
-      <WriteReviewModal
-        isOpen={showWriteReview}
-        onClose={() => setShowWriteReview(false)}
-        onSuccess={() => {
-          // Refresh feed
-          window.location.reload();
-        }}
-      />
     </MainLayout>
   );
 }
