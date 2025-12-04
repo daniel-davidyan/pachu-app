@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
         created_at,
         user_id,
         restaurant_id,
-        restaurants!inner (
+        restaurants (
           id,
           name,
           address,

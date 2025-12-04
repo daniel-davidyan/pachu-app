@@ -281,8 +281,12 @@ export default function ProfilePage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 truncate">{review.restaurants?.name || 'Restaurant'}</h3>
-                      <p className="text-xs text-gray-500 truncate">{review.restaurants?.address || 'Address not available'}</p>
+                      <h3 className="font-bold text-gray-900 truncate">
+                        {review.restaurants?.name || 'Restaurant (Deleted)'}
+                      </h3>
+                      <p className="text-xs text-gray-500 truncate">
+                        {review.restaurants?.address || 'Location no longer available'}
+                      </p>
                       <div className="flex items-center gap-1 mt-1">
                         {[...Array(5)].map((_, i) => (
                           <Star
