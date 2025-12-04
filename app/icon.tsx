@@ -11,25 +11,44 @@ export const contentType = 'image/png'
 export default function Icon() {
   return new ImageResponse(
     (
-      // ImageResponse JSX element
       <div
         style={{
-          fontSize: 24,
-          background: 'linear-gradient(135deg, #C5459C 0%, #932B74 100%)',
           width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'white',
-          fontWeight: 'bold',
-          borderRadius: '50%',
+          background: 'linear-gradient(145deg, #E855A8 0%, #C5459C 50%, #9B3578 100%)',
+          borderRadius: '8px',
+          position: 'relative',
         }}
       >
-        P
+        {/* Fork icon simplified */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '1px',
+          }}
+        >
+          {/* Fork prongs */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '2px',
+            }}
+          >
+            <div style={{ width: '2px', height: '8px', background: 'white', borderRadius: '1px' }} />
+            <div style={{ width: '2px', height: '8px', background: 'white', borderRadius: '1px' }} />
+            <div style={{ width: '2px', height: '8px', background: 'white', borderRadius: '1px' }} />
+          </div>
+          {/* Fork handle */}
+          <div style={{ width: '10px', height: '3px', background: 'white', borderRadius: '2px' }} />
+          <div style={{ width: '4px', height: '10px', background: 'white', borderRadius: '2px' }} />
+        </div>
       </div>
     ),
-    // ImageResponse options
     {
       ...size,
     }

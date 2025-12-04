@@ -11,25 +11,45 @@ export const contentType = 'image/png'
 export default function AppleIcon() {
   return new ImageResponse(
     (
-      // ImageResponse JSX element
       <div
         style={{
-          fontSize: 120,
-          background: 'linear-gradient(135deg, #C5459C 0%, #932B74 100%)',
           width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'white',
-          fontWeight: 'bold',
-          borderRadius: '20%',
+          background: 'linear-gradient(145deg, #E855A8 0%, #C5459C 50%, #9B3578 100%)',
+          borderRadius: '40px',
+          position: 'relative',
         }}
       >
-        P
+        {/* Fork icon */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          {/* Fork prongs */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '8px',
+            }}
+          >
+            <div style={{ width: '8px', height: '40px', background: 'white', borderRadius: '4px' }} />
+            <div style={{ width: '8px', height: '40px', background: 'white', borderRadius: '4px' }} />
+            <div style={{ width: '8px', height: '40px', background: 'white', borderRadius: '4px' }} />
+          </div>
+          {/* Fork connector */}
+          <div style={{ width: '48px', height: '12px', background: 'white', borderRadius: '6px' }} />
+          {/* Fork handle */}
+          <div style={{ width: '16px', height: '50px', background: 'white', borderRadius: '8px' }} />
+        </div>
       </div>
     ),
-    // ImageResponse options
     {
       ...size,
     }

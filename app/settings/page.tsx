@@ -103,11 +103,14 @@ export default function SettingsPage() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
                 {group.items.map((item, index) => {
                   const Icon = item.icon;
+                  const isClickable = !!item.href;
                   return (
-                    <button
+                    <div
                       key={index}
-                      onClick={() => item.href && router.push(item.href)}
-                      className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left"
+                      onClick={() => isClickable && router.push(item.href!)}
+                      className={`w-full flex items-center gap-3 p-4 transition-colors text-left ${
+                        isClickable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
+                      }`}
                     >
                       <div className={`w-9 h-9 rounded-xl ${item.iconBg} flex items-center justify-center`}>
                         <Icon className={`w-5 h-5 ${item.iconColor}`} />
@@ -123,8 +126,10 @@ export default function SettingsPage() {
                           {item.badge}
                         </span>
                       )}
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
-                    </button>
+                      {isClickable && (
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      )}
+                    </div>
                   );
                 })}
               </div>
