@@ -4,7 +4,22 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { User, Globe, Bell, Shield, HelpCircle, LogOut, ChevronRight, Moon, Mail } from 'lucide-react';
+import { User, Globe, Bell, Shield, HelpCircle, LogOut, ChevronRight, Moon, Mail, LucideIcon } from 'lucide-react';
+
+interface SettingsItem {
+  icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
+  label: string;
+  value?: string;
+  href?: string;
+  badge?: string;
+}
+
+interface SettingsGroup {
+  title: string;
+  items: SettingsItem[];
+}
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -16,7 +31,7 @@ export default function SettingsPage() {
     router.push('/auth/login');
   };
 
-  const settingsGroups = [
+  const settingsGroups: SettingsGroup[] = [
     {
       title: 'Account',
       items: [
