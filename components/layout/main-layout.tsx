@@ -9,9 +9,9 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       <TopBar />
-      <main className="pt-14 pb-16">
+      <main className="pt-14 pb-20">
         {children}
       </main>
       <BottomNav />

@@ -208,7 +208,7 @@ export function AIChatPanel({ onFilterChange, matchedCount = 0 }: AIChatPanelPro
   return (
     <div 
       ref={panelRef}
-      className="fixed bottom-20 left-4 right-4 bg-white/95 backdrop-blur-xl rounded-t-[28px] shadow-[0_-8px_32px_rgba(0,0,0,0.12)] border border-white/20 z-40 transition-all duration-100"
+      className="fixed bottom-[72px] left-3 right-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.1)] border border-gray-200/50 z-40 transition-all duration-100"
       style={{ height: panelHeight }}
     >
       {/* Drag Handle */}

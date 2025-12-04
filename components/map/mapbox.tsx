@@ -64,25 +64,32 @@ export function Mapbox({
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/light-v11',
       center: userLocation,
-      zoom: 14
+      zoom: 15,
+      pitch: 0,
+      attributionControl: false
     });
 
-    // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // Add navigation controls (smaller, positioned better)
+    map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
 
-    // Add user location control
-    map.current.addControl(
-      new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-        },
-        trackUserLocation: true,
-        showUserHeading: true
-      }),
-      'top-right'
-    );
+    // Add user location control with auto-trigger
+    const geolocate = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true
+      },
+      trackUserLocation: true,
+      showUserHeading: true,
+      showAccuracyCircle: false
+    });
+    
+    map.current.addControl(geolocate, 'bottom-right');
+
+    // Auto-trigger geolocation on load
+    map.current.on('load', () => {
+      geolocate.trigger();
+    });
 
     return () => {
       map.current?.remove();

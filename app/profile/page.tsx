@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
-import { User, MapPin, Calendar, Edit, Settings, Heart, Users, Star } from 'lucide-react';
+import { User, MapPin, Calendar, Edit, Settings, Heart, Users, Star, Camera, ChevronRight, Bookmark, Award } from 'lucide-react';
 import Link from 'next/link';
 
 interface Profile {
@@ -27,7 +27,6 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ reviews: 0, friends: 0, wishlist: 0 });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'reviews' | 'wishlist' | 'friends'>('reviews');
   const supabase = createClient();
 
   useEffect(() => {
@@ -56,12 +55,7 @@ export default function ProfilePage() {
 
   const fetchStats = async () => {
     try {
-      // TODO: Fetch actual stats from database when reviews/friends tables are ready
-      setStats({
-        reviews: 0,
-        friends: 0,
-        wishlist: 0,
-      });
+      setStats({ reviews: 0, friends: 0, wishlist: 0 });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -75,8 +69,8 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-pulse text-gray-400">Loading profile...</div>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       </MainLayout>
     );
@@ -85,12 +79,10 @@ export default function ProfilePage() {
   if (!profile) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
             <p className="text-gray-500 mb-4">Profile not found</p>
-            <Link href="/feed" className="text-primary hover:text-primary-600">
-              Go to Feed
-            </Link>
+            <Link href="/feed" className="text-primary font-medium">Go to Feed</Link>
           </div>
         </div>
       </MainLayout>
@@ -99,157 +91,158 @@ export default function ProfilePage() {
 
   return (
     <MainLayout>
-      <div className="pb-6">
-        {/* Profile Header */}
-        <div className="bg-gradient-to-br from-primary to-primary-700 px-4 pt-4 pb-20">
-          <div className="flex justify-end mb-4">
-            <Link
-              href="/settings"
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-            >
-              <Settings className="w-5 h-5 text-white" />
+      <div className="pb-24 bg-gradient-to-b from-white to-gray-50 min-h-screen">
+        {/* Header */}
+        <div className="px-4 pt-2 pb-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">Profile</h1>
+          <Link
+            href="/settings"
+            className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+          >
+            <Settings className="w-5 h-5 text-gray-600" />
+          </Link>
+        </div>
+
+        {/* Profile Card */}
+        <div className="px-4">
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Cover + Avatar */}
+            <div className="relative">
+              <div className="h-24 bg-gradient-to-r from-primary/80 via-primary to-primary/80" />
+              <div className="absolute -bottom-12 left-1/2 -translate-x-1/2">
+                <div className="relative">
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name || profile.username}
+                      className="w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                      <span className="text-3xl font-bold text-white">
+                        {(profile.full_name || profile.username).charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <button className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-100 hover:bg-gray-50 transition-colors">
+                    <Camera className="w-4 h-4 text-gray-600" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="pt-14 pb-5 px-5 text-center">
+              <h2 className="text-xl font-bold text-gray-900">
+                {profile.full_name || profile.username}
+              </h2>
+              <p className="text-sm text-gray-500">@{profile.username}</p>
+              
+              {profile.bio ? (
+                <p className="text-sm text-gray-600 mt-3 leading-relaxed">{profile.bio}</p>
+              ) : (
+                <button className="text-sm text-primary font-medium mt-3 hover:underline">
+                  + Add bio
+                </button>
+              )}
+
+              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mt-3">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Joined {formatDate(profile.created_at)}</span>
+              </div>
+
+              {/* Stats Row */}
+              <div className="flex justify-center gap-8 mt-5 pt-5 border-t border-gray-100">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-gray-900">{stats.reviews}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Reviews</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-gray-900">{stats.friends}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Following</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-gray-900">{stats.wishlist}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Saved</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="px-4 mt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <button className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Star className="w-5 h-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-gray-900">My Reviews</p>
+                <p className="text-xs text-gray-500">{stats.reviews} places</p>
+              </div>
+            </button>
+            <button className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]">
+              <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+                <Heart className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-gray-900">Wishlist</p>
+                <p className="text-xs text-gray-500">{stats.wishlist} saved</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Menu Items */}
+        <div className="px-4 mt-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+            <Link href="/profile/edit" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+                  <Edit className="w-4 h-4 text-blue-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-900">Edit Profile</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400" />
+            </Link>
+            
+            <Link href="/search" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center">
+                  <Users className="w-4 h-4 text-purple-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-900">Find Friends</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400" />
+            </Link>
+
+            <Link href="/settings" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center">
+                  <Settings className="w-4 h-4 text-gray-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-900">Settings</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400" />
             </Link>
           </div>
         </div>
 
-        {/* Profile Card */}
-        <div className="px-4 -mt-16">
-          <div className="bg-white rounded-3xl shadow-xl p-6">
-            {/* Avatar and Name */}
-            <div className="flex flex-col items-center -mt-16 mb-4">
-              <div className="relative">
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.full_name || profile.username}
-                    className="w-28 h-28 rounded-full border-4 border-white shadow-lg object-cover"
-                  />
-                ) : (
-                  <div className="w-28 h-28 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-primary-200 to-primary-400 flex items-center justify-center">
-                    <User className="w-14 h-14 text-white" />
-                  </div>
-                )}
-                <Link
-                  href="/profile/edit"
-                  className="absolute bottom-0 right-0 w-9 h-9 bg-primary rounded-full flex items-center justify-center shadow-lg hover:bg-primary-600 transition-colors"
-                >
-                  <Edit className="w-4 h-4 text-white" />
-                </Link>
-              </div>
-
-              <h1 className="text-2xl font-bold text-gray-900 mt-4">
-                {profile.full_name || profile.username}
-              </h1>
-              <p className="text-sm text-gray-500">@{profile.username}</p>
-
-              {profile.bio && (
-                <p className="text-sm text-gray-600 text-center mt-3 max-w-md">
-                  {profile.bio}
-                </p>
-              )}
-
-              <div className="flex items-center gap-2 text-xs text-gray-500 mt-3">
-                <Calendar className="w-4 h-4" />
-                <span>Joined {formatDate(profile.created_at)}</span>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 mt-6">
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <Star className="w-4 h-4 text-primary" />
-                  <span className="text-xl font-bold text-gray-900">{stats.reviews}</span>
-                </div>
-                <p className="text-xs text-gray-600">Reviews</p>
-              </div>
-
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <Users className="w-4 h-4 text-primary" />
-                  <span className="text-xl font-bold text-gray-900">{stats.friends}</span>
-                </div>
-                <p className="text-xs text-gray-600">Friends</p>
-              </div>
-
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <Heart className="w-4 h-4 text-primary" />
-                  <span className="text-xl font-bold text-gray-900">{stats.wishlist}</span>
-                </div>
-                <p className="text-xs text-gray-600">Wishlist</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="px-4 mt-6">
-          <div className="flex gap-2 bg-gray-100 rounded-xl p-1">
-            <button
-              onClick={() => setActiveTab('reviews')}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'reviews'
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              My Reviews
-            </button>
-            <button
-              onClick={() => setActiveTab('wishlist')}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'wishlist'
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Wishlist
-            </button>
-            <button
-              onClick={() => setActiveTab('friends')}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'friends'
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Friends
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Content */}
+        {/* Achievement Banner */}
         <div className="px-4 mt-4">
-          {activeTab === 'reviews' && (
-            <div className="bg-white rounded-2xl shadow p-6 text-center">
-              <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">No reviews yet</p>
-              <p className="text-gray-400 text-xs mt-1">
-                Start sharing your restaurant experiences!
-              </p>
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-4 border border-amber-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                <Award className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Start your journey!</p>
+                <p className="text-xs text-gray-600 mt-0.5">Write your first review to unlock badges</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-amber-600" />
             </div>
-          )}
-
-          {activeTab === 'wishlist' && (
-            <div className="bg-white rounded-2xl shadow p-6 text-center">
-              <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Your wishlist is empty</p>
-              <p className="text-gray-400 text-xs mt-1">
-                Save restaurants you want to try!
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'friends' && (
-            <div className="bg-white rounded-2xl shadow p-6 text-center">
-              <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">No friends yet</p>
-              <p className="text-gray-400 text-xs mt-1">
-                Connect with friends to see their reviews!
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </MainLayout>
