@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Star, Heart, Navigation, Phone, Globe, ChevronRight } from 'lucide-react';
+import { X, MapPin, Star, Heart, Navigation, Phone, Globe, ChevronRight, Edit3 } from 'lucide-react';
 import { Restaurant } from './mapbox';
+import { WriteReviewModal } from '@/components/review/write-review-modal';
 
 interface RestaurantCardProps {
   restaurant: Restaurant | null;
@@ -13,6 +14,7 @@ interface RestaurantCardProps {
 export function RestaurantCard({ restaurant, onClose, userLocation }: RestaurantCardProps) {
   const [similarPlaces, setSimilarPlaces] = useState<Restaurant[]>([]);
   const [isLiked, setIsLiked] = useState(false);
+  const [showWriteReview, setShowWriteReview] = useState(false);
 
   // Fetch similar places
   useEffect(() => {
@@ -138,8 +140,11 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                 <Navigation className="w-4 h-4" />
                 Directions
               </button>
-              <button className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors active:scale-95">
-                <Phone className="w-5 h-5 text-gray-600" />
+              <button 
+                onClick={() => setShowWriteReview(true)}
+                className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors active:scale-95"
+              >
+                <Edit3 className="w-5 h-5 text-gray-600" />
               </button>
               <button 
                 onClick={() => setIsLiked(!isLiked)}
@@ -189,6 +194,23 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
           )}
         </div>
       </div>
+
+      {/* Write Review Modal */}
+      <WriteReviewModal
+        isOpen={showWriteReview}
+        onClose={() => setShowWriteReview(false)}
+        restaurant={restaurant ? {
+          googlePlaceId: restaurant.googlePlaceId || restaurant.id,
+          name: restaurant.name,
+          address: restaurant.address,
+          latitude: restaurant.latitude,
+          longitude: restaurant.longitude,
+          photoUrl: restaurant.photoUrl,
+        } : null}
+        onSuccess={() => {
+          setShowWriteReview(false);
+        }}
+      />
     </>
   );
 }
