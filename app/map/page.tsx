@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
 import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
-import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine } from 'lucide-react';
+import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, MapPin } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 
 // Dynamically import Mapbox with no SSR to avoid build issues
@@ -39,6 +39,23 @@ export default function MapPage() {
   const [activeCategory, setActiveCategory] = useState('restaurants');
   const [showChat, setShowChat] = useState(true);
   const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
+
+  const handleRecenterMap = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Unable to get your location. Please enable location services.');
+        }
+      );
+    }
+  };
 
   // Filter restaurants based on AI chat filters
   const filteredRestaurants = useMemo(() => {
@@ -154,6 +171,13 @@ export default function MapPage() {
         )}
       </div>
 
+      {/* Hide default Mapbox controls */}
+      <style jsx global>{`
+        .mapboxgl-ctrl-bottom-right {
+          display: none !important;
+        }
+      `}</style>
+
       {/* Category Carousel - Top */}
       <div className="absolute top-4 left-0 right-0 z-20">
         <div className="flex gap-2 px-4 overflow-x-auto scrollbar-hide">
@@ -196,6 +220,15 @@ export default function MapPage() {
           <span className="text-xs text-gray-700">Finding places...</span>
         </div>
       )}
+
+      {/* Custom Location Button - Gentle & Modern */}
+      <button
+        onClick={handleRecenterMap}
+        className="fixed bottom-[140px] right-4 z-50 w-11 h-11 bg-white/95 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center border border-gray-200 hover:bg-white hover:shadow-xl transition-all hover:scale-105 active:scale-95 group"
+        aria-label="Center map on my location"
+      >
+        <MapPin className="w-5 h-5 text-gray-600 group-hover:text-primary transition-colors" strokeWidth={2} />
+      </button>
 
       {/* AI Chat Bottom Sheet - Hide when restaurant selected */}
       {showChat && (

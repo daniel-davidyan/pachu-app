@@ -71,21 +71,33 @@ export function Mapbox({
       attributionControl: false
     });
 
-    // Add user location control only (no zoom buttons)
+    // Add user location control with mobile support
     const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: {
-        enableHighAccuracy: true
+        enableHighAccuracy: true,
+        timeout: 6000,
+        maximumAge: 0
       },
       trackUserLocation: true,
       showUserHeading: true,
-      showAccuracyCircle: false
+      showAccuracyCircle: false,
+      fitBoundsOptions: {
+        maxZoom: 15
+      }
     });
     
     map.current.addControl(geolocate, 'bottom-right');
 
-    // Auto-trigger geolocation on load
+    // Attempt to trigger geolocation on load (works on desktop, needs user action on mobile)
     map.current.on('load', () => {
-      geolocate.trigger();
+      // Small delay to ensure map is fully loaded
+      setTimeout(() => {
+        try {
+          geolocate.trigger();
+        } catch (e) {
+          console.log('Geolocation requires user interaction on mobile');
+        }
+      }, 100);
     });
 
     return () => {

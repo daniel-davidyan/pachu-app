@@ -136,7 +136,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   };
 
   const handleSend = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading) {
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -209,9 +211,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   // If not active, show only floating search bar
   if (!isActive) {
     return (
-      <div className="fixed bottom-[84px] left-4 right-4 z-40">
-        <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-3 shadow-xl focus-within:border-primary transition-all hover:shadow-2xl">
-          <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+      <div className="fixed bottom-[76px] left-4 right-4 z-40">
+        <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-2 shadow-xl focus-within:border-primary transition-all hover:shadow-2xl">
+          <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
           <input
             type="text"
             value={inputValue}
@@ -226,13 +228,21 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
           />
           <button
             onClick={handleSend}
-            disabled={!inputValue.trim() || isLoading}
-            className="w-9 h-9 flex items-center justify-center bg-gradient-to-r from-primary to-primary/90 text-white rounded-full disabled:bg-gray-200 disabled:from-gray-200 disabled:to-gray-200 hover:shadow-lg hover:scale-105 transition-all active:scale-95 flex-shrink-0 shadow-md"
+            disabled={isLoading}
+            style={{
+              background: inputValue.trim() 
+                ? 'linear-gradient(to right, #C5459C, rgba(197, 69, 156, 0.9))' 
+                : '#E5E7EB'
+            }}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:shadow-lg hover:scale-105 transition-all active:scale-95 flex-shrink-0 shadow-md"
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <Send className="w-4 h-4 stroke-[2.5]" />
+              <Send 
+                className="w-4 h-4 stroke-[2.5]"
+                style={{ color: inputValue.trim() ? '#FFFFFF' : '#6B7280' }}
+              />
             )}
           </button>
         </div>
@@ -328,7 +338,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
 
             {/* Input Area */}
             <div className="flex-shrink-0">
-              <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-3 focus-within:border-primary transition-colors shadow-md">
+              <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-2 focus-within:border-primary transition-colors shadow-md">
                 <input
                   ref={inputRef}
                   type="text"
@@ -340,13 +350,21 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!inputValue.trim() || isLoading}
-                  className="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-primary to-primary/90 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all active:scale-95 flex-shrink-0 disabled:bg-gray-200 disabled:from-gray-200 disabled:to-gray-200 disabled:hover:scale-100 disabled:text-gray-400"
+                  disabled={isLoading}
+                  style={{
+                    background: inputValue.trim() 
+                      ? 'linear-gradient(to right, #C5459C, rgba(197, 69, 156, 0.9))' 
+                      : '#E5E7EB'
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all active:scale-95 flex-shrink-0"
                 >
                   {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
                   ) : (
-                    <Send className="w-5 h-5 stroke-[2.5]" />
+                    <Send 
+                      className="w-4 h-4 stroke-[2.5]"
+                      style={{ color: inputValue.trim() ? '#FFFFFF' : '#6B7280' }}
+                    />
                   )}
                 </button>
               </div>
