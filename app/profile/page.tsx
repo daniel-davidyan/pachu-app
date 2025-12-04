@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
-import { User, MapPin, Calendar, Edit, Settings, Heart, Users, Star, Camera, ChevronRight, Bookmark, Award } from 'lucide-react';
+import { User, Calendar, Edit, Heart, Users, Star, Camera, ChevronRight, Award } from 'lucide-react';
 import Link from 'next/link';
 
 interface Profile {
@@ -93,14 +93,8 @@ export default function ProfilePage() {
     <MainLayout>
       <div className="pb-24 bg-gradient-to-b from-white to-gray-50 min-h-screen">
         {/* Header */}
-        <div className="px-4 pt-2 pb-4 flex items-center justify-between">
+        <div className="px-4 pt-2 pb-4">
           <h1 className="text-xl font-bold text-gray-900">Profile</h1>
-          <Link
-            href="/settings"
-            className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
-          >
-            <Settings className="w-5 h-5 text-gray-600" />
-          </Link>
         </div>
 
         {/* Profile Card */}

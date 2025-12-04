@@ -53,7 +53,17 @@
   /* Hide scrollbar but keep functionality */
   ::-webkit-scrollbar {
     width: 0px;
+    height: 0px;
     background: transparent;
+  }
+
+  /* Hide scrollbar for all elements */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 

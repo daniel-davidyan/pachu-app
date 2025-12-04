@@ -71,10 +71,7 @@ export function Mapbox({
       attributionControl: false
     });
 
-    // Add navigation controls (smaller, positioned better)
-    map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
-
-    // Add user location control with auto-trigger
+    // Add user location control only (no zoom buttons)
     const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: {
         enableHighAccuracy: true
