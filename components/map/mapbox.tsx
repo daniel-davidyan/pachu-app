@@ -102,39 +102,71 @@ export function Mapbox({
       const el = document.createElement('div');
       el.className = 'restaurant-marker';
       
-      // Different colors based on source
-      const markerColor = 
-        restaurant.source === 'own' ? '#C5459C' :      // Purple for own reviews
-        restaurant.source === 'friends' ? '#C5459C' :  // Purple for friends
-        '#459CC5';                                      // Blue for Google
-
-      el.style.cssText = `
-        background-color: ${markerColor};
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        transition: transform 0.2s;
-      `;
+      // Determine if it's a friend/own review or Google
+      const isFriendOrOwn = restaurant.source === 'friends' || restaurant.source === 'own';
       
-      // Add icon
-      el.innerHTML = restaurant.source === 'google' ? '🔵' : '⭐';
+      // Get appropriate emoji based on cuisine or type
+      const getIcon = () => {
+        const cuisines = restaurant.cuisineTypes || [];
+        const name = restaurant.name.toLowerCase();
+        
+        if (cuisines.some(c => c.includes('coffee') || c.includes('cafe')) || name.includes('cafe') || name.includes('coffee')) return '☕';
+        if (cuisines.some(c => c.includes('pizza') || c.includes('italian')) || name.includes('pizza')) return '🍕';
+        if (cuisines.some(c => c.includes('sushi') || c.includes('japanese'))) return '🍣';
+        if (cuisines.some(c => c.includes('chinese') || c.includes('asian'))) return '🥡';
+        if (cuisines.some(c => c.includes('burger') || c.includes('american'))) return '🍔';
+        if (cuisines.some(c => c.includes('mexican'))) return '🌮';
+        if (cuisines.some(c => c.includes('indian'))) return '🍛';
+        if (cuisines.some(c => c.includes('bakery') || c.includes('dessert'))) return '🧁';
+        if (cuisines.some(c => c.includes('bar'))) return '🍺';
+        if (cuisines.some(c => c.includes('seafood') || c.includes('fish'))) return '🦐';
+        if (cuisines.some(c => c.includes('steakhouse') || c.includes('grill'))) return '🥩';
+        if (cuisines.some(c => c.includes('thai'))) return '🍜';
+        if (cuisines.some(c => c.includes('mediterranean') || c.includes('greek'))) return '🥙';
+        return '🍽️';
+      };
+
+      // Create marker HTML - Modern pill style like Corner
+      el.innerHTML = `
+        <div class="marker-content" style="
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background: ${isFriendOrOwn ? '#C5459C' : 'white'};
+          color: ${isFriendOrOwn ? 'white' : '#1f2937'};
+          padding: 6px 10px;
+          border-radius: 20px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+          border: 2px solid ${isFriendOrOwn ? '#C5459C' : 'white'};
+          font-size: 13px;
+          font-weight: 600;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        ">
+          <span style="font-size: 16px;">${getIcon()}</span>
+          <span style="max-width: 80px; overflow: hidden; text-overflow: ellipsis;">
+            ${restaurant.rating > 0 ? restaurant.rating.toFixed(1) : ''}
+          </span>
+        </div>
+      `;
 
       // Hover effect
+      const markerContent = el.querySelector('.marker-content') as HTMLElement;
       el.addEventListener('mouseenter', () => {
-        el.style.transform = 'scale(1.2)';
+        if (markerContent) {
+          markerContent.style.transform = 'scale(1.1)';
+          markerContent.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)';
+        }
       });
       el.addEventListener('mouseleave', () => {
-        el.style.transform = 'scale(1)';
+        if (markerContent) {
+          markerContent.style.transform = 'scale(1)';
+          markerContent.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
+        }
       });
 
-      const marker = new mapboxgl.Marker(el)
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([restaurant.longitude, restaurant.latitude])
         .addTo(map.current!);
 

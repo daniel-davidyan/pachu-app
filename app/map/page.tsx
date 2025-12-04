@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { MainLayout } from '@/components/layout/main-layout';
+import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
-import { UtensilsCrossed, Hotel, Briefcase, Loader2 } from 'lucide-react';
+import { AIChatPanel, RestaurantFilters } from '@/components/map/ai-chat-panel';
+import { Loader2 } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 
 // Dynamically import Mapbox with no SSR to avoid build issues
 const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.Mapbox), {
   ssr: false,
   loading: () => (
-    <div className="bg-white rounded-lg shadow h-full flex items-center justify-center text-gray-500">
+    <div className="bg-white rounded-2xl shadow h-full flex items-center justify-center text-gray-500">
       <div className="text-center">
         <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
         <p>Loading map...</p>
@@ -22,10 +23,40 @@ const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.M
 
 export default function MapPage() {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [filters, setFilters] = useState<RestaurantFilters>({ query: '' });
+
+  // Filter restaurants based on AI chat filters
+  const filteredRestaurants = useMemo(() => {
+    let result = [...allRestaurants];
+    
+    // Filter by price level
+    if (filters.priceLevel && filters.priceLevel.length > 0) {
+      result = result.filter(r => 
+        r.priceLevel !== undefined && filters.priceLevel!.includes(r.priceLevel)
+      );
+    }
+    
+    // Filter by rating
+    if (filters.rating) {
+      result = result.filter(r => r.rating >= filters.rating!);
+    }
+    
+    // Filter by cuisine types
+    if (filters.cuisineTypes && filters.cuisineTypes.length > 0) {
+      result = result.filter(r => 
+        r.cuisineTypes?.some(c => 
+          filters.cuisineTypes!.some(fc => c.toLowerCase().includes(fc.toLowerCase()))
+        )
+      );
+    }
+    
+    // Limit to 15 max for display
+    return result.slice(0, 15);
+  }, [allRestaurants, filters]);
 
   // Get user location
   useEffect(() => {
@@ -54,43 +85,32 @@ export default function MapPage() {
     const fetchRestaurants = async () => {
       setLoading(true);
       try {
-        console.log('📍 User location:', userLocation);
-        
         // Fetch friends' reviews first
         const friendsResponse = await fetch('/api/restaurants/friends-reviews');
         const friendsData = await friendsResponse.json();
         const friendsRestaurants = friendsData.restaurants || [];
-        
-        console.log('👥 Friends restaurants:', friendsRestaurants.length);
 
         // If user has friends with reviews, prioritize them
         if (friendsRestaurants.length > 0) {
-          setRestaurants(friendsRestaurants);
+          setAllRestaurants(friendsRestaurants);
           setLoading(false);
           return;
         }
 
         // Otherwise, fetch Google Places restaurants
-        const googleUrl = `/api/restaurants/nearby?latitude=${userLocation.lat}&longitude=${userLocation.lng}&radius=2000`;
-        console.log('🔍 Fetching from:', googleUrl);
-        
-        const googleResponse = await fetch(googleUrl);
+        const googleResponse = await fetch(
+          `/api/restaurants/nearby?latitude=${userLocation.lat}&longitude=${userLocation.lng}&radius=2000`
+        );
         const googleData = await googleResponse.json();
         
-        console.log('📊 Google API response:', googleData);
-        
         if (googleData.error) {
-          console.error('❌ Google API error:', googleData.error);
-          alert(`Error loading restaurants: ${googleData.error}\n\nPlease check:\n1. Google Places API is enabled\n2. Billing is enabled in Google Cloud\n3. API key has no restrictions`);
+          console.error('Google API error:', googleData.error);
         }
         
         const googleRestaurants = googleData.restaurants || [];
-        console.log('🍽️ Google restaurants found:', googleRestaurants.length);
-
-        setRestaurants(googleRestaurants);
+        setAllRestaurants(googleRestaurants);
       } catch (error) {
-        console.error('❌ Error fetching restaurants:', error);
-        alert('Failed to load restaurants. Check browser console for details.');
+        console.error('Error fetching restaurants:', error);
       } finally {
         setLoading(false);
       }
@@ -99,81 +119,53 @@ export default function MapPage() {
     fetchRestaurants();
   }, [userLocation]);
 
+  const handleFilterChange = (newFilters: RestaurantFilters) => {
+    setFilters(newFilters);
+  };
+
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-6">
-        {/* Category Icons */}
-        <div className="flex gap-4 mb-6 justify-center items-start">
-          {/* Restaurants - Active */}
-          <div className="flex flex-col items-center">
-            <button 
-              style={{ backgroundColor: '#C5459C' }}
-              className="flex items-center justify-center w-14 h-14 rounded-2xl shadow-lg transition-all"
-              aria-label="Restaurants"
-            >
-              <UtensilsCrossed className="w-6 h-6 text-white" strokeWidth={2.5} />
-            </button>
-            <div className="h-4"></div>
-          </div>
-
-          {/* Hotels - Disabled */}
-          <div className="flex flex-col items-center">
-            <button 
-              disabled
-              className="flex items-center justify-center w-14 h-14 bg-gray-200 rounded-2xl shadow-sm opacity-50 cursor-not-allowed"
-              aria-label="Hotels (Coming Soon)"
-            >
-              <Hotel className="w-6 h-6 text-gray-400" strokeWidth={2} />
-            </button>
-            <span className="text-[10px] text-gray-400 mt-1.5 font-medium">Coming Soon</span>
-          </div>
-
-          {/* Business - Disabled */}
-          <div className="flex flex-col items-center">
-            <button 
-              disabled
-              className="flex items-center justify-center w-14 h-14 bg-gray-200 rounded-2xl shadow-sm opacity-50 cursor-not-allowed"
-              aria-label="Business (Coming Soon)"
-            >
-              <Briefcase className="w-6 h-6 text-gray-400" strokeWidth={2} />
-            </button>
-            <span className="text-[10px] text-gray-400 mt-1.5 font-medium">Coming Soon</span>
-          </div>
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="bg-white rounded-lg shadow p-4 mb-4 flex items-center gap-3">
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            <span className="text-gray-700">Finding restaurants near you...</span>
+    <div className="fixed inset-0 bg-gray-100">
+      {/* Full Screen Map */}
+      <div className="absolute inset-0">
+        {mapboxToken ? (
+          <Mapbox 
+            accessToken={mapboxToken}
+            restaurants={filteredRestaurants}
+            onRestaurantClick={setSelectedRestaurant}
+          />
+        ) : (
+          <div className="bg-white h-full flex items-center justify-center text-gray-500">
+            <div className="text-center">
+              <p className="font-semibold">Mapbox token not found</p>
+              <p className="text-sm mt-2">Please add NEXT_PUBLIC_MAPBOX_TOKEN to your .env.local file</p>
+            </div>
           </div>
         )}
-
-        {/* Map Content */}
-        <div className="h-[calc(100vh-220px)] relative">
-          {mapboxToken ? (
-            <Mapbox 
-              accessToken={mapboxToken}
-              restaurants={restaurants}
-              onRestaurantClick={setSelectedRestaurant}
-            />
-          ) : (
-            <div className="bg-white rounded-lg shadow h-full flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <p className="font-semibold">Mapbox token not found</p>
-                <p className="text-sm mt-2">Please add NEXT_PUBLIC_MAPBOX_TOKEN to your .env.local file</p>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Loading Indicator */}
+      {loading && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-xl rounded-full px-4 py-2 shadow-lg flex items-center gap-2 z-30">
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          <span className="text-sm text-gray-700">Finding restaurants...</span>
+        </div>
+      )}
+
+      {/* AI Chat Panel (Draggable) */}
+      <AIChatPanel 
+        onFilterChange={handleFilterChange}
+        matchedCount={filteredRestaurants.length}
+      />
 
       {/* Restaurant Detail Card */}
       <RestaurantCard 
         restaurant={selectedRestaurant}
         onClose={() => setSelectedRestaurant(null)}
       />
-    </MainLayout>
+
+      {/* Bottom Navigation */}
+      <BottomNav />
+    </div>
   );
 }
 

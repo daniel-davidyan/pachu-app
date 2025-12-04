@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Map, MessageCircle, Heart, User } from 'lucide-react';
+import { Home, Search, Map, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -15,20 +15,14 @@ export function BottomNav() {
       icon: Home,
     },
     {
+      name: 'Search',
+      href: '/search',
+      icon: Search,
+    },
+    {
       name: 'Map',
       href: '/map',
       icon: Map,
-    },
-    {
-      name: 'Chat',
-      href: '/chat',
-      icon: MessageCircle,
-      isCenter: true,
-    },
-    {
-      name: 'Wishlist',
-      href: '/wishlist',
-      icon: Heart,
     },
     {
       name: 'Profile',
@@ -42,51 +36,45 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-200 z-50 shadow-lg">
-      <div className="flex items-center justify-between h-full px-4">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
+    <nav className="fixed bottom-4 left-4 right-4 z-50">
+      <div className="bg-white/95 backdrop-blur-xl rounded-[28px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20">
+        <div className="flex items-center justify-around h-16 px-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center transition-colors relative",
-                item.isCenter ? "flex-initial px-2" : "flex-1"
-              )}
-            >
-              {item.isCenter ? (
-                // Center button with special styling
-                <div 
-                  style={{ backgroundColor: '#C5459C' }}
-                  className="flex items-center justify-center w-14 h-14 rounded-2xl shadow-xl hover:opacity-90 transition-all -mt-8 border-4 border-white"
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center justify-center py-2 px-4 rounded-2xl transition-all duration-200",
+                  active 
+                    ? "bg-primary/10" 
+                    : "hover:bg-gray-100/80 active:scale-95"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "w-6 h-6 transition-all duration-200",
+                    active ? "text-primary" : "text-gray-500"
+                  )}
+                  strokeWidth={active ? 2.5 : 1.8}
+                />
+                <span
+                  className={cn(
+                    "text-[10px] mt-1 transition-all duration-200",
+                    active 
+                      ? "text-primary font-semibold" 
+                      : "text-gray-500 font-medium"
+                  )}
                 >
-                  <Icon className="w-7 h-7 text-white" strokeWidth={2.5} />
-                </div>
-              ) : (
-                <>
-                  <Icon
-                    className={cn(
-                      "w-6 h-6 transition-colors mb-1",
-                      active ? "text-primary" : "text-gray-500"
-                    )}
-                    strokeWidth={active ? 2.5 : 2}
-                  />
-                  <span
-                    className={cn(
-                      "text-[10px] transition-colors",
-                      active ? "text-primary font-semibold" : "text-gray-500 font-medium"
-                    )}
-                  >
-                    {item.name}
-                  </span>
-                </>
-              )}
-            </Link>
-          );
-        })}
+                  {item.name}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );
