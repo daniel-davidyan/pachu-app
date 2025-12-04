@@ -11,13 +11,13 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
+  themeColor: '#C5459C',
 };
 
 export const metadata: Metadata = {
   title: "Pachu - Your Personal Taste Recommender",
   description: "Discover restaurants through AI recommendations and friends' reviews",
   manifest: '/manifest.json',
-  themeColor: '#C5459C',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
-import { AIChatPanel, RestaurantFilters } from '@/components/map/ai-chat-panel';
+import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
 import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 
@@ -38,6 +38,7 @@ export default function MapPage() {
   const [filters, setFilters] = useState<RestaurantFilters>({ query: '' });
   const [activeCategory, setActiveCategory] = useState('restaurants');
   const [showChat, setShowChat] = useState(true);
+  const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
 
   // Filter restaurants based on AI chat filters
   const filteredRestaurants = useMemo(() => {
@@ -120,6 +121,12 @@ export default function MapPage() {
     setFilters(newFilters);
   };
 
+  const handleRestaurantsFound = (restaurants: any[]) => {
+    // Add AI-suggested restaurants to the map
+    setAllRestaurants(restaurants);
+    setHighlightedRestaurants(restaurants.map(r => r.id));
+  };
+
   // Hide chat when restaurant is selected
   useEffect(() => {
     if (selectedRestaurant) {
@@ -190,11 +197,13 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* AI Chat Panel (Draggable) - Hide when restaurant selected */}
+      {/* AI Chat Bottom Sheet - Hide when restaurant selected */}
       {showChat && (
-        <AIChatPanel 
+        <AIChatSheet 
           onFilterChange={handleFilterChange}
+          onRestaurantsFound={handleRestaurantsFound}
           matchedCount={filteredRestaurants.length}
+          userLocation={userLocation}
         />
       )}
 

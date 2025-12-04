@@ -199,6 +199,8 @@ export async function GET(request: NextRequest) {
     const restaurantId = searchParams.get('restaurantId');
     const userId = searchParams.get('userId');
 
+    // Query reviews with restaurant and photo data
+    // Using left join to handle cases where restaurant might be deleted
     let query = supabase
       .from('reviews')
       .select(`
