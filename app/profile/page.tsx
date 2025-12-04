@@ -109,9 +109,18 @@ export default function ProfilePage() {
     try {
       const response = await fetch(`/api/reviews?userId=${user.id}`);
       const data = await response.json();
-      setReviews(data.reviews || []);
+      
+      console.log('Fetched reviews:', data); // Debug log
+      
+      if (data.error) {
+        console.error('API error:', data.error);
+        setReviews([]);
+      } else {
+        setReviews(data.reviews || []);
+      }
     } catch (error) {
       console.error('Error fetching reviews:', error);
+      setReviews([]);
     } finally {
       setLoadingReviews(false);
     }
@@ -245,46 +254,61 @@ export default function ProfilePage() {
         </div>
 
         {/* My Reviews Section */}
-        <div className="px-4 mt-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">My Reviews</h2>
+        <div className="px-4 mt-6 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-gray-900">My Reviews</h2>
+            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+              {stats.reviews} {stats.reviews === 1 ? 'review' : 'reviews'}
+            </span>
+          </div>
           
           {loadingReviews ? (
-            <div className="text-center py-8">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-sm text-gray-500">Loading your reviews...</p>
             </div>
           ) : reviews.length > 0 ? (
             <div className="space-y-3">
               {reviews.map((review) => (
-                <div key={review.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div key={review.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                   {/* Restaurant Header */}
                   <div className="p-4 flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0">
-                      {review.restaurants.image_url ? (
+                    <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
+                      {review.restaurants?.image_url ? (
                         <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xl">🍽️</div>
+                        <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{review.restaurants.name}</h3>
-                      <p className="text-xs text-gray-500 truncate">{review.restaurants.address}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="font-semibold text-sm">{review.rating}</span>
+                      <h3 className="font-bold text-gray-900 truncate">{review.restaurants?.name || 'Restaurant'}</h3>
+                      <p className="text-xs text-gray-500 truncate">{review.restaurants?.address || 'Address not available'}</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3.5 h-3.5 ${
+                              i < review.rating
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'fill-gray-200 text-gray-200'
+                            }`}
+                          />
+                        ))}
+                        <span className="text-xs font-semibold text-gray-600 ml-1">({review.rating}/5)</span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Review Photos */}
                   {review.review_photos && review.review_photos.length > 0 && (
-                    <div className="px-4 pb-2">
+                    <div className="px-4 pb-3">
                       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                         {review.review_photos.map((photo, index) => (
                           <img
                             key={index}
                             src={photo.photo_url}
                             alt=""
-                            className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                            className="w-24 h-24 rounded-xl object-cover flex-shrink-0 border border-gray-200"
                           />
                         ))}
                       </div>
@@ -293,16 +317,16 @@ export default function ProfilePage() {
 
                   {/* Review Text */}
                   {review.content && (
-                    <div className="px-4 pb-4">
-                      <p className="text-sm text-gray-700">{review.content}</p>
+                    <div className="px-4 pb-3">
+                      <p className="text-sm text-gray-700 leading-relaxed">{review.content}</p>
                     </div>
                   )}
 
                   {/* Date */}
-                  <div className="px-4 pb-4">
+                  <div className="px-4 pb-3 border-t border-gray-50 pt-3">
                     <p className="text-xs text-gray-400">
-                      {new Date(review.created_at).toLocaleDateString('en-US', { 
-                        month: 'short', 
+                      📅 {new Date(review.created_at).toLocaleDateString('en-US', { 
+                        month: 'long', 
                         day: 'numeric', 
                         year: 'numeric' 
                       })}
@@ -312,10 +336,18 @@ export default function ProfilePage() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-              <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">No reviews yet</p>
-              <p className="text-sm text-gray-400 mt-1">Start sharing your restaurant experiences!</p>
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <Star className="w-8 h-8 text-primary" />
+              </div>
+              <p className="text-gray-900 font-bold text-lg">No reviews yet</p>
+              <p className="text-sm text-gray-600 mt-2 mb-4">Start sharing your restaurant experiences!</p>
+              <Link 
+                href="/map" 
+                className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+              >
+                ✍️ Write Your First Review
+              </Link>
             </div>
           )}
         </div>

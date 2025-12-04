@@ -165,22 +165,22 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
       
-      {/* Modal */}
-      <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl max-h-[90vh] overflow-hidden animate-slide-up">
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">
-            {step === 'search' ? 'Find a Place' : 'Write Review'}
+      {/* Modal - Compact & Modern */}
+      <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl max-h-[75vh] overflow-hidden animate-slide-up flex flex-col shadow-2xl">
+        {/* Header - Compact */}
+        <div className="sticky top-0 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-primary/10 px-4 py-3 flex items-center justify-between flex-shrink-0">
+          <h2 className="text-base font-bold text-gray-900">
+            {step === 'search' ? '🔍 Find a Place' : '✍️ Write Review'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-1.5 hover:bg-white/50 rounded-full transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-60px)]">
+        <div className="overflow-y-auto flex-1">
           {step === 'search' ? (
             /* Search Step */
             <div className="p-4">
@@ -240,15 +240,15 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
               </div>
             </div>
           ) : (
-            /* Review Step */
-            <div className="p-4 space-y-6">
-              {/* Selected Restaurant */}
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                <div className="w-14 h-14 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+            /* Review Step - Compact */
+            <div className="p-4 space-y-4">
+              {/* Selected Restaurant - Compact */}
+              <div className="flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
+                <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                   {selectedRestaurant?.photoUrl ? (
                     <img src={selectedRestaurant.photoUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
+                    <div className="w-full h-full flex items-center justify-center text-xl">🍽️</div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -265,20 +265,20 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 )}
               </div>
 
-              {/* Star Rating */}
+              {/* Star Rating - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Your Rating</label>
-                <div className="flex gap-2 justify-center">
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Rating ⭐</label>
+                <div className="flex gap-1.5 justify-center">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       onClick={() => setRating(star)}
                       onMouseEnter={() => setHoverRating(star)}
                       onMouseLeave={() => setHoverRating(0)}
-                      className="p-1 transition-transform hover:scale-110"
+                      className="p-0.5 transition-transform hover:scale-110"
                     >
                       <Star
-                        className={`w-10 h-10 ${
+                        className={`w-9 h-9 ${
                           star <= (hoverRating || rating)
                             ? 'fill-yellow-400 text-yellow-400'
                             : 'text-gray-300'
@@ -287,30 +287,32 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                     </button>
                   ))}
                 </div>
-                <p className="text-center text-sm text-gray-500 mt-2">
-                  {rating === 1 && 'Poor'}
-                  {rating === 2 && 'Fair'}
-                  {rating === 3 && 'Good'}
-                  {rating === 4 && 'Very Good'}
-                  {rating === 5 && 'Excellent'}
-                </p>
+                {rating > 0 && (
+                  <p className="text-center text-xs font-medium text-primary mt-1.5">
+                    {rating === 1 && '😞 Poor'}
+                    {rating === 2 && '😐 Fair'}
+                    {rating === 3 && '😊 Good'}
+                    {rating === 4 && '😄 Very Good'}
+                    {rating === 5 && '🤩 Excellent'}
+                  </p>
+                )}
               </div>
 
-              {/* Review Text */}
+              {/* Review Text - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Your Review (Optional)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Review (Optional) 📝</label>
                 <textarea
                   value={reviewText}
                   onChange={(e) => setReviewText(e.target.value)}
                   placeholder="Share your experience..."
-                  rows={4}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  rows={3}
+                  className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none border border-gray-200"
                 />
               </div>
 
-              {/* Photo Upload */}
+              {/* Photo Upload - Compact */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Add Photos (Optional)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Add Photos (Optional) 📷</label>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -320,15 +322,15 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                   className="hidden"
                 />
                 
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-1.5 flex-wrap">
                   {photoUrls.map((url, index) => (
-                    <div key={index} className="relative w-20 h-20">
-                      <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
+                    <div key={index} className="relative w-16 h-16">
+                      <img src={url} alt="" className="w-full h-full object-cover rounded-lg border border-gray-200" />
                       <button
                         onClick={() => removePhoto(index)}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center"
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
@@ -336,30 +338,35 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                   {photos.length < 5 && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary transition-colors"
+                      className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
                     >
-                      <Camera className="w-6 h-6" />
-                      <span className="text-xs mt-1">Add</span>
+                      <Camera className="w-5 h-5" />
+                      <span className="text-[10px] mt-0.5">Add</span>
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <button
-                onClick={handleSubmit}
-                disabled={rating === 0 || submitting}
-                className="w-full py-4 bg-primary text-white rounded-2xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Posting...
-                  </>
-                ) : (
-                  'Post Review'
-                )}
-              </button>
+              {/* Submit Button - VISIBLE & MODERN */}
+              <div className="pt-2 pb-6 sticky bottom-0 bg-white">
+                <button
+                  onClick={handleSubmit}
+                  disabled={rating === 0 || submitting}
+                  className="w-full py-3.5 bg-gradient-to-r from-primary to-primary/90 text-white rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md border-2 border-primary"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Posting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Post Review</span>
+                      <span className="text-xl">🎉</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Get reviews for a restaurant
+// Get reviews for a restaurant or user
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -208,12 +208,7 @@ export async function GET(request: NextRequest) {
         created_at,
         user_id,
         restaurant_id,
-        profiles (
-          username,
-          full_name,
-          avatar_url
-        ),
-        restaurants (
+        restaurants!inner (
           id,
           name,
           address,
@@ -237,18 +232,27 @@ export async function GET(request: NextRequest) {
     const { data: reviews, error } = await query.limit(50);
 
     if (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('Error fetching reviews - Details:', error);
+      console.error('Query params:', { restaurantId, userId });
       return NextResponse.json(
-        { error: 'Failed to fetch reviews' },
+        { 
+          error: 'Failed to fetch reviews',
+          details: error.message,
+          hint: error.hint 
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ reviews });
+    // Return empty array if no reviews
+    return NextResponse.json({ reviews: reviews || [] });
   } catch (error) {
     console.error('Error in reviews API:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
