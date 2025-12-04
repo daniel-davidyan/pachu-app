@@ -23,16 +23,19 @@ interface MapboxProps {
   restaurants: Restaurant[];
   onRestaurantClick?: (restaurant: Restaurant) => void;
   getUserLocation?: boolean;
+  mapRef?: React.MutableRefObject<mapboxgl.Map | null>;
 }
 
 export function Mapbox({ 
   accessToken,
   restaurants,
   onRestaurantClick,
-  getUserLocation = true
+  getUserLocation = true,
+  mapRef: externalMapRef
 }: MapboxProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const internalMapRef = useRef<mapboxgl.Map | null>(null);
+  const map = externalMapRef || internalMapRef;
   const markers = useRef<mapboxgl.Marker[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
 

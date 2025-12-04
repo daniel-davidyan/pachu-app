@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
 import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
 import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, MapPin } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
+import type mapboxgl from 'mapbox-gl';
 
 // Dynamically import Mapbox with no SSR to avoid build issues
 const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.Mapbox), {
@@ -39,19 +40,35 @@ export default function MapPage() {
   const [activeCategory, setActiveCategory] = useState('restaurants');
   const [showChat, setShowChat] = useState(true);
   const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
 
   const handleRecenterMap = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          const newLocation = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setUserLocation(newLocation);
+          
+          // Immediately center the map on the new location
+          if (mapRef.current) {
+            mapRef.current.flyTo({
+              center: [newLocation.lng, newLocation.lat],
+              zoom: 15,
+              duration: 1500
+            });
+          }
         },
         (error) => {
           console.error('Error getting location:', error);
           alert('Unable to get your location. Please enable location services.');
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
         }
       );
     }
@@ -160,6 +177,7 @@ export default function MapPage() {
             accessToken={mapboxToken}
             restaurants={filteredRestaurants}
             onRestaurantClick={setSelectedRestaurant}
+            mapRef={mapRef}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-500">
@@ -221,13 +239,13 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Custom Location Button - Gentle & Modern */}
+      {/* Custom Location Button - Aligned with bottom tabs */}
       <button
         onClick={handleRecenterMap}
-        className="fixed bottom-[140px] right-4 z-50 w-11 h-11 bg-white/95 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center border border-gray-200 hover:bg-white hover:shadow-xl transition-all hover:scale-105 active:scale-95 group"
+        className="fixed bottom-5 right-4 z-50 w-10 h-10 bg-white/95 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center border border-gray-200 hover:bg-white hover:shadow-xl transition-all hover:scale-105 active:scale-95 group"
         aria-label="Center map on my location"
       >
-        <MapPin className="w-5 h-5 text-gray-600 group-hover:text-primary transition-colors" strokeWidth={2} />
+        <MapPin className="w-4 h-4 text-gray-600 group-hover:text-primary transition-colors" strokeWidth={2} />
       </button>
 
       {/* AI Chat Bottom Sheet - Hide when restaurant selected */}
