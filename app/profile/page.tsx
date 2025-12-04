@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
-import { User, Calendar, Edit, Heart, Users, Star, Camera, ChevronRight, Award } from 'lucide-react';
+import { User, Calendar, Edit, Heart, Users, Star, Camera, ChevronRight, Award, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 interface Profile {
