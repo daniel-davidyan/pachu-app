@@ -531,7 +531,7 @@ export function Mapbox({
         return category.toLowerCase();
       };
       
-      // Main restaurant marker - white circle with icon + text label (transparent background)
+      // Main restaurant marker - white circle with icon + text label (always on top)
       el.innerHTML = `
         <div class="marker-wrapper" style="
           display: flex;
@@ -539,6 +539,7 @@ export function Mapbox({
           gap: 4px;
           cursor: pointer;
           position: relative;
+          z-index: 1000;
         ">
           <!-- White circle with icon (no extra ring) -->
           <div class="marker-circle" style="
@@ -553,17 +554,25 @@ export function Mapbox({
             border: 2px solid ${isFriendOrOwn ? '#C5459C' : '#e5e7eb'};
             transition: all 0.2s ease;
             flex-shrink: 0;
+            position: relative;
+            z-index: 1000;
           ">
             <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
           </div>
           
-          <!-- Text labels (transparent background with text shadow) -->
+          <!-- Text labels with solid white background to hide map text -->
           <div class="marker-labels" style="
             display: flex;
             flex-direction: column;
             gap: 0px;
             min-width: 0;
             line-height: 1;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2px 6px;
+            border-radius: 4px;
+            backdrop-filter: blur(4px);
+            position: relative;
+            z-index: 1000;
           ">
             <!-- Restaurant name (FIRST - above) -->
             <div style="
@@ -575,7 +584,6 @@ export function Mapbox({
               overflow: hidden;
               text-overflow: ellipsis;
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.95);
               line-height: 1.1;
               margin-bottom: 1px;
             ">
@@ -591,7 +599,6 @@ export function Mapbox({
               white-space: nowrap;
               letter-spacing: 0.3px;
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              text-shadow: 0 1px 2px rgba(255,255,255,0.8), 0 0 4px rgba(255,255,255,0.9);
               line-height: 1.1;
               margin-top: 1px;
             ">
@@ -623,9 +630,19 @@ export function Mapbox({
       });
 
       try {
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        const marker = new mapboxgl.Marker({ 
+          element: el, 
+          anchor: 'bottom',
+          offset: [0, 0]
+        })
           .setLngLat([restaurant.longitude, restaurant.latitude])
           .addTo(currentMap);
+        
+        // Ensure marker stays on top
+        if (el.parentElement) {
+          el.parentElement.style.zIndex = '1000';
+        }
+        
         markers.current.push(marker);
       } catch (e) {
         console.warn('Error adding main restaurant marker:', e);
@@ -676,9 +693,18 @@ export function Mapbox({
       });
 
       try {
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        const marker = new mapboxgl.Marker({ 
+          element: el, 
+          anchor: 'center'
+        })
           .setLngLat([restaurant.longitude, restaurant.latitude])
           .addTo(currentMap);
+        
+        // Ensure dot marker stays on top too
+        if (el.parentElement) {
+          el.parentElement.style.zIndex = '999';
+        }
+        
         markers.current.push(marker);
       } catch (e) {
         console.warn('Error adding dot marker:', e);
