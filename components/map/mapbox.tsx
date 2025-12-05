@@ -303,7 +303,9 @@ export function Mapbox({
     currentMap.on('moveend', () => {
       if (map.current && loadRestaurantsRef.current) {
         const bounds = map.current.getBounds();
-        loadRestaurantsRef.current(bounds);
+        if (bounds) {
+          loadRestaurantsRef.current(bounds);
+        }
       }
     });
 
@@ -317,7 +319,9 @@ export function Mapbox({
         // Load initial restaurants
         if (map.current && loadRestaurantsRef.current) {
           const bounds = map.current.getBounds();
-          loadRestaurantsRef.current(bounds);
+          if (bounds) {
+            loadRestaurantsRef.current(bounds);
+          }
         }
       }, 100);
     });
