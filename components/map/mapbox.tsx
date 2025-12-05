@@ -415,7 +415,7 @@ export function Mapbox({
       const userEl = document.createElement('div');
       userEl.className = 'user-location-marker';
       
-      // Modern pulsing location marker with compass arrow
+      // Modern pulsing location marker
       userEl.innerHTML = `
         <div style="position: relative; width: 40px; height: 40px;">
           <!-- Pulsing rings -->
@@ -429,21 +429,6 @@ export function Mapbox({
             background: rgba(66, 133, 244, 0.2);
             border-radius: 50%;
             animation: pulse 2s ease-out infinite;
-          "></div>
-          
-          <!-- Direction arrow (compass) -->
-          <div class="direction-arrow" style="
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translate(-50%, -100%);
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-bottom: 16px solid #4285F4;
-            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
-            transition: transform 0.3s ease-out;
           "></div>
           
           <!-- Main blue circle -->
@@ -480,35 +465,6 @@ export function Mapbox({
       })
         .setLngLat(userLocation)
         .addTo(currentMap);
-      
-      // Update compass direction using device orientation
-      if (window.DeviceOrientationEvent) {
-        const handleOrientation = (event: DeviceOrientationEvent) => {
-          if (event.alpha !== null && userEl) {
-            const arrow = userEl.querySelector('.direction-arrow') as HTMLElement;
-            if (arrow) {
-              // event.alpha gives us the compass heading (0-360)
-              // Adjust for proper north alignment
-              const heading = 360 - event.alpha;
-              arrow.style.transform = `translate(-50%, -100%) rotate(${heading}deg)`;
-            }
-          }
-        };
-        
-        // Request permission for iOS 13+ devices
-        if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-          (DeviceOrientationEvent as any).requestPermission()
-            .then((permissionState: string) => {
-              if (permissionState === 'granted') {
-                window.addEventListener('deviceorientation', handleOrientation);
-              }
-            })
-            .catch(console.error);
-        } else {
-          // Non-iOS devices
-          window.addEventListener('deviceorientation', handleOrientation);
-        }
-      }
     }
 
     return () => {
