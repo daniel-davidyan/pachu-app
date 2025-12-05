@@ -3,9 +3,24 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+interface ConnectionDetails {
+  supabaseUrl?: string;
+  hasAnonKey?: string;
+  testingConnection?: string;
+  healthCheck?: string;
+  possibleCause?: string;
+  session?: string;
+  sessionError?: string;
+  user?: string;
+  userError?: string;
+  profilesTable?: string;
+  error?: string;
+  stack?: string;
+}
+
 export default function TestConnection() {
   const [status, setStatus] = useState<string>('Testing...');
-  const [details, setDetails] = useState<any>(null);
+  const [details, setDetails] = useState<ConnectionDetails | null>(null);
 
   useEffect(() => {
     const testConnection = async () => {
