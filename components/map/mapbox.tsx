@@ -410,12 +410,12 @@ export function Mapbox({
       }, 100);
     });
 
-    // Add custom user location marker
+    // Add custom user location marker with compass direction
     if (userLocation) {
       const userEl = document.createElement('div');
       userEl.className = 'user-location-marker';
       
-      // Modern pulsing location marker
+      // Modern pulsing location marker with compass arrow
       userEl.innerHTML = `
         <div style="position: relative; width: 40px; height: 40px;">
           <!-- Pulsing rings -->
@@ -429,6 +429,21 @@ export function Mapbox({
             background: rgba(66, 133, 244, 0.2);
             border-radius: 50%;
             animation: pulse 2s ease-out infinite;
+          "></div>
+          
+          <!-- Direction arrow (compass) -->
+          <div class="direction-arrow" style="
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 16px solid #4285F4;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+            transition: transform 0.3s ease-out;
           "></div>
           
           <!-- Main blue circle -->
@@ -465,6 +480,35 @@ export function Mapbox({
       })
         .setLngLat(userLocation)
         .addTo(currentMap);
+      
+      // Update compass direction using device orientation
+      if (window.DeviceOrientationEvent) {
+        const handleOrientation = (event: DeviceOrientationEvent) => {
+          if (event.alpha !== null && userEl) {
+            const arrow = userEl.querySelector('.direction-arrow') as HTMLElement;
+            if (arrow) {
+              // event.alpha gives us the compass heading (0-360)
+              // Adjust for proper north alignment
+              const heading = 360 - event.alpha;
+              arrow.style.transform = `translate(-50%, -100%) rotate(${heading}deg)`;
+            }
+          }
+        };
+        
+        // Request permission for iOS 13+ devices
+        if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+          (DeviceOrientationEvent as any).requestPermission()
+            .then((permissionState: string) => {
+              if (permissionState === 'granted') {
+                window.addEventListener('deviceorientation', handleOrientation);
+              }
+            })
+            .catch(console.error);
+        } else {
+          // Non-iOS devices
+          window.addEventListener('deviceorientation', handleOrientation);
+        }
+      }
     }
 
     return () => {
@@ -560,7 +604,7 @@ export function Mapbox({
             <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
           </div>
           
-          <!-- Text labels (transparent but with strong blocker to hide map text) -->
+          <!-- Text labels (fully transparent, no background) -->
           <div class="marker-labels" style="
             display: flex;
             flex-direction: column;
@@ -569,18 +613,7 @@ export function Mapbox({
             line-height: 1;
             position: relative;
             z-index: 1000;
-            padding: 2px 4px;
           ">
-            <!-- Strong white blocker behind text to hide map labels -->
-            <div style="
-              position: absolute;
-              inset: -6px;
-              background: white;
-              filter: blur(12px);
-              opacity: 0.95;
-              z-index: -1;
-            "></div>
-            
             <!-- Restaurant name (FIRST - above) -->
             <div style="
               font-size: 12px;
@@ -593,13 +626,7 @@ export function Mapbox({
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               line-height: 1.1;
               margin-bottom: 1px;
-              text-shadow: 
-                0 0 8px rgba(255,255,255,1),
-                0 0 12px rgba(255,255,255,1),
-                0 0 16px rgba(255,255,255,0.9),
-                0 1px 3px rgba(255,255,255,0.95);
-              position: relative;
-              z-index: 1;
+              text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.95);
             ">
               ${restaurant.name}
             </div>
@@ -615,13 +642,7 @@ export function Mapbox({
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               line-height: 1.1;
               margin-top: 1px;
-              text-shadow: 
-                0 0 8px rgba(255,255,255,1),
-                0 0 12px rgba(255,255,255,1),
-                0 0 16px rgba(255,255,255,0.9),
-                0 1px 2px rgba(255,255,255,0.95);
-              position: relative;
-              z-index: 1;
+              text-shadow: 0 1px 2px rgba(255,255,255,0.8), 0 0 4px rgba(255,255,255,0.9);
             ">
               ${getCategoryLabel()}
             </div>
