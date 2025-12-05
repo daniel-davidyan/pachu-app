@@ -313,7 +313,7 @@ export function Mapbox({
     loadRestaurantsRef.current = loadRestaurantsInBounds;
   }, [loadRestaurantsInBounds]);
 
-  // Track user's current location continuously
+  // Get user's current location (once on load)
   useEffect(() => {
     if (!getUserLocation) {
       setUserLocation([34.7818, 32.0853]);
@@ -321,7 +321,6 @@ export function Mapbox({
     }
 
     if (navigator.geolocation) {
-      // Get initial position
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { longitude, latitude } = position.coords;
@@ -337,31 +336,6 @@ export function Mapbox({
           maximumAge: 0
         }
       );
-
-      // Watch position continuously
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { longitude, latitude } = position.coords;
-          setUserLocation([longitude, latitude]);
-          
-          // Update user marker position if it exists
-          if (userLocationMarker.current && map.current) {
-            userLocationMarker.current.setLngLat([longitude, latitude]);
-          }
-        },
-        (error) => {
-          console.error('Error watching location:', error);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 5000
-        }
-      );
-
-      return () => {
-        navigator.geolocation.clearWatch(watchId);
-      };
     } else {
       setUserLocation([34.7818, 32.0853]);
     }

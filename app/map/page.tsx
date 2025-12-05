@@ -252,32 +252,27 @@ export default function MapPage() {
                 key={cat.id}
                 onClick={() => cat.active && setActiveCategory(cat.id)}
                 disabled={isDisabled}
-                style={{
-                  backgroundColor: isActive ? `${cat.color}15` : 'rgba(255, 255, 255, 0.95)',
-                  color: isActive ? cat.color : isDisabled ? '#9CA3AF' : '#374151',
-                  borderColor: isActive ? cat.color : 'transparent',
-                  boxShadow: isActive 
-                    ? `0 4px 16px ${cat.color}30, 0 0 0 2px white` 
-                    : '0 2px 12px rgba(0,0,0,0.1)',
-                }}
                 className={`
-                  flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold
-                  whitespace-nowrap transition-all duration-300 flex-shrink-0 border-2
+                  flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold
+                  whitespace-nowrap transition-all duration-300 flex-shrink-0
                   backdrop-blur-sm
+                  ${isActive 
+                    ? 'bg-gray-100 text-gray-900 shadow-md' 
+                    : 'bg-white/90 text-gray-600 shadow-sm'
+                  }
                   ${isDisabled 
                     ? 'cursor-not-allowed opacity-60' 
-                    : 'hover:scale-105 active:scale-95'
+                    : 'hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]'
                   }
                 `}
               >
                 <Icon 
-                  className="w-4 h-4" 
-                  strokeWidth={2.5}
-                  style={{ color: isActive ? cat.color : isDisabled ? '#9CA3AF' : '#6B7280' }}
+                  className={`w-4 h-4 ${isActive ? 'text-gray-900' : isDisabled ? 'text-gray-400' : 'text-gray-500'}`}
+                  strokeWidth={2}
                 />
                 <span>{cat.name}</span>
                 {isDisabled && (
-                  <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full font-semibold">
+                  <span className="text-[9px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">
                     Soon
                   </span>
                 )}
@@ -310,23 +305,21 @@ export default function MapPage() {
       <button
         onClick={handleRecenterMap}
         disabled={isRecentering}
-        className={`fixed right-4 z-50 w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+        className={`fixed right-4 z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
           isRecentering 
-            ? 'bg-gradient-to-br from-primary/70 to-pink-500/70 scale-95' 
-            : 'bg-gradient-to-br from-primary to-pink-500 hover:scale-105 active:scale-95'
+            ? 'bg-gray-100 scale-95' 
+            : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
         }`}
         style={{
-          bottom: chatActive ? `${chatHeight + 88}px` : '132px', // Collapsed: 76px (search pos) + 40px (search height) + 16px (spacing) = 132px
-          boxShadow: isRecentering
-            ? '0 2px 8px rgba(197, 69, 156, 0.3), 0 0 0 2px rgba(255,255,255,0.8)'
-            : '0 3px 12px rgba(197, 69, 156, 0.4), 0 0 0 2px white',
+          bottom: chatActive ? `${chatHeight + 88}px` : '132px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
         }}
         aria-label="Center map on my location"
       >
         {isRecentering ? (
-          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
         ) : (
-          <MapPin className="w-4 h-4 text-white" strokeWidth={2.5} fill="white" />
+          <MapPin className="w-5 h-5 text-gray-700" strokeWidth={2} fill="gray-700" />
         )}
       </button>
 
