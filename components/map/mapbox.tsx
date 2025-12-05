@@ -560,20 +560,26 @@ export function Mapbox({
             <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
           </div>
           
-          <!-- Text labels with solid white background to hide map text -->
+          <!-- Text labels (transparent but with strong glow to hide map text) -->
           <div class="marker-labels" style="
             display: flex;
             flex-direction: column;
             gap: 0px;
             min-width: 0;
             line-height: 1;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 2px 6px;
-            border-radius: 4px;
-            backdrop-filter: blur(4px);
             position: relative;
             z-index: 1000;
+            padding: 2px;
           ">
+            <!-- Invisible blocker behind text to hide map labels -->
+            <div style="
+              position: absolute;
+              inset: -4px;
+              background: rgba(255, 255, 255, 0.85);
+              filter: blur(8px);
+              z-index: -1;
+            "></div>
+            
             <!-- Restaurant name (FIRST - above) -->
             <div style="
               font-size: 12px;
@@ -586,6 +592,13 @@ export function Mapbox({
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               line-height: 1.1;
               margin-bottom: 1px;
+              text-shadow: 
+                0 0 8px rgba(255,255,255,1),
+                0 0 12px rgba(255,255,255,1),
+                0 0 16px rgba(255,255,255,0.9),
+                0 1px 3px rgba(255,255,255,0.95);
+              position: relative;
+              z-index: 1;
             ">
               ${restaurant.name}
             </div>
@@ -601,6 +614,13 @@ export function Mapbox({
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               line-height: 1.1;
               margin-top: 1px;
+              text-shadow: 
+                0 0 8px rgba(255,255,255,1),
+                0 0 12px rgba(255,255,255,1),
+                0 0 16px rgba(255,255,255,0.9),
+                0 1px 2px rgba(255,255,255,0.95);
+              position: relative;
+              z-index: 1;
             ">
               ${getCategoryLabel()}
             </div>
