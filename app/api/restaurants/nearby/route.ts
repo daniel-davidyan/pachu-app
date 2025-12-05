@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Use Google Places Nearby Search API
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=restaurant&key=${apiKey}`;
+    // Use Google Places Nearby Search API - Restaurant only
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=restaurant&keyword=restaurant&key=${apiKey}`;
     
-    console.log('🔍 Calling Google Places API:', { latitude, longitude, radius });
+    console.log('🔍 Calling Google Places API (restaurants only):', { latitude, longitude, radius });
     
     const response = await fetch(url);
     const data = await response.json();
@@ -43,8 +43,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform Google Places data to our Restaurant format
-    const restaurants = data.results?.map((place: any) => ({
+    // Transform Google Places data to our Restaurant format (filter out non-restaurants)
+    const restaurants = data.results?.filter((place: any) => {
+      // Only include places that are clearly restaurants
+      const types = place.types || [];
+      return types.includes('restaurant') || types.includes('food');
+    }).map((place: any) => ({
       id: place.place_id,
       name: place.name,
       address: place.vicinity,
