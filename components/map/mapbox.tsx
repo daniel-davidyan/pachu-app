@@ -181,6 +181,7 @@ export function Mapbox({
   const internalMapRef = useRef<mapboxgl.Map | null>(null);
   const map = externalMapRef || internalMapRef;
   const markers = useRef<mapboxgl.Marker[]>([]);
+  const userLocationMarker = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [currentZoom, setCurrentZoom] = useState(15.5);
   const [loadedRestaurants, setLoadedRestaurants] = useState<Restaurant[]>([]);
@@ -312,9 +313,15 @@ export function Mapbox({
     loadRestaurantsRef.current = loadRestaurantsInBounds;
   }, [loadRestaurantsInBounds]);
 
-  // Get user's current location
+  // Track user's current location continuously
   useEffect(() => {
-    if (getUserLocation && navigator.geolocation) {
+    if (!getUserLocation) {
+      setUserLocation([34.7818, 32.0853]);
+      return;
+    }
+
+    if (navigator.geolocation) {
+      // Get initial position
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { longitude, latitude } = position.coords;
@@ -322,12 +329,40 @@ export function Mapbox({
         },
         (error) => {
           console.error('Error getting location:', error);
-          // Default to Tel Aviv if location fails
           setUserLocation([34.7818, 32.0853]);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
       );
+
+      // Watch position continuously
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { longitude, latitude } = position.coords;
+          setUserLocation([longitude, latitude]);
+          
+          // Update user marker position if it exists
+          if (userLocationMarker.current && map.current) {
+            userLocationMarker.current.setLngLat([longitude, latitude]);
+          }
+        },
+        (error) => {
+          console.error('Error watching location:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5000
+        }
+      );
+
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+      };
     } else {
-      // Default to Tel Aviv
       setUserLocation([34.7818, 32.0853]);
     }
   }, [getUserLocation]);
@@ -401,10 +436,71 @@ export function Mapbox({
       }, 100);
     });
 
+    // Add custom user location marker
+    if (userLocation) {
+      const userEl = document.createElement('div');
+      userEl.className = 'user-location-marker';
+      
+      // Modern pulsing location marker
+      userEl.innerHTML = `
+        <div style="position: relative; width: 40px; height: 40px;">
+          <!-- Pulsing rings -->
+          <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: rgba(66, 133, 244, 0.2);
+            border-radius: 50%;
+            animation: pulse 2s ease-out infinite;
+          "></div>
+          
+          <!-- Main blue circle -->
+          <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: #4285F4;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+          "></div>
+          
+          <!-- White center dot -->
+          <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+          "></div>
+        </div>
+      `;
+      
+      userLocationMarker.current = new mapboxgl.Marker({ 
+        element: userEl, 
+        anchor: 'center' 
+      })
+        .setLngLat(userLocation)
+        .addTo(currentMap);
+    }
+
     return () => {
       if (map.current) {
         map.current.remove();
         map.current = null;
+      }
+      if (userLocationMarker.current) {
+        userLocationMarker.current.remove();
+        userLocationMarker.current = null;
       }
     };
   }, [accessToken, userLocation]);
@@ -497,7 +593,7 @@ export function Mapbox({
           ">
             <!-- Restaurant name (FIRST - above) -->
             <div style="
-              font-size: 10px;
+              font-size: 12px;
               color: #1f2937;
               font-weight: 600;
               white-space: nowrap;
@@ -507,14 +603,14 @@ export function Mapbox({
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.95);
               line-height: 1.1;
-              margin-bottom: 0px;
+              margin-bottom: 1px;
             ">
               ${restaurant.name}
             </div>
             
             <!-- Category (SECOND - below, small gray text) -->
             <div style="
-              font-size: 9px;
+              font-size: 10px;
               color: #6b7280;
               font-weight: 500;
               text-transform: lowercase;
@@ -523,7 +619,7 @@ export function Mapbox({
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               text-shadow: 0 1px 2px rgba(255,255,255,0.8), 0 0 4px rgba(255,255,255,0.9);
               line-height: 1.1;
-              margin-top: 0px;
+              margin-top: 1px;
             ">
               ${getCategoryLabel()}
             </div>
@@ -632,6 +728,20 @@ export function Mapbox({
           <span className="text-xs font-semibold text-gray-700">Loading places...</span>
         </div>
       )}
+      
+      {/* CSS for pulsing animation */}
+      <style jsx global>{`
+        @keyframes pulse {
+          0% {
+            transform: translate(-50%, -50%) scale(0.5);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(1.5);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
