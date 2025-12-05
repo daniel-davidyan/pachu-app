@@ -46,14 +46,62 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
   const getIcon = (r: Restaurant) => {
     const cuisines = r.cuisineTypes || [];
     const name = r.name.toLowerCase();
-    if (cuisines.some(c => c.includes('coffee') || c.includes('cafe')) || name.includes('cafe')) return '☕';
-    if (cuisines.some(c => c.includes('pizza') || c.includes('italian'))) return '🍕';
+    
+    // Coffee & Café
+    if (cuisines.some(c => c.includes('coffee') || c.includes('cafe')) || name.includes('cafe') || name.includes('coffee')) return '☕';
+    
+    // Pizza & Italian
+    if (cuisines.some(c => c.includes('pizza') || c.includes('italian')) || name.includes('pizza')) return '🍕';
+    
+    // Sushi & Japanese
     if (cuisines.some(c => c.includes('sushi') || c.includes('japanese'))) return '🍣';
+    
+    // Chinese & Asian
     if (cuisines.some(c => c.includes('chinese') || c.includes('asian'))) return '🥡';
-    if (cuisines.some(c => c.includes('burger'))) return '🍔';
-    if (cuisines.some(c => c.includes('mexican'))) return '🌮';
-    if (cuisines.some(c => c.includes('bakery'))) return '🧁';
-    if (cuisines.some(c => c.includes('bar'))) return '🍺';
+    
+    // Burger & American
+    if (cuisines.some(c => c.includes('burger') || c.includes('american')) || name.includes('burger')) return '🍔';
+    
+    // Mexican
+    if (cuisines.some(c => c.includes('mexican')) || name.includes('taco') || name.includes('burrito')) return '🌮';
+    
+    // Indian
+    if (cuisines.some(c => c.includes('indian'))) return '🍛';
+    
+    // Bakery & Desserts
+    if (cuisines.some(c => c.includes('bakery') || c.includes('dessert') || c.includes('ice_cream'))) return '🧁';
+    
+    // Bar & Pub
+    if (cuisines.some(c => c.includes('bar') || c.includes('pub')) || name.includes('bar')) return '🍺';
+    
+    // Seafood
+    if (cuisines.some(c => c.includes('seafood') || c.includes('fish'))) return '🦐';
+    
+    // Steakhouse & Grill
+    if (cuisines.some(c => c.includes('steakhouse') || c.includes('grill') || c.includes('bbq'))) return '🥩';
+    
+    // Thai
+    if (cuisines.some(c => c.includes('thai'))) return '🍜';
+    
+    // Mediterranean & Greek
+    if (cuisines.some(c => c.includes('mediterranean') || c.includes('greek') || c.includes('middle_eastern'))) return '🥙';
+    
+    // French
+    if (cuisines.some(c => c.includes('french'))) return '🥐';
+    
+    // Vietnamese
+    if (cuisines.some(c => c.includes('vietnamese'))) return '🍲';
+    
+    // Korean
+    if (cuisines.some(c => c.includes('korean'))) return '🍱';
+    
+    // Breakfast & Brunch
+    if (cuisines.some(c => c.includes('breakfast') || c.includes('brunch'))) return '🥞';
+    
+    // Vegan & Vegetarian
+    if (cuisines.some(c => c.includes('vegan') || c.includes('vegetarian'))) return '🥗';
+    
+    // Default
     return '🍽️';
   };
 

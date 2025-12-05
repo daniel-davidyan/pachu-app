@@ -15,6 +15,7 @@ interface AIChatSheetProps {
   onRestaurantsFound?: (restaurants: any[]) => void;
   matchedCount?: number;
   userLocation?: { lat: number; lng: number } | null;
+  onChatStateChange?: (isActive: boolean, height: number) => void;
 }
 
 export interface RestaurantFilters {
@@ -27,7 +28,7 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
-export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount = 0, userLocation }: AIChatSheetProps) {
+export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount = 0, userLocation, onChatStateChange }: AIChatSheetProps) {
   const [isActive, setIsActive] = useState(false); // Whether pane is visible
   const [sheetHeight, setSheetHeight] = useState(200); // Height when active
   const [isDragging, setIsDragging] = useState(false);
@@ -48,6 +49,13 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   useEffect(() => {
     setMaxHeight(window.innerHeight - 100);
   }, []);
+
+  // Notify parent of chat state changes
+  useEffect(() => {
+    if (onChatStateChange) {
+      onChatStateChange(isActive, sheetHeight);
+    }
+  }, [isActive, sheetHeight, onChatStateChange]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {

@@ -23,11 +23,11 @@ const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.M
 });
 
 const categories = [
-  { id: 'restaurants', name: 'Restaurants', icon: UtensilsCrossed, active: true },
-  { id: 'cafes', name: 'Cafés', icon: Coffee, active: false },
-  { id: 'bars', name: 'Bars', icon: Wine, active: false },
-  { id: 'hotels', name: 'Hotels', icon: Hotel, active: false },
-  { id: 'services', name: 'Services', icon: Briefcase, active: false },
+  { id: 'restaurants', name: 'Restaurants', icon: UtensilsCrossed, active: true, color: '#C5459C' },
+  { id: 'cafes', name: 'Cafés', icon: Coffee, active: false, color: '#8B4513' },
+  { id: 'bars', name: 'Bars', icon: Wine, active: false, color: '#F97316' },
+  { id: 'hotels', name: 'Hotels', icon: Hotel, active: false, color: '#6366F1' },
+  { id: 'services', name: 'Services', icon: Briefcase, active: false, color: '#10B981' },
 ];
 
 export default function MapPage() {
@@ -41,8 +41,12 @@ export default function MapPage() {
   const [showChat, setShowChat] = useState(true);
   const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [isRecentering, setIsRecentering] = useState(false);
+  const [chatActive, setChatActive] = useState(false);
+  const [chatHeight, setChatHeight] = useState(200);
 
   const handleRecenterMap = () => {
+    setIsRecentering(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -56,14 +60,18 @@ export default function MapPage() {
           if (mapRef.current) {
             mapRef.current.flyTo({
               center: [newLocation.lng, newLocation.lat],
-              zoom: 15,
+              zoom: 13,
               duration: 1500
             });
           }
+          
+          // Reset loading state after animation
+          setTimeout(() => setIsRecentering(false), 1500);
         },
         (error) => {
           console.error('Error getting location:', error);
           alert('Unable to get your location. Please enable location services.');
+          setIsRecentering(false);
         },
         {
           enableHighAccuracy: true,
@@ -161,6 +169,11 @@ export default function MapPage() {
     setHighlightedRestaurants(restaurants.map(r => r.id));
   };
 
+  const handleChatStateChange = (isActive: boolean, height: number) => {
+    setChatActive(isActive);
+    setChatHeight(height);
+  };
+
   // Hide chat when restaurant is selected
   useEffect(() => {
     if (selectedRestaurant) {
@@ -169,7 +182,7 @@ export default function MapPage() {
   }, [selectedRestaurant]);
 
   return (
-    <div className="fixed inset-0 bg-[#f5f5f7]">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Full Screen Map */}
       <div className="absolute inset-0">
         {mapboxToken ? (
@@ -194,6 +207,36 @@ export default function MapPage() {
         .mapboxgl-ctrl-bottom-right {
           display: none !important;
         }
+        
+        /* Animate marker entry */
+        .restaurant-marker {
+          animation: markerPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        @keyframes markerPop {
+          0% {
+            transform: scale(0) translateY(20px);
+            opacity: 0;
+          }
+          100% {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+          }
+        }
+        
+        /* Fade in animation */
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-in-out;
+        }
       `}</style>
 
       {/* Category Carousel - Top */}
@@ -209,21 +252,34 @@ export default function MapPage() {
                 key={cat.id}
                 onClick={() => cat.active && setActiveCategory(cat.id)}
                 disabled={isDisabled}
+                style={{
+                  backgroundColor: isActive ? `${cat.color}15` : 'rgba(255, 255, 255, 0.95)',
+                  color: isActive ? cat.color : isDisabled ? '#9CA3AF' : '#374151',
+                  borderColor: isActive ? cat.color : 'transparent',
+                  boxShadow: isActive 
+                    ? `0 4px 16px ${cat.color}30, 0 0 0 2px white` 
+                    : '0 2px 12px rgba(0,0,0,0.1)',
+                }}
                 className={`
-                  flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold
-                  whitespace-nowrap transition-all duration-200 flex-shrink-0 shadow-lg border-2
-                  ${isActive 
-                    ? 'bg-primary/10 text-primary border-primary' 
-                    : isDisabled
-                      ? 'bg-white/90 text-gray-400 border-transparent cursor-not-allowed'
-                      : 'bg-white text-gray-700 border-transparent hover:bg-gray-50'
+                  flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold
+                  whitespace-nowrap transition-all duration-300 flex-shrink-0 border-2
+                  backdrop-blur-sm
+                  ${isDisabled 
+                    ? 'cursor-not-allowed opacity-60' 
+                    : 'hover:scale-105 active:scale-95'
                   }
                 `}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : ''}`} strokeWidth={2} />
+                <Icon 
+                  className="w-4 h-4" 
+                  strokeWidth={2.5}
+                  style={{ color: isActive ? cat.color : isDisabled ? '#9CA3AF' : '#6B7280' }}
+                />
                 <span>{cat.name}</span>
                 {isDisabled && (
-                  <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full">Soon</span>
+                  <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full font-semibold">
+                    Soon
+                  </span>
                 )}
               </button>
             );
@@ -233,19 +289,45 @@ export default function MapPage() {
 
       {/* Loading Indicator */}
       {loading && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 glass rounded-full px-4 py-2 shadow-lg flex items-center gap-2 z-30 animate-fade-in">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-          <span className="text-xs text-gray-700">Finding places...</span>
+        <div 
+          className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-2 z-30 animate-fade-in"
+          style={{
+            boxShadow: '0 4px 16px rgba(197, 69, 156, 0.2), 0 0 0 2px white',
+          }}
+        >
+          <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-r from-primary via-pink-500 to-orange-500 animate-spin" 
+            style={{
+              background: 'conic-gradient(from 0deg, #C5459C, #EC4899, #F97316, #C5459C)',
+            }}
+          />
+          <span className="text-xs font-semibold bg-gradient-to-r from-primary to-pink-600 bg-clip-text text-transparent">
+            Finding places...
+          </span>
         </div>
       )}
 
-      {/* Custom Location Button - Aligned with bottom tabs */}
+      {/* Custom Location Button - Above chat, right side */}
       <button
         onClick={handleRecenterMap}
-        className="fixed bottom-5 right-4 z-50 w-10 h-10 bg-white/95 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center border border-gray-200 hover:bg-white hover:shadow-xl transition-all hover:scale-105 active:scale-95 group"
+        disabled={isRecentering}
+        className={`fixed right-4 z-50 w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+          isRecentering 
+            ? 'bg-gradient-to-br from-primary/70 to-pink-500/70 scale-95' 
+            : 'bg-gradient-to-br from-primary to-pink-500 hover:scale-105 active:scale-95'
+        }`}
+        style={{
+          bottom: chatActive ? `${chatHeight + 88}px` : '132px', // Collapsed: 76px (search pos) + 40px (search height) + 16px (spacing) = 132px
+          boxShadow: isRecentering
+            ? '0 2px 8px rgba(197, 69, 156, 0.3), 0 0 0 2px rgba(255,255,255,0.8)'
+            : '0 3px 12px rgba(197, 69, 156, 0.4), 0 0 0 2px white',
+        }}
         aria-label="Center map on my location"
       >
-        <MapPin className="w-4 h-4 text-gray-600 group-hover:text-primary transition-colors" strokeWidth={2} />
+        {isRecentering ? (
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <MapPin className="w-4 h-4 text-white" strokeWidth={2.5} fill="white" />
+        )}
       </button>
 
       {/* AI Chat Bottom Sheet - Hide when restaurant selected */}
@@ -255,6 +337,7 @@ export default function MapPage() {
           onRestaurantsFound={handleRestaurantsFound}
           matchedCount={filteredRestaurants.length}
           userLocation={userLocation}
+          onChatStateChange={handleChatStateChange}
         />
       )}
 
