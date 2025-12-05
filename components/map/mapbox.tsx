@@ -34,103 +34,140 @@ interface Cluster {
   restaurants: Restaurant[];
 }
 
-// Enhanced icon mapping with more categories and colors
+// Enhanced icon mapping with more categories and variety
 const getRestaurantIcon = (restaurant: Restaurant): { emoji: string; color: string; bg: string } => {
   const cuisines = restaurant.cuisineTypes || [];
   const name = restaurant.name.toLowerCase();
+  const allText = [...cuisines, name].join(' ').toLowerCase();
   
   // Coffee & Café
-  if (cuisines.some(c => c.includes('coffee') || c.includes('cafe')) || name.includes('cafe') || name.includes('coffee')) {
+  if (allText.includes('coffee') || allText.includes('cafe') || allText.includes('espresso')) {
     return { emoji: '☕', color: '#8B4513', bg: '#FFF4E6' };
   }
   
-  // Pizza & Italian
-  if (cuisines.some(c => c.includes('pizza') || c.includes('italian')) || name.includes('pizza')) {
+  // Pizza
+  if (allText.includes('pizza') || allText.includes('pizzeria')) {
     return { emoji: '🍕', color: '#DC2626', bg: '#FEE2E2' };
   }
   
   // Sushi & Japanese
-  if (cuisines.some(c => c.includes('sushi') || c.includes('japanese'))) {
+  if (allText.includes('sushi') || allText.includes('japanese') || allText.includes('ramen')) {
     return { emoji: '🍣', color: '#DC2626', bg: '#FEE2E2' };
   }
   
   // Chinese & Asian
-  if (cuisines.some(c => c.includes('chinese') || c.includes('asian'))) {
+  if (allText.includes('chinese') || allText.includes('dim sum') || allText.includes('noodles')) {
     return { emoji: '🥡', color: '#EA580C', bg: '#FFEDD5' };
   }
   
-  // Burger & American
-  if (cuisines.some(c => c.includes('burger') || c.includes('american')) || name.includes('burger')) {
+  // Burger
+  if (allText.includes('burger') || allText.includes('hamburger')) {
     return { emoji: '🍔', color: '#F59E0B', bg: '#FEF3C7' };
   }
   
   // Mexican
-  if (cuisines.some(c => c.includes('mexican')) || name.includes('taco') || name.includes('burrito')) {
+  if (allText.includes('mexican') || allText.includes('taco') || allText.includes('burrito')) {
     return { emoji: '🌮', color: '#F97316', bg: '#FFEDD5' };
   }
   
   // Indian
-  if (cuisines.some(c => c.includes('indian'))) {
+  if (allText.includes('indian') || allText.includes('curry') || allText.includes('tandoor')) {
     return { emoji: '🍛', color: '#EAB308', bg: '#FEF9C3' };
   }
   
-  // Bakery & Desserts
-  if (cuisines.some(c => c.includes('bakery') || c.includes('dessert') || c.includes('ice_cream'))) {
-    return { emoji: '🧁', color: '#EC4899', bg: '#FCE7F3' };
+  // Bakery & Pastry
+  if (allText.includes('bakery') || allText.includes('patisserie') || allText.includes('pastry')) {
+    return { emoji: '🥐', color: '#C2410C', bg: '#FED7AA' };
   }
   
-  // Bar & Pub
-  if (cuisines.some(c => c.includes('bar') || c.includes('pub')) || name.includes('bar')) {
-    return { emoji: '🍺', color: '#F97316', bg: '#FED7AA' };
+  // Ice cream & Desserts
+  if (allText.includes('ice cream') || allText.includes('gelato') || allText.includes('dessert')) {
+    return { emoji: '🍨', color: '#EC4899', bg: '#FCE7F3' };
+  }
+  
+  // Bar & Pub & Wine
+  if (allText.includes('bar') || allText.includes('pub') || allText.includes('wine')) {
+    return { emoji: '🍷', color: '#F97316', bg: '#FED7AA' };
   }
   
   // Seafood
-  if (cuisines.some(c => c.includes('seafood') || c.includes('fish'))) {
+  if (allText.includes('seafood') || allText.includes('fish') || allText.includes('oyster')) {
     return { emoji: '🦐', color: '#06B6D4', bg: '#CFFAFE' };
   }
   
-  // Steakhouse & Grill
-  if (cuisines.some(c => c.includes('steakhouse') || c.includes('grill') || c.includes('bbq'))) {
+  // Steakhouse & Grill & BBQ
+  if (allText.includes('steak') || allText.includes('grill') || allText.includes('bbq') || allText.includes('meat')) {
     return { emoji: '🥩', color: '#991B1B', bg: '#FEE2E2' };
   }
   
   // Thai
-  if (cuisines.some(c => c.includes('thai'))) {
+  if (allText.includes('thai')) {
     return { emoji: '🍜', color: '#EF4444', bg: '#FEE2E2' };
   }
   
-  // Mediterranean & Greek
-  if (cuisines.some(c => c.includes('mediterranean') || c.includes('greek') || c.includes('middle_eastern'))) {
+  // Mediterranean & Middle Eastern
+  if (allText.includes('mediterranean') || allText.includes('greek') || allText.includes('middle eastern') || allText.includes('falafel') || allText.includes('shawarma')) {
     return { emoji: '🥙', color: '#059669', bg: '#D1FAE5' };
   }
   
-  // French
-  if (cuisines.some(c => c.includes('french'))) {
-    return { emoji: '🥐', color: '#C2410C', bg: '#FED7AA' };
-  }
-  
-  // Vietnamese
-  if (cuisines.some(c => c.includes('vietnamese'))) {
+  // Vietnamese & Pho
+  if (allText.includes('vietnamese') || allText.includes('pho')) {
     return { emoji: '🍲', color: '#D97706', bg: '#FEF3C7' };
   }
   
   // Korean
-  if (cuisines.some(c => c.includes('korean'))) {
+  if (allText.includes('korean') || allText.includes('kimchi') || allText.includes('bibimbap')) {
     return { emoji: '🍱', color: '#DC2626', bg: '#FEE2E2' };
   }
   
   // Breakfast & Brunch
-  if (cuisines.some(c => c.includes('breakfast') || c.includes('brunch'))) {
+  if (allText.includes('breakfast') || allText.includes('brunch') || allText.includes('pancake')) {
     return { emoji: '🥞', color: '#F59E0B', bg: '#FEF3C7' };
   }
   
-  // Vegan & Vegetarian
-  if (cuisines.some(c => c.includes('vegan') || c.includes('vegetarian'))) {
+  // Salad & Healthy
+  if (allText.includes('salad') || allText.includes('healthy') || allText.includes('juice')) {
     return { emoji: '🥗', color: '#16A34A', bg: '#DCFCE7' };
   }
   
-  // Default restaurant
-  return { emoji: '🍽️', color: '#6366F1', bg: '#E0E7FF' };
+  // Sandwich & Deli
+  if (allText.includes('sandwich') || allText.includes('deli') || allText.includes('sub')) {
+    return { emoji: '🥪', color: '#D97706', bg: '#FEF3C7' };
+  }
+  
+  // Chicken
+  if (allText.includes('chicken') || allText.includes('wings') || allText.includes('fried chicken')) {
+    return { emoji: '🍗', color: '#F59E0B', bg: '#FEF3C7' };
+  }
+  
+  // Soup
+  if (allText.includes('soup')) {
+    return { emoji: '🍜', color: '#EF4444', bg: '#FEE2E2' };
+  }
+  
+  // Italian (general, not pizza)
+  if (allText.includes('italian') || allText.includes('pasta') || allText.includes('trattoria')) {
+    return { emoji: '🍝', color: '#DC2626', bg: '#FEE2E2' };
+  }
+  
+  // American / Diner
+  if (allText.includes('american') || allText.includes('diner')) {
+    return { emoji: '🍟', color: '#F59E0B', bg: '#FEF3C7' };
+  }
+  
+  // Fast Food
+  if (allText.includes('fast food') || allText.includes('quick service')) {
+    return { emoji: '🌭', color: '#F97316', bg: '#FFEDD5' };
+  }
+  
+  // Default - use different plate icons based on rating
+  if (restaurant.rating >= 4.5) {
+    return { emoji: '⭐', color: '#EAB308', bg: '#FEF9C3' }; // High rated
+  } else if (restaurant.rating >= 4.0) {
+    return { emoji: '🍴', color: '#6366F1', bg: '#E0E7FF' }; // Good rated
+  } else {
+    return { emoji: '🍽️', color: '#6B7280', bg: '#F3F4F6' }; // Standard
+  }
 };
 
 export function Mapbox({ 
@@ -145,36 +182,74 @@ export function Mapbox({
   const map = externalMapRef || internalMapRef;
   const markers = useRef<mapboxgl.Marker[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [currentZoom, setCurrentZoom] = useState(13);
+  const [currentZoom, setCurrentZoom] = useState(15.5);
   const [loadedRestaurants, setLoadedRestaurants] = useState<Restaurant[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadedBounds = useRef<Set<string>>(new Set());
   const loadRestaurantsRef = useRef<((bounds: mapboxgl.LngLatBounds) => Promise<void>) | null>(null);
 
-  // Categorize restaurants by importance (for display as icons vs dots)
+  // Smart de-duplication and categorization based on proximity and zoom
   const categorizeRestaurants = useCallback((restaurants: Restaurant[], zoom: number) => {
-    // Sort by rating and review count to determine "main" restaurants
+    // Calculate minimum distance between markers based on zoom
+    // Higher zoom = allow closer markers
+    const getMinDistance = (zoom: number): number => {
+      if (zoom >= 17) return 0.0001; // Very close zoom - show almost all
+      if (zoom >= 16) return 0.0003; // Close zoom - show most
+      if (zoom >= 15) return 0.0008; // Normal close - smart filtering
+      if (zoom >= 14) return 0.0015; // Medium - more filtering
+      if (zoom >= 12) return 0.003;  // Far - significant filtering
+      return 0.006; // Very far - heavy filtering
+    };
+    
+    const minDistance = getMinDistance(zoom);
+    
+    // Sort by rating and review count to determine importance
     const sorted = [...restaurants].sort((a, b) => {
       const scoreA = (a.rating * Math.log(a.totalReviews + 1));
       const scoreB = (b.rating * Math.log(b.totalReviews + 1));
       return scoreB - scoreA;
     });
     
+    // Smart de-duplication: keep best restaurant when too close
+    const filtered: Restaurant[] = [];
+    const positions = new Set<string>();
+    
+    for (const restaurant of sorted) {
+      // Check if too close to any existing marker
+      let tooClose = false;
+      
+      for (const existing of filtered) {
+        const distance = Math.sqrt(
+          Math.pow(restaurant.latitude - existing.latitude, 2) + 
+          Math.pow(restaurant.longitude - existing.longitude, 2)
+        );
+        
+        if (distance < minDistance) {
+          tooClose = true;
+          break;
+        }
+      }
+      
+      if (!tooClose) {
+        filtered.push(restaurant);
+      }
+    }
+    
     // Based on zoom, decide how many to show as full icons vs dots
     let mainCount: number;
-    if (zoom >= 14) {
-      mainCount = sorted.length; // Show all as icons when zoomed in
-    } else if (zoom >= 12) {
-      mainCount = Math.min(30, sorted.length); // Show top 30 as icons
-    } else if (zoom >= 10) {
-      mainCount = Math.min(15, sorted.length); // Show top 15 as icons
+    if (zoom >= 15) {
+      mainCount = filtered.length; // Show all filtered as icons when zoomed in close
+    } else if (zoom >= 13) {
+      mainCount = Math.min(30, filtered.length); // Show top 30 as icons
+    } else if (zoom >= 11) {
+      mainCount = Math.min(15, filtered.length); // Show top 15 as icons
     } else {
-      mainCount = Math.min(8, sorted.length); // Show top 8 as icons
+      mainCount = Math.min(8, filtered.length); // Show top 8 as icons
     }
     
     return {
-      mainRestaurants: sorted.slice(0, mainCount),
-      dotRestaurants: sorted.slice(mainCount)
+      mainRestaurants: filtered.slice(0, mainCount),
+      dotRestaurants: filtered.slice(mainCount)
     };
   }, []);
 
@@ -265,26 +340,26 @@ export function Mapbox({
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12', // More colorful style
+      style: 'mapbox://styles/mapbox/streets-v11', // Clean, modern, minimal style
       center: userLocation,
-      zoom: 13, // Normal zoom like Google Maps (not too close, not too far)
+      zoom: 15.5, // Closer zoom to see details clearly
       pitch: 0,
       attributionControl: false
     });
 
-    // Add user location control with mobile support (but don't auto-trigger)
+    // Add user location control with mobile support (manual trigger only)
     const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: {
         enableHighAccuracy: true,
-        timeout: 6000,
+        timeout: 10000,
         maximumAge: 0
       },
       trackUserLocation: true,
       showUserHeading: true,
-      showAccuracyCircle: false,
+      showAccuracyCircle: true, // Show blue circle for current location
       fitBoundsOptions: {
-        maxZoom: 13, // Keep same zoom as initial
-        zoom: 13 // Maintain current zoom
+        maxZoom: 15.5,
+        zoom: 15.5
       }
     });
     
@@ -367,48 +442,107 @@ export function Mapbox({
       const isFriendOrOwn = restaurant.source === 'friends' || restaurant.source === 'own';
       const iconData = getRestaurantIcon(restaurant);
       
-      // Main restaurant marker - colorful pill with icon
+      // Get category label (like "israeli bakery", "shop", etc.)
+      const getCategoryLabel = () => {
+        if (!restaurant.cuisineTypes || restaurant.cuisineTypes.length === 0) return 'place';
+        // Get first cuisine type and clean it up
+        let category = restaurant.cuisineTypes[0];
+        // Remove common prefixes and clean up
+        category = category.replace(/_/g, ' ');
+        // Remove generic terms
+        if (category === 'restaurant' || category === 'food' || category === 'point of interest' || category === 'establishment') {
+          // Try to get second type if available
+          if (restaurant.cuisineTypes.length > 1) {
+            category = restaurant.cuisineTypes[1].replace(/_/g, ' ');
+          } else {
+            return 'place';
+          }
+        }
+        return category.toLowerCase();
+      };
+      
+      // Main restaurant marker - white circle with icon + text label (transparent background)
       el.innerHTML = `
-        <div class="marker-content" style="
+        <div class="marker-wrapper" style="
           display: flex;
           align-items: center;
-          gap: 5px;
-          background: ${isFriendOrOwn ? 'linear-gradient(135deg, #C5459C 0%, #EC4899 100%)' : iconData.bg};
-          color: ${isFriendOrOwn ? 'white' : iconData.color};
-          padding: 7px 12px;
-          border-radius: 24px;
-          box-shadow: 0 3px 14px rgba(0,0,0,0.2), 0 0 0 2px white;
-          border: 2px solid ${isFriendOrOwn ? '#C5459C' : 'white'};
-          font-size: 13px;
-          font-weight: 700;
-          white-space: nowrap;
+          gap: 4px;
           cursor: pointer;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
         ">
-          <span style="font-size: 18px; line-height: 1;">${iconData.emoji}</span>
-          ${restaurant.rating > 0 ? `
-            <span style="
-              font-size: 13px;
-              font-weight: 700;
-              letter-spacing: -0.3px;
+          <!-- White circle with icon (no extra ring) -->
+          <div class="marker-circle" style="
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            border: 2px solid ${isFriendOrOwn ? '#C5459C' : '#e5e7eb'};
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+          ">
+            <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
+          </div>
+          
+          <!-- Text labels (transparent background with text shadow) -->
+          <div class="marker-labels" style="
+            display: flex;
+            flex-direction: column;
+            gap: 0px;
+            min-width: 0;
+            line-height: 1;
+          ">
+            <!-- Restaurant name (FIRST - above) -->
+            <div style="
+              font-size: 10px;
+              color: #1f2937;
+              font-weight: 600;
+              white-space: nowrap;
+              max-width: 120px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.95);
+              line-height: 1.1;
+              margin-bottom: 0px;
             ">
-              ${restaurant.rating.toFixed(1)}
-            </span>
-          ` : ''}
+              ${restaurant.name}
+            </div>
+            
+            <!-- Category (SECOND - below, small gray text) -->
+            <div style="
+              font-size: 9px;
+              color: #6b7280;
+              font-weight: 500;
+              text-transform: lowercase;
+              white-space: nowrap;
+              letter-spacing: 0.3px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              text-shadow: 0 1px 2px rgba(255,255,255,0.8), 0 0 4px rgba(255,255,255,0.9);
+              line-height: 1.1;
+              margin-top: 0px;
+            ">
+              ${getCategoryLabel()}
+            </div>
+          </div>
         </div>
       `;
 
-      const markerContent = el.querySelector('.marker-content') as HTMLElement;
+      const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
+      const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
       el.addEventListener('mouseenter', () => {
-        if (markerContent) {
-          markerContent.style.transform = 'translateY(-3px) scale(1.08)';
-          markerContent.style.boxShadow = '0 6px 24px rgba(0,0,0,0.3), 0 0 0 3px white';
+        if (markerCircle) {
+          markerCircle.style.transform = 'scale(1.1)';
+          markerCircle.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
         }
       });
       el.addEventListener('mouseleave', () => {
-        if (markerContent) {
-          markerContent.style.transform = 'translateY(0) scale(1)';
-          markerContent.style.boxShadow = '0 3px 14px rgba(0,0,0,0.2), 0 0 0 2px white';
+        if (markerCircle) {
+          markerCircle.style.transform = 'scale(1)';
+          markerCircle.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
         }
       });
 

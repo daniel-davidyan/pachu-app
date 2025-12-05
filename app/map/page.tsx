@@ -60,7 +60,7 @@ export default function MapPage() {
           if (mapRef.current) {
             mapRef.current.flyTo({
               center: [newLocation.lng, newLocation.lat],
-              zoom: 13,
+              zoom: 15.5,
               duration: 1500
             });
           }
