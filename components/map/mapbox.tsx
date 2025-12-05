@@ -560,7 +560,7 @@ export function Mapbox({
             <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
           </div>
           
-          <!-- Text labels (transparent but with strong glow to hide map text) -->
+          <!-- Text labels (transparent but with strong blocker to hide map text) -->
           <div class="marker-labels" style="
             display: flex;
             flex-direction: column;
@@ -569,14 +569,15 @@ export function Mapbox({
             line-height: 1;
             position: relative;
             z-index: 1000;
-            padding: 2px;
+            padding: 2px 4px;
           ">
-            <!-- Invisible blocker behind text to hide map labels -->
+            <!-- Strong white blocker behind text to hide map labels -->
             <div style="
               position: absolute;
-              inset: -4px;
-              background: rgba(255, 255, 255, 0.85);
-              filter: blur(8px);
+              inset: -6px;
+              background: white;
+              filter: blur(12px);
+              opacity: 0.95;
               z-index: -1;
             "></div>
             
