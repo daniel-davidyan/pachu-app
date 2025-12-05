@@ -127,14 +127,14 @@ export default function FeedPage() {
                     flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold
                     whitespace-nowrap transition-all duration-200 flex-shrink-0 border-2
                     ${isActive 
-                      ? 'bg-primary/10 text-primary border-primary' 
+                      ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]' 
                       : isDisabled
-                        ? 'bg-white text-gray-400 border-gray-200 cursor-not-allowed'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        ? 'bg-white text-gray-400 border-gray-200 cursor-not-allowed shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 shadow-sm'
                     }
                   `}
             >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : ''}`} strokeWidth={2} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-[#C5459C]' : ''}`} strokeWidth={2} />
                   <span>{cat.name}</span>
                   {isDisabled && (
                     <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full">Soon</span>

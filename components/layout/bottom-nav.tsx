@@ -37,7 +37,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-      <div className="bg-white rounded-full shadow-lg border border-gray-200 px-2">
+      <div className="bg-white rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.3)] border-2 border-gray-300 px-2">
         <div className="flex items-center justify-center gap-1 h-12">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -57,7 +57,7 @@ export function BottomNav() {
                 <Icon
                   className={cn(
                     "w-5 h-5 transition-all duration-200",
-                    active ? "text-primary" : "text-gray-400"
+                    active ? "text-[#C5459C]" : "text-gray-400"
                   )}
                   strokeWidth={active ? 2.5 : 1.5}
                 />

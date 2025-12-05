@@ -254,11 +254,11 @@ export default function MapPage() {
                 disabled={isDisabled}
                 className={`
                   flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold
-                  whitespace-nowrap transition-all duration-300 flex-shrink-0
+                  whitespace-nowrap transition-all duration-300 flex-shrink-0 border-2
                   backdrop-blur-sm
                   ${isActive 
-                    ? 'bg-gray-100 text-gray-900 shadow-md' 
-                    : 'bg-white/90 text-gray-600 shadow-sm'
+                    ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_6px_20px_rgba(197,69,156,0.3)]' 
+                    : 'bg-white/90 text-gray-600 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
                   }
                   ${isDisabled 
                     ? 'cursor-not-allowed opacity-60' 
@@ -267,7 +267,7 @@ export default function MapPage() {
                 `}
               >
                 <Icon 
-                  className={`w-4 h-4 ${isActive ? 'text-gray-900' : isDisabled ? 'text-gray-400' : 'text-gray-500'}`}
+                  className={`w-4 h-4 ${isActive ? 'text-[#C5459C]' : isDisabled ? 'text-gray-400' : 'text-gray-500'}`}
                   strokeWidth={2}
                 />
                 <span>{cat.name}</span>
