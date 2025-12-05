@@ -17,7 +17,6 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Pachu - Your Personal Taste Recommender",
   description: "Discover restaurants through AI recommendations and friends' reviews",
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
