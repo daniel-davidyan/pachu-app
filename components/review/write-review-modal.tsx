@@ -347,22 +347,27 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 </div>
               </div>
 
-              {/* Submit Button - VISIBLE & MODERN */}
-              <div className="pt-2 pb-6 sticky bottom-0 bg-white">
+              {/* Submit Button - Compact & Modern */}
+              <div className="pt-2 pb-4 sticky bottom-0 bg-white">
                 <button
                   onClick={handleSubmit}
                   disabled={rating === 0 || submitting}
-                  className="w-full py-3.5 bg-gradient-to-r from-primary to-primary/90 text-white rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md border-2 border-primary"
+                  className="w-full py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                  style={{ 
+                    backgroundColor: '#C5459C',
+                    color: '#FFFFFF',
+                    boxShadow: '0 2px 8px rgba(197, 69, 156, 0.25)'
+                  }}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Posting...</span>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span style={{ color: '#FFFFFF' }}>Posting...</span>
                     </>
                   ) : (
                     <>
-                      <span>Post Review</span>
-                      <span className="text-xl">🎉</span>
+                      <span style={{ color: '#FFFFFF' }}>Post Review</span>
+                      <span className="text-base">🎉</span>
                     </>
                   )}
                 </button>

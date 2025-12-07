@@ -146,4 +146,37 @@ body {
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* Custom range slider */
+  .slider-thumb::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #C5459C;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(197, 69, 156, 0.4);
+    transition: all 0.2s;
+  }
+
+  .slider-thumb::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(197, 69, 156, 0.5);
+  }
+
+  .slider-thumb::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #C5459C;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(197, 69, 156, 0.4);
+    transition: all 0.2s;
+  }
+
+  .slider-thumb::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(197, 69, 156, 0.5);
+  }
 }
