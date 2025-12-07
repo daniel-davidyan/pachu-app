@@ -12,7 +12,7 @@ interface Message {
 
 interface AIChatPanelV2Props {
   onFilterChange?: (filters: RestaurantFilters) => void;
-  onRestaurantsFound?: (restaurants: any[]) => void;
+  onRestaurantsFound?: (restaurants: Array<{ id: string; name: string; }>) => void;
   matchedCount?: number;
   userLocation?: { lat: number; lng: number } | null;
 }
@@ -188,7 +188,7 @@ export function AIChatPanelV2({ onFilterChange, onRestaurantsFound, matchedCount
           </div>
           <div className="text-left">
             <p className="font-bold text-sm">Ask AI to find restaurants</p>
-            <p className="text-xs text-white/80">Tell me what you're craving...</p>
+            <p className="text-xs text-white/80">Tell me what you&apos;re craving...</p>
           </div>
         </div>
         <ChevronUp className="w-5 h-5 group-hover:translate-y-[-2px] transition-transform" />
