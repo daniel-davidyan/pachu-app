@@ -12,7 +12,7 @@ interface Message {
 
 interface AIChatSheetProps {
   onFilterChange?: (filters: RestaurantFilters) => void;
-  onRestaurantsFound?: (restaurants: any[]) => void;
+  onRestaurantsFound?: (restaurants: Array<{ id: string; name: string; }>) => void;
   matchedCount?: number;
   userLocation?: { lat: number; lng: number } | null;
   onChatStateChange?: (isActive: boolean, height: number) => void;
@@ -312,7 +312,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
                     <Sparkles className="w-7 h-7 text-primary" />
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-1 text-sm">Find your perfect restaurant</h3>
-                  <p className="text-xs text-gray-500">Tell me what you're craving...</p>
+                  <p className="text-xs text-gray-500">Tell me what you&apos;re craving...</p>
                 </div>
               )}
 

@@ -242,9 +242,9 @@ export default function FeedPage() {
 
           {/* Distance Slider for All mode */}
           {feedMode === 'all' && (
-            <div className="px-4 pb-4">
-              <div className="bg-gray-50 rounded-2xl p-3">
-                <div className="flex items-center justify-between mb-1.5">
+            <div className="px-4 pb-3">
+              <div className="bg-gray-50 rounded-2xl p-2">
+                <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold text-gray-700">Distance</span>
                   <span className="text-xs font-bold text-primary">{distanceKm} km</span>
                 </div>
