@@ -242,8 +242,8 @@ export async function GET(
     }
 
     // Extract location from PostGIS geography field
-    let latitude = 32.0853; // Default Tel Aviv
-    let longitude = 34.7818;
+    const latitude = 32.0853; // Default Tel Aviv
+    const longitude = 34.7818;
     
     // PostGIS location is stored as geography - we'll need to parse it properly
     // For now using defaults, but this can be extracted from the location field
