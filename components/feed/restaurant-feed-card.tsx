@@ -92,9 +92,9 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
   return (
     <>
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Restaurant Header with Image */}
+        {/* Restaurant Header with Image - SMALL VERSION */}
         <div className="relative">
-          <div className="relative aspect-[16/9] bg-gray-100">
+          <div className="relative h-32 bg-gray-100">
             {restaurant.imageUrl ? (
               <img 
                 src={restaurant.imageUrl} 
@@ -253,17 +253,17 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                         {review.user.avatarUrl ? (
                           <img
                             src={review.user.avatarUrl}
-                            alt={review.user.username}
+                            alt={review.user.fullName}
                             className="w-8 h-8 rounded-full object-cover"
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs">
-                            {review.user.username.charAt(0).toUpperCase()}
+                            {review.user.fullName.charAt(0).toUpperCase()}
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-900 truncate">
-                            {review.user.username}
+                            {review.user.fullName}
                           </p>
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-0.5">
@@ -283,13 +283,13 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                         </div>
                       </div>
 
-                      {/* Review Photos */}
+                      {/* Review Photos - BIGGER */}
                       {review.photos && review.photos.length > 0 && (
-                        <div className="mb-2">
+                        <div className="mb-2 -mx-3 mt-3">
                           <img
                             src={review.photos[0]}
-                            alt="Review"
-                            className="w-full h-24 object-cover rounded-lg"
+                            alt="Review photo"
+                            className="w-full h-48 object-cover"
                           />
                         </div>
                       )}

@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     // Build restaurant data with reviews and mutual friends
     const restaurants = await Promise.all(
       paginatedRestaurants.map(async (restaurant: any) => {
-        // Get all reviews for this restaurant
+        // Get all reviews for this restaurant from people I follow
         const { data: reviewsData } = await supabase
           .from('reviews')
           .select(`
@@ -62,58 +62,81 @@ export async function GET(request: NextRequest) {
             rating,
             content,
             created_at,
-            users (
-              id,
-              username,
-              full_name,
-              avatar_url
-            )
+            user_id
           `)
           .eq('restaurant_id', restaurant.id)
+          .in('user_id', followingIds)
           .order('created_at', { ascending: false })
           .limit(10);
 
-        const reviews = reviewsData?.map((review: any) => ({
-          id: review.id,
-          rating: review.rating,
-          content: review.content || '',
-          createdAt: review.created_at,
-          user: {
-            id: review.users?.id || '',
-            username: review.users?.username || 'Unknown',
-            fullName: review.users?.full_name || review.users?.username || 'Unknown',
-            avatarUrl: review.users?.avatar_url,
-          },
-          photos: [],
-        })) || [];
+        // Get user profiles separately
+        const userIds = reviewsData?.map(r => r.user_id) || [];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', userIds);
+
+        // Map profiles to reviews
+        const profilesMap = new Map();
+        profilesData?.forEach((profile: any) => {
+          profilesMap.set(profile.id, profile);
+        });
+
+        // Get photos for these reviews
+        const reviewIds = reviewsData?.map((r: any) => r.id) || [];
+        const { data: photosData } = await supabase
+          .from('review_photos')
+          .select('review_id, photo_url')
+          .in('review_id', reviewIds)
+          .order('sort_order', { ascending: true });
+
+        // Group photos by review
+        const photosByReview = new Map<string, string[]>();
+        photosData?.forEach((photo: any) => {
+          if (!photosByReview.has(photo.review_id)) {
+            photosByReview.set(photo.review_id, []);
+          }
+          photosByReview.get(photo.review_id)?.push(photo.photo_url);
+        });
+
+        const reviews = reviewsData?.map((review: any) => {
+          const profile = profilesMap.get(review.user_id);
+          return {
+            id: review.id,
+            rating: review.rating,
+            content: review.content || '',
+            createdAt: review.created_at,
+            user: {
+              id: review.user_id,
+              username: profile?.username || 'Unknown',
+              fullName: profile?.full_name || profile?.username || 'Unknown',
+              avatarUrl: profile?.avatar_url,
+            },
+            photos: photosByReview.get(review.id) || [],
+          };
+        }) || [];
 
         // Get mutual friends (people I follow who reviewed this restaurant)
         const { data: mutualFriendsData } = await supabase
           .from('reviews')
-          .select(`
-            user_id,
-            users (
-              id,
-              username,
-              full_name,
-              avatar_url
-            )
-          `)
+          .select('user_id')
           .eq('restaurant_id', restaurant.id)
           .in('user_id', followingIds);
 
-        // Remove duplicates
-        const uniqueFriends = new Map();
-        mutualFriendsData?.forEach((item: any) => {
-          if (item.users && !uniqueFriends.has(item.users.id)) {
-            uniqueFriends.set(item.users.id, {
-              id: item.users.id,
-              name: item.users.full_name || item.users.username,
-              avatarUrl: item.users.avatar_url,
-            });
-          }
-        });
-        const mutualFriends = Array.from(uniqueFriends.values());
+        // Get unique friend IDs
+        const friendIds = [...new Set(mutualFriendsData?.map(r => r.user_id) || [])];
+        
+        // Get their profiles
+        const { data: friendProfiles } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', friendIds);
+
+        const mutualFriends = friendProfiles?.map((profile: any) => ({
+          id: profile.id,
+          name: profile.full_name || profile.username,
+          avatarUrl: profile.avatar_url,
+        })) || [];
 
         // For now, we'll skip distance calculation
         // PostGIS location field needs proper extraction which we'll add later

@@ -97,19 +97,41 @@ export default function FeedPage() {
                 const detailsResponse = await fetch(`/api/restaurants/details?placeId=${restaurant.googlePlaceId}`);
                 const detailsData = await detailsResponse.json();
                 
-                const reviews = (detailsData.reviews || []).slice(0, 10).map((googleReview: any) => ({
-                  id: `${restaurant.id}-${googleReview.author_name}`,
-                  rating: googleReview.rating,
-                  content: googleReview.text,
-                  createdAt: new Date(googleReview.time * 1000).toISOString(),
-                  user: {
-                    id: googleReview.author_name,
-                    username: googleReview.author_name,
-                    fullName: googleReview.author_name,
-                    avatarUrl: googleReview.profile_photo_url,
-                  },
-                  photos: [],
-                }));
+                const reviews = (detailsData.reviews || []).slice(0, 10).map((googleReview: any, index: number) => {
+                  // Extract photos from Google review if available
+                  const reviewPhotos = [];
+                  if (googleReview.photos && Array.isArray(googleReview.photos)) {
+                    reviewPhotos.push(...googleReview.photos.map((photo: any) => 
+                      photo.photo_reference 
+                        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
+                        : null
+                    ).filter(Boolean));
+                  }
+                  
+                  // If no review photos, use restaurant photos (Google reviews typically don't have individual photos)
+                  if (reviewPhotos.length === 0 && detailsData.photos && detailsData.photos[index]) {
+                    const photo = detailsData.photos[index];
+                    if (photo.photo_reference) {
+                      reviewPhotos.push(
+                        `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
+                      );
+                    }
+                  }
+                  
+                  return {
+                    id: `${restaurant.id}-${googleReview.author_name}`,
+                    rating: googleReview.rating,
+                    content: googleReview.text,
+                    createdAt: new Date(googleReview.time * 1000).toISOString(),
+                    user: {
+                      id: googleReview.author_name,
+                      username: googleReview.author_name,
+                      fullName: googleReview.author_name,
+                      avatarUrl: googleReview.profile_photo_url,
+                    },
+                    photos: reviewPhotos,
+                  };
+                });
 
                 return {
                   id: restaurant.id,
