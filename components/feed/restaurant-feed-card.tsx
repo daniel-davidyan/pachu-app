@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { Star, Heart, PenLine, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
 
 interface MutualFriend {
   id: string;
@@ -51,6 +52,12 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
+
+  // Check if a user ID is a valid UUID (real user vs Google review author)
+  const isRealUser = (userId: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(userId);
+  };
 
   const handleWishlist = async () => {
     setIsWishlisted(!isWishlisted);
@@ -157,17 +164,19 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
 
         {/* Restaurant Info */}
         <div className="p-4">
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-lg text-gray-900 truncate">{restaurant.name}</h3>
-              {restaurant.address && (
-                <div className="flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                  <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
-                </div>
-              )}
+          <Link href={`/restaurant/${restaurant.id}`}>
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-lg text-gray-900 truncate hover:text-primary transition-colors">{restaurant.name}</h3>
+                {restaurant.address && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </Link>
 
           {/* Rating and Distance */}
           <div className="flex items-center gap-2 mb-3">
@@ -186,23 +195,23 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
             <div className="flex items-center gap-2 mb-4">
               <div className="flex -space-x-2">
                 {restaurant.mutualFriends.slice(0, 3).map((friend, index) => (
-                  friend.avatarUrl ? (
-                    <img
-                      key={friend.id}
-                      src={friend.avatarUrl}
-                      alt={friend.name}
-                      className="w-6 h-6 rounded-full border-2 border-white object-cover"
-                    />
-                  ) : (
-                    <div
-                      key={friend.id}
-                      className="w-6 h-6 rounded-full border-2 border-white bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center"
-                    >
-                      <span className="text-[10px] font-bold text-white">
-                        {friend.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )
+                  <Link key={friend.id} href={`/profile/${friend.id}`}>
+                    {friend.avatarUrl ? (
+                      <img
+                        src={friend.avatarUrl}
+                        alt={friend.name}
+                        className="w-6 h-6 rounded-full border-2 border-white object-cover cursor-pointer hover:scale-110 transition-transform"
+                      />
+                    ) : (
+                      <div
+                        className="w-6 h-6 rounded-full border-2 border-white bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                      >
+                        <span className="text-[10px] font-bold text-white">
+                          {friend.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </Link>
                 ))}
               </div>
               <p className="text-xs text-gray-600 flex-1">
@@ -220,6 +229,8 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
               >
                 {restaurant.reviews.map((review) => {
                   const timeAgo = formatDistanceToNow(new Date(review.createdAt), { addSuffix: true });
+                  const userIsReal = isRealUser(review.user.id);
+                  const reviewIsReal = isRealUser(review.id.split('-')[0] || review.id);
                   
                   return (
                     <div
@@ -227,56 +238,114 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                       className="flex-shrink-0 w-[85%] bg-gray-50 rounded-2xl p-3 snap-start"
                     >
                       {/* Reviewer Info */}
-                      <div className="flex items-center gap-2 mb-2">
-                        {review.user.avatarUrl ? (
-                          <img
-                            src={review.user.avatarUrl}
-                            alt={review.user.fullName}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs">
-                            {review.user.fullName.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-900 truncate">
-                            {review.user.fullName}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-0.5">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`w-2.5 h-2.5 ${
-                                    i < review.rating
-                                      ? 'fill-yellow-400 text-yellow-400'
-                                      : 'fill-gray-200 text-gray-200'
-                                  }`}
-                                />
-                              ))}
+                      {userIsReal ? (
+                        <Link href={`/profile/${review.user.id}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            {review.user.avatarUrl ? (
+                              <img
+                                src={review.user.avatarUrl}
+                                alt={review.user.fullName}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+                                {review.user.fullName.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-gray-900 truncate hover:text-primary transition-colors">
+                                {review.user.fullName}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-0.5">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-2.5 h-2.5 ${
+                                        i < review.rating
+                                          ? 'fill-yellow-400 text-yellow-400'
+                                          : 'fill-gray-200 text-gray-200'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-[10px] text-gray-400">{timeAgo}</span>
+                              </div>
                             </div>
-                            <span className="text-[10px] text-gray-400">{timeAgo}</span>
+                          </div>
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-2 mb-2">
+                          {review.user.avatarUrl ? (
+                            <img
+                              src={review.user.avatarUrl}
+                              alt={review.user.fullName}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+                              {review.user.fullName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-900 truncate">
+                              {review.user.fullName}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-0.5">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`w-2.5 h-2.5 ${
+                                      i < review.rating
+                                        ? 'fill-yellow-400 text-yellow-400'
+                                        : 'fill-gray-200 text-gray-200'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-[10px] text-gray-400">{timeAgo}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Review Photos - BIGGER */}
                       {review.photos && review.photos.length > 0 && (
-                        <div className="mb-2 -mx-3 mt-3">
-                          <img
-                            src={review.photos[0]}
-                            alt="Review photo"
-                            className="w-full h-48 object-cover"
-                          />
-                        </div>
+                        reviewIsReal ? (
+                          <Link href={`/review/${review.id}`}>
+                            <div className="mb-2 -mx-3 mt-3 cursor-pointer">
+                              <img
+                                src={review.photos[0]}
+                                alt="Review photo"
+                                className="w-full h-48 object-cover hover:opacity-95 transition-opacity"
+                              />
+                            </div>
+                          </Link>
+                        ) : (
+                          <div className="mb-2 -mx-3 mt-3">
+                            <img
+                              src={review.photos[0]}
+                              alt="Review photo"
+                              className="w-full h-48 object-cover"
+                            />
+                          </div>
+                        )
                       )}
 
                       {/* Review Content */}
                       {review.content && (
-                        <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
-                          {review.content}
-                        </p>
+                        reviewIsReal ? (
+                          <Link href={`/review/${review.id}`}>
+                            <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 hover:text-gray-900 transition-colors cursor-pointer">
+                              {review.content}
+                            </p>
+                          </Link>
+                        ) : (
+                          <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
+                            {review.content}
+                          </p>
+                        )
                       )}
                     </div>
                   );
