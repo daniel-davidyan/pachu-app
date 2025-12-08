@@ -308,7 +308,7 @@ export default function FeedPage() {
             setRestaurants(prev => {
               const combined = [...prev, ...validRestaurants];
               const unique = combined.reduce((acc, restaurant) => {
-                if (!acc.find(r => r.id === restaurant.id)) {
+                if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
                   acc.push(restaurant);
                 }
                 return acc;
@@ -334,7 +334,7 @@ export default function FeedPage() {
             setRestaurants(prev => {
               const combined = [...prev, ...data.restaurants];
               const unique = combined.reduce((acc, restaurant) => {
-                if (!acc.find(r => r.id === restaurant.id)) {
+                if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
                   acc.push(restaurant);
                 }
                 return acc;
