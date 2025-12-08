@@ -211,31 +211,9 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
             </div>
           )}
 
-          {/* Reviews Carousel */}
+          {/* Reviews */}
           {restaurant.reviews.length > 0 && (
-            <div className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Reviews ({restaurant.reviews.length})
-                </h4>
-                {restaurant.reviews.length > 1 && (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => scrollCarousel('left')}
-                      className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                    >
-                      <ChevronLeft className="w-3 h-3 text-gray-600" />
-                    </button>
-                    <button
-                      onClick={() => scrollCarousel('right')}
-                      className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                    >
-                      <ChevronRight className="w-3 h-3 text-gray-600" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
+            <div>
               <div
                 ref={carouselRef}
                 className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory"
