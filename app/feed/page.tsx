@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Star, Heart, MapPin, Loader2, Users, Plus, Bookmark } from 'lucide-react';
 import { RestaurantFeedCard } from '@/components/feed/restaurant-feed-card';
@@ -57,131 +57,104 @@ export default function FeedPage() {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
   const scrollThreshold = 10; // Minimum scroll distance to trigger hide/show
-  const restoringScroll = useRef(false);
-  const savedStateRef = useRef<any>(null);
-  const hasRestoredState = useRef(false);
+  const hasFetchedOnMount = useRef(false);
+  const scrollRestored = useRef(false);
 
-  // Restore saved state from sessionStorage (client-side only)
-  useEffect(() => {
-    if (hasRestoredState.current) return;
-    
+  // Restore feed settings IMMEDIATELY
+  useLayoutEffect(() => {
+    if (scrollRestored.current) return;
+    scrollRestored.current = true;
+
     try {
-      const saved = sessionStorage.getItem('feedState');
-      if (saved) {
-        const savedState = JSON.parse(saved);
-        
-        // Validate saved state - don't restore if too old or invalid
-        const age = Date.now() - (savedState.timestamp || 0);
-        if (age < 5 * 60 * 1000 && savedState.feedMode && savedState.restaurants) {
-          savedStateRef.current = savedState;
-          
-          // Restore feed mode and distance
-          if (savedState.feedMode) setFeedMode(savedState.feedMode);
-          if (savedState.distanceKm) setDistanceKm(savedState.distanceKm);
-        } else {
-          // Clear stale cache
-          sessionStorage.removeItem('feedState');
-        }
-        
-        hasRestoredState.current = true;
+      const settings = sessionStorage.getItem('pachu_feed_settings');
+      if (settings) {
+        const data = JSON.parse(settings);
+        if (data.feedMode) setFeedMode(data.feedMode);
+        if (data.distanceKm) setDistanceKm(data.distanceKm);
       }
     } catch (error) {
-      console.error('Error restoring feed state:', error);
-      sessionStorage.removeItem('feedState');
+      // Silently handle errors
     }
   }, []);
 
-  // Save feed state and restaurants data before navigation
+  // Restore scroll AFTER content loads
   useEffect(() => {
-    // Only save if we have restaurants and not loading
     if (loading || restaurants.length === 0) return;
-    
-    const saveState = () => {
-      const state = {
-        feedMode,
-        distanceKm,
-        scrollPosition: window.scrollY,
-        restaurants: restaurants,
-        timestamp: Date.now(),
-      };
-      sessionStorage.setItem('feedState', JSON.stringify(state));
+
+    try {
+      const saved = sessionStorage.getItem('pachu_feed_scroll');
+      if (!saved) return;
+
+      const data = JSON.parse(saved);
+      const targetScroll = data.position || 0;
+      const timestamp = data.timestamp || 0;
+      const age = Date.now() - timestamp;
+
+      if (age < 5 * 60 * 1000 && targetScroll > 0) {
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        
+        if (maxScroll < targetScroll) {
+          // Page not tall enough yet, retry after content loads
+          const retryTimeout = setTimeout(() => {
+            const newMaxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            if (newMaxScroll >= targetScroll) {
+              window.scrollTo(0, targetScroll);
+            }
+          }, 500);
+          return () => clearTimeout(retryTimeout);
+        } else {
+          window.scrollTo(0, targetScroll);
+          
+          // Verify and fix if needed
+          setTimeout(() => {
+            if (Math.abs(window.scrollY - targetScroll) > 10) {
+              window.scrollTo(0, targetScroll);
+            }
+          }, 100);
+        }
+      }
+    } catch (error) {
+      // Silently handle errors
+    }
+  }, [loading, restaurants]);
+
+  // Save scroll position continuously (simplified)
+  useEffect(() => {
+    const saveScroll = () => {
+      const scrollPos = window.scrollY;
+      if (scrollPos > 0) {
+        sessionStorage.setItem('pachu_feed_scroll', JSON.stringify({
+          position: scrollPos,
+          timestamp: Date.now()
+        }));
+      }
     };
 
-    // Save state on scroll (debounced)
-    let scrollTimeout: NodeJS.Timeout;
+    // Save on scroll (debounced)
+    let timeout: NodeJS.Timeout;
     const handleScroll = () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(saveState, 100);
+      clearTimeout(timeout);
+      timeout = setTimeout(saveScroll, 100);
+    };
+
+    // Save settings
+    const saveSettings = () => {
+      sessionStorage.setItem('pachu_feed_settings', JSON.stringify({
+        feedMode,
+        distanceKm
+      }));
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Save state periodically and before leaving
-    const saveInterval = setInterval(saveState, 3000);
+    saveSettings();
     
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      clearInterval(saveInterval);
-      saveState();
+      saveScroll();
+      saveSettings();
     };
-  }, [feedMode, distanceKm, restaurants, loading]);
+  }, [feedMode, distanceKm]);
 
-  // Restore scroll position after content loads
-  useEffect(() => {
-    const savedState = savedStateRef.current;
-    if (!savedState?.scrollPosition || restoringScroll.current) return;
-    
-    // Wait for restaurants to load
-    if (loading || restaurants.length === 0) return;
-    
-    restoringScroll.current = true;
-    const targetScroll = savedState.scrollPosition;
-    
-    console.log('Attempting to restore scroll to:', targetScroll);
-    
-    // Aggressive scroll restoration with multiple attempts
-    let attempts = 0;
-    const maxAttempts = 20;
-    
-    const restoreScroll = () => {
-      attempts++;
-      const currentScroll = window.scrollY;
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      
-      // If we're already at the right position, we're done
-      if (Math.abs(currentScroll - targetScroll) < 10) {
-        console.log('Scroll restored successfully at:', currentScroll);
-        restoringScroll.current = false;
-        return;
-      }
-      
-      // If we have enough content or we've tried enough times, scroll now
-      if (maxScroll >= targetScroll * 0.7 || attempts >= maxAttempts) {
-        window.scrollTo({
-          top: targetScroll,
-          behavior: 'instant' as ScrollBehavior,
-        });
-        
-        // Keep trying for a bit in case something resets it
-        if (attempts < maxAttempts) {
-          requestAnimationFrame(restoreScroll);
-        } else {
-          console.log('Scroll restoration completed after', attempts, 'attempts');
-          restoringScroll.current = false;
-        }
-      } else {
-        // Content not ready yet, try again
-        requestAnimationFrame(restoreScroll);
-      }
-    };
-    
-    // Start restoration after a small delay
-    const timeoutId = setTimeout(() => {
-      restoreScroll();
-    }, 50);
-    
-    return () => clearTimeout(timeoutId);
-  }, [loading, restaurants]);
 
   // Prevent Next.js from scrolling to top on navigation
   useEffect(() => {
@@ -200,9 +173,6 @@ export default function FeedPage() {
   // Scroll behavior - hide/show header and bottom nav
   useEffect(() => {
     const handleScroll = () => {
-      // Don't hide/show header while restoring scroll
-      if (restoringScroll.current) return;
-      
       const currentScrollY = window.scrollY;
       
       // Only trigger on significant scroll
@@ -247,29 +217,8 @@ export default function FeedPage() {
   }, []);
 
   // Fetch restaurants based on mode
-  const fetchRestaurants = useCallback(async (pageNum: number, skipCache = false) => {
+  const fetchRestaurants = useCallback(async (pageNum: number) => {
     if (!userLocation) return;
-    
-    // Try to use cached data on first load (only if same mode and within 2 minutes)
-    const savedState = savedStateRef.current;
-    if (
-      pageNum === 0 && 
-      !skipCache && 
-      savedState?.restaurants && 
-      savedState?.restaurants.length > 0 &&
-      savedState?.timestamp &&
-      savedState?.feedMode === feedMode
-    ) {
-      const age = Date.now() - savedState.timestamp;
-      // Use cache if less than 2 minutes old and same feed mode
-      if (age < 2 * 60 * 1000) {
-        console.log('Using cached restaurants:', savedState.restaurants.length);
-        setRestaurants(savedState.restaurants);
-        setLoading(false);
-        setHasMore(true);
-        return;
-      }
-    }
     
     try {
       if (pageNum === 0) {
@@ -407,15 +356,17 @@ export default function FeedPage() {
 
   // Initial load and when mode or distance changes
   useEffect(() => {
-    if (userLocation) {
-      // Skip cache if mode or distance changed
-      const savedState = savedStateRef.current;
-      const skipCache = savedState && (
-        savedState.feedMode !== feedMode || 
-        savedState.distanceKm !== distanceKm
-      );
-      fetchRestaurants(0, skipCache);
+    if (!userLocation) return;
+    
+    // Prevent multiple fetches on initial mount
+    if (!hasFetchedOnMount.current) {
+      hasFetchedOnMount.current = true;
+      fetchRestaurants(0);
+      return;
     }
+    
+    // For subsequent changes (mode or distance), fetch new data
+    fetchRestaurants(0);
   }, [userLocation, feedMode, distanceKm, fetchRestaurants]);
 
   // Infinite scroll observer
