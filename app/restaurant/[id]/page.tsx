@@ -418,7 +418,11 @@ export default function RestaurantPage() {
 
                     {/* Review Title */}
                     {review.title && (
-                      <h3 className="font-semibold text-gray-900 mb-2">{review.title}</h3>
+                      <Link href={`/review/${review.id}`}>
+                        <h3 className="font-semibold text-gray-900 mb-2 hover:text-primary transition-colors cursor-pointer">
+                          {review.title}
+                        </h3>
+                      </Link>
                     )}
 
                     {/* Review Photos */}
@@ -430,7 +434,7 @@ export default function RestaurantPage() {
                               <img
                                 src={photo}
                                 alt={`Review photo ${index + 1}`}
-                                className="h-48 w-auto rounded-xl object-cover"
+                                className="h-48 w-auto rounded-xl object-cover cursor-pointer hover:opacity-95 transition-opacity"
                               />
                             </Link>
                           ))}
@@ -441,9 +445,11 @@ export default function RestaurantPage() {
                     {/* Review Content */}
                     {review.content && (
                       <div>
-                        <p className={`text-sm text-gray-600 leading-relaxed ${!isExpanded && shouldShowExpand ? 'line-clamp-3' : ''}`}>
-                          {review.content}
-                        </p>
+                        <Link href={`/review/${review.id}`}>
+                          <p className={`text-sm text-gray-600 leading-relaxed hover:text-gray-900 transition-colors cursor-pointer ${!isExpanded && shouldShowExpand ? 'line-clamp-3' : ''}`}>
+                            {review.content}
+                          </p>
+                        </Link>
                         {shouldShowExpand && (
                           <button
                             onClick={() => toggleReviewExpansion(review.id)}

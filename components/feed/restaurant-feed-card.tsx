@@ -230,7 +230,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                 {restaurant.reviews.map((review) => {
                   const timeAgo = formatDistanceToNow(new Date(review.createdAt), { addSuffix: true });
                   const userIsReal = isRealUser(review.user.id);
-                  const reviewIsReal = isRealUser(review.id.split('-')[0] || review.id);
+                  const reviewIsReal = isRealUser(review.id);
                   
                   return (
                     <div

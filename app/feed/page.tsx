@@ -43,6 +43,7 @@ interface RestaurantFeed {
 }
 
 export default function FeedPage() {
+  // Always use default values for SSR compatibility
   const [feedMode, setFeedMode] = useState<'following' | 'all'>('all');
   const [restaurants, setRestaurants] = useState<RestaurantFeed[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,10 +57,101 @@ export default function FeedPage() {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
   const scrollThreshold = 10; // Minimum scroll distance to trigger hide/show
+  const restoringScroll = useRef(false);
+  const savedStateRef = useRef<any>(null);
+  const hasRestoredState = useRef(false);
+
+  // Restore saved state from sessionStorage (client-side only)
+  useEffect(() => {
+    if (hasRestoredState.current) return;
+    
+    try {
+      const saved = sessionStorage.getItem('feedState');
+      if (saved) {
+        const savedState = JSON.parse(saved);
+        savedStateRef.current = savedState;
+        
+        // Restore feed mode and distance
+        if (savedState.feedMode) setFeedMode(savedState.feedMode);
+        if (savedState.distanceKm) setDistanceKm(savedState.distanceKm);
+        
+        hasRestoredState.current = true;
+      }
+    } catch (error) {
+      console.error('Error restoring feed state:', error);
+    }
+  }, []);
+
+  // Save feed state and restaurants data before navigation
+  useEffect(() => {
+    const saveState = () => {
+      const state = {
+        feedMode,
+        distanceKm,
+        scrollPosition: window.scrollY,
+        restaurants: restaurants,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem('feedState', JSON.stringify(state));
+    };
+
+    // Save state on scroll (debounced)
+    let scrollTimeout: NodeJS.Timeout;
+    const handleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(saveState, 100);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Save state periodically and before leaving
+    const saveInterval = setInterval(saveState, 2000);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearInterval(saveInterval);
+      saveState();
+    };
+  }, [feedMode, distanceKm, restaurants]);
+
+  // Restore scroll position after content loads
+  useEffect(() => {
+    const savedState = savedStateRef.current;
+    if (!loading && restaurants.length > 0 && savedState?.scrollPosition && !restoringScroll.current) {
+      restoringScroll.current = true;
+      
+      // Wait for content to render, then restore scroll
+      const restoreScroll = () => {
+        // Check if we have enough content to scroll to the saved position
+        const targetScroll = savedState.scrollPosition;
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        
+        if (maxScroll >= targetScroll * 0.8) {
+          // Content is ready, restore scroll
+          window.scrollTo({
+            top: targetScroll,
+            behavior: 'instant' as ScrollBehavior,
+          });
+          restoringScroll.current = false;
+        } else {
+          // Content not ready yet, try again
+          requestAnimationFrame(restoreScroll);
+        }
+      };
+      
+      // Use setTimeout to ensure content is rendered
+      setTimeout(() => {
+        requestAnimationFrame(restoreScroll);
+      }, 100);
+    }
+  }, [loading, restaurants]);
 
   // Scroll behavior - hide/show header and bottom nav
   useEffect(() => {
     const handleScroll = () => {
+      // Don't hide/show header while restoring scroll
+      if (restoringScroll.current) return;
+      
       const currentScrollY = window.scrollY;
       
       // Only trigger on significant scroll
@@ -104,8 +196,21 @@ export default function FeedPage() {
   }, []);
 
   // Fetch restaurants based on mode
-  const fetchRestaurants = useCallback(async (pageNum: number) => {
+  const fetchRestaurants = useCallback(async (pageNum: number, skipCache = false) => {
     if (!userLocation) return;
+    
+    // Try to use cached data on first load
+    const savedState = savedStateRef.current;
+    if (pageNum === 0 && !skipCache && savedState?.restaurants && savedState?.timestamp) {
+      const age = Date.now() - savedState.timestamp;
+      // Use cache if less than 5 minutes old
+      if (age < 5 * 60 * 1000) {
+        setRestaurants(savedState.restaurants);
+        setLoading(false);
+        setHasMore(true);
+        return;
+      }
+    }
     
     try {
       if (pageNum === 0) {
@@ -191,7 +296,17 @@ export default function FeedPage() {
           if (pageNum === 0) {
             setRestaurants(validRestaurants);
           } else {
-            setRestaurants(prev => [...prev, ...validRestaurants]);
+            // Deduplicate when appending new restaurants
+            setRestaurants(prev => {
+              const combined = [...prev, ...validRestaurants];
+              const unique = combined.reduce((acc, restaurant) => {
+                if (!acc.find(r => r.id === restaurant.id)) {
+                  acc.push(restaurant);
+                }
+                return acc;
+              }, [] as RestaurantFeed[]);
+              return unique;
+            });
           }
           setHasMore(googleData.restaurants.length > (pageNum + 1) * 5);
           setPage(pageNum);
@@ -207,7 +322,17 @@ export default function FeedPage() {
           if (pageNum === 0) {
             setRestaurants(data.restaurants);
           } else {
-            setRestaurants(prev => [...prev, ...data.restaurants]);
+            // Deduplicate when appending new restaurants
+            setRestaurants(prev => {
+              const combined = [...prev, ...data.restaurants];
+              const unique = combined.reduce((acc, restaurant) => {
+                if (!acc.find(r => r.id === restaurant.id)) {
+                  acc.push(restaurant);
+                }
+                return acc;
+              }, [] as RestaurantFeed[]);
+              return unique;
+            });
           }
           setHasMore(data.hasMore);
           setPage(pageNum);
@@ -224,7 +349,13 @@ export default function FeedPage() {
   // Initial load and when mode or distance changes
   useEffect(() => {
     if (userLocation) {
-      fetchRestaurants(0);
+      // Skip cache if mode or distance changed
+      const savedState = savedStateRef.current;
+      const skipCache = savedState && (
+        savedState.feedMode !== feedMode || 
+        savedState.distanceKm !== distanceKm
+      );
+      fetchRestaurants(0, skipCache);
     }
   }, [userLocation, feedMode, distanceKm, fetchRestaurants]);
 
@@ -339,13 +470,23 @@ export default function FeedPage() {
           )}
 
           {/* Restaurant Cards */}
-          {restaurants.map((restaurant) => (
-            <RestaurantFeedCard
-              key={restaurant.id}
-              restaurant={restaurant}
-              userLocation={userLocation}
-            />
-          ))}
+          {(() => {
+            // Deduplicate restaurants by ID to prevent duplicate key errors
+            const uniqueRestaurants = restaurants.reduce((acc, restaurant) => {
+              if (!acc.find(r => r.id === restaurant.id)) {
+                acc.push(restaurant);
+              }
+              return acc;
+            }, [] as RestaurantFeed[]);
+            
+            return uniqueRestaurants.map((restaurant) => (
+              <RestaurantFeedCard
+                key={restaurant.id}
+                restaurant={restaurant}
+                userLocation={userLocation}
+              />
+            ));
+          })()}
 
           {/* Load More Trigger */}
           {hasMore && !loading && (

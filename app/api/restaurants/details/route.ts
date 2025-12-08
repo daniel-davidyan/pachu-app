@@ -21,8 +21,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Use Google Places Details API to get reviews and photos
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=reviews,rating,user_ratings_total,photos&key=${apiKey}`;
+    // Use Google Places Details API to get full restaurant information
+    const fields = [
+      'name',
+      'formatted_address',
+      'address_components',
+      'geometry',
+      'formatted_phone_number',
+      'website',
+      'price_level',
+      'rating',
+      'user_ratings_total',
+      'reviews',
+      'photos',
+      'types',
+      'editorial_summary'
+    ].join(',');
+    
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${apiKey}`;
     
     console.log('🔍 Fetching Google Place details for:', placeId);
     
@@ -37,13 +53,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Return the place details with reviews and photos
-    return NextResponse.json({
-      reviews: data.result?.reviews || [],
-      rating: data.result?.rating,
-      totalReviews: data.result?.user_ratings_total,
-      photos: data.result?.photos || [],
-    });
+    // Return the complete place details
+    return NextResponse.json(data.result || {});
   } catch (error) {
     console.error('Error fetching place details:', error);
     return NextResponse.json(
