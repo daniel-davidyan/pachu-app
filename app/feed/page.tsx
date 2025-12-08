@@ -51,8 +51,40 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(true);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [distanceKm, setDistanceKm] = useState(5);
+  const [showHeader, setShowHeader] = useState(true);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollY = useRef(0);
+  const scrollThreshold = 10; // Minimum scroll distance to trigger hide/show
+
+  // Scroll behavior - hide/show header and bottom nav
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Only trigger on significant scroll
+      if (Math.abs(currentScrollY - lastScrollY.current) < scrollThreshold) {
+        return;
+      }
+      
+      // Scrolling down - hide
+      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        setShowHeader(false);
+      }
+      // Scrolling up - show
+      else if (currentScrollY < lastScrollY.current) {
+        setShowHeader(true);
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   // Get user location
   useEffect(() => {
@@ -222,10 +254,14 @@ export default function FeedPage() {
   }, [loading, loadingMore, hasMore, page, fetchRestaurants]);
 
   return (
-    <MainLayout>
+    <MainLayout showBottomNav={showHeader}>
       <div className="pb-24 min-h-screen bg-gray-50">
         {/* Header with Tabs */}
-        <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
+        <div 
+          className={`sticky top-0 z-20 bg-white border-b border-gray-200 transition-transform duration-300 ease-in-out ${
+            showHeader ? 'translate-y-0' : '-translate-y-full'
+          }`}
+        >
           <div className="px-4 pt-4 pb-3">
             <h1 className="text-xl font-bold text-gray-900 mb-4">Discover</h1>
             

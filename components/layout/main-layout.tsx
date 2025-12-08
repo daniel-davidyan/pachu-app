@@ -5,16 +5,17 @@ import { BottomNav } from './bottom-nav';
 
 interface MainLayoutProps {
   children: React.ReactNode;
+  showBottomNav?: boolean;
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ children, showBottomNav = true }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-100">
       <TopBar />
       <main className="pt-14 pb-20">
         {children}
       </main>
-      <BottomNav />
+      <BottomNav show={showBottomNav} />
     </div>
   );
 }
