@@ -266,10 +266,9 @@ export default function MapPage() {
                 className={`
                   flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold
                   whitespace-nowrap transition-all duration-300 flex-shrink-0 border-2
-                  backdrop-blur-sm
                   ${isActive 
-                    ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_6px_20px_rgba(197,69,156,0.3)]' 
-                    : 'bg-white/90 text-gray-600 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
+                    ? 'bg-transparent text-[#C5459C] border-primary shadow-[0_6px_20px_rgba(197,69,156,0.3)]' 
+                    : 'bg-transparent text-gray-600 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
                   }
                   ${isDisabled 
                     ? 'cursor-not-allowed opacity-60' 
@@ -364,31 +363,55 @@ export default function MapPage() {
               <span>Open Now</span>
             </button>
 
-            {/* Following / All Selector - Show Only Selected */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleViewModeChange(viewMode === 'following' ? 'all' : 'following');
-              }}
-              disabled={isTogglingView}
-              className={`
-                relative flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold h-[26px]
-                transition-all duration-300 border backdrop-blur-sm cursor-pointer
-                bg-white/95 border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)]
-                hover:scale-[1.02] active:scale-[0.98]
-                ${viewMode === 'following' ? 'text-primary' : 'text-gray-800'}
-              `}
-            >
+            {/* Following / All Selector */}
+            <div className="relative flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-full p-0.5 border border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)] h-[26px]">
               {/* Loader overlay */}
               {isTogglingView && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-full z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-full z-20">
                   <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 </div>
               )}
-              <span className={isTogglingView ? 'opacity-0' : ''}>
-                {viewMode === 'following' ? 'Following' : 'All'}
-              </span>
-            </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleViewModeChange('following');
+                }}
+                disabled={isTogglingView}
+                className={`
+                  relative z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold
+                  transition-all duration-200 cursor-pointer
+                  ${viewMode === 'following' 
+                    ? 'text-primary' 
+                    : 'text-gray-500 hover:text-gray-700'
+                  }
+                  ${isTogglingView ? 'opacity-50' : ''}
+                `}
+              >
+                Following
+              </button>
+              
+              <div className="w-px h-3 bg-gray-300" />
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleViewModeChange('all');
+                }}
+                disabled={isTogglingView}
+                className={`
+                  relative z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold
+                  transition-all duration-200 cursor-pointer
+                  ${viewMode === 'all' 
+                    ? 'text-primary' 
+                    : 'text-gray-500 hover:text-gray-700'
+                  }
+                  ${isTogglingView ? 'opacity-50' : ''}
+                `}
+              >
+                All
+              </button>
+            </div>
           </div>
         </div>
       )}
