@@ -47,11 +47,13 @@ export default function MapPage() {
   const [openNow, setOpenNow] = useState(false);
   const [viewMode, setViewMode] = useState<'following' | 'all'>('all');
   const [isTogglingView, setIsTogglingView] = useState(false);
+  const [showViewDropup, setShowViewDropup] = useState(false);
 
   const handleViewModeChange = (mode: 'following' | 'all') => {
     if (mode !== viewMode) {
       setIsTogglingView(true);
       setViewMode(mode);
+      setShowViewDropup(false);
       setTimeout(() => setIsTogglingView(false), 600);
     }
   };
@@ -192,6 +194,23 @@ export default function MapPage() {
     }
   }, [selectedRestaurant]);
 
+  // Close dropup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showViewDropup) {
+        setShowViewDropup(false);
+      }
+    };
+    
+    if (showViewDropup) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showViewDropup]);
+
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Full Screen Map */}
@@ -263,15 +282,13 @@ export default function MapPage() {
                 key={cat.id}
                 onClick={() => cat.active && setActiveCategory(cat.id)}
                 disabled={isDisabled}
-                style={{
-                  backgroundColor: 'transparent'
-                }}
                 className={`
                   flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold
                   whitespace-nowrap transition-all duration-300 flex-shrink-0 border-2
+                  backdrop-blur-sm
                   ${isActive 
-                    ? 'text-[#C5459C] border-primary shadow-[0_6px_20px_rgba(197,69,156,0.3)]' 
-                    : 'text-gray-600 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
+                    ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_6px_20px_rgba(197,69,156,0.3)]' 
+                    : 'bg-white/90 text-gray-600 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
                   }
                   ${isDisabled 
                     ? 'cursor-not-allowed opacity-60' 
@@ -366,47 +383,65 @@ export default function MapPage() {
               <span>Open Now</span>
             </button>
 
-            {/* Following / All Selector */}
-            <div className="relative flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-full p-0.5 border border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)] h-[26px]">
-              {/* Loader overlay */}
-              {isTogglingView && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-full z-20">
-                  <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            {/* Following / All Dropup Selector */}
+            <div className="relative">
+              {/* Dropup Menu */}
+              {showViewDropup && (
+                <div 
+                  className="absolute bottom-full mb-2 left-0 bg-white/95 backdrop-blur-sm rounded-xl border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden animate-fade-in"
+                  style={{ minWidth: '100%' }}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewModeChange('following');
+                    }}
+                    className="w-full px-3 py-2 text-[10px] font-semibold text-left hover:bg-gray-50 transition-colors"
+                    style={{ color: viewMode === 'following' ? '#C5459C' : '#374151' }}
+                  >
+                    Following
+                  </button>
+                  <div className="w-full h-px bg-gray-200" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewModeChange('all');
+                    }}
+                    className="w-full px-3 py-2 text-[10px] font-semibold text-left hover:bg-gray-50 transition-colors"
+                    style={{ color: viewMode === 'all' ? '#C5459C' : '#374151' }}
+                  >
+                    All
+                  </button>
                 </div>
               )}
-              
+
+              {/* Selected Option Button */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleViewModeChange('following');
+                  setShowViewDropup(!showViewDropup);
                 }}
                 disabled={isTogglingView}
-                className={`
-                  relative z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold
-                  transition-all duration-200 cursor-pointer
-                  ${isTogglingView ? 'opacity-50' : ''}
-                `}
-                style={{ color: viewMode === 'following' ? '#C5459C' : '#6B7280' }}
+                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold h-[26px] bg-white/95 backdrop-blur-sm border border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all duration-300"
               >
-                Following
-              </button>
-              
-              <div className="w-px h-3 bg-gray-300" />
-              
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleViewModeChange('all');
-                }}
-                disabled={isTogglingView}
-                className={`
-                  relative z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold
-                  transition-all duration-200 cursor-pointer
-                  ${isTogglingView ? 'opacity-50' : ''}
-                `}
-                style={{ color: viewMode === 'all' ? '#C5459C' : '#6B7280' }}
-              >
-                All
+                {/* Loader overlay */}
+                {isTogglingView && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-full z-10">
+                    <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  </div>
+                )}
+                <span className={isTogglingView ? 'opacity-0' : ''} style={{ color: '#C5459C' }}>
+                  {viewMode === 'following' ? 'Following' : 'All'}
+                </span>
+                <svg 
+                  className={`w-3 h-3 transition-transform duration-200 ${showViewDropup ? 'rotate-180' : ''}`}
+                  style={{ color: '#C5459C' }}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
             </div>
           </div>
