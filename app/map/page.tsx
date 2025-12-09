@@ -374,10 +374,7 @@ export default function MapPage() {
                 handleViewModeChange(viewMode === 'following' ? 'all' : 'following');
               }}
               disabled={isTogglingView}
-              className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold
-                transition-all duration-300 border backdrop-blur-sm cursor-pointer
-                bg-primary text-white border-primary shadow-[0_2px_8px_rgba(197,69,156,0.4)]
-                hover:scale-[1.02] active:scale-[0.98]"
+              className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-300 border backdrop-blur-sm cursor-pointer bg-primary text-white border-primary shadow-[0_2px_8px_rgba(197,69,156,0.4)] hover:scale-[1.02] active:scale-[0.98]"
             >
               {/* Loader overlay */}
               {isTogglingView && (
