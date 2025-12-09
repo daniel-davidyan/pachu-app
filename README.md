@@ -1,4 +1,4 @@
-# Pachu - Your Personal Taste Recommender
+# Pachu - the taste signature
 
 A mobile-optimized web application that combines AI-powered restaurant recommendations with a social network for sharing reviews with friends.
 

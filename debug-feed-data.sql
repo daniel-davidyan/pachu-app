@@ -47,3 +47,4 @@ LIMIT 5;
 SELECT * FROM restaurants_nearby(32.0853, 34.7818, 50000) -- 50km radius
 LIMIT 5;
 
+
