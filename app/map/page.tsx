@@ -370,7 +370,7 @@ export default function MapPage() {
                 setOpenNow(!openNow);
               }}
               className={`
-                flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold h-[26px]
+                relative flex items-center justify-center gap-1.5 px-2.5 rounded-full text-[10px] font-semibold h-[26px]
                 transition-all duration-300 border backdrop-blur-sm
                 ${openNow
                   ? 'bg-emerald-500 text-white border-emerald-500 shadow-[0_2px_8px_rgba(16,185,129,0.3)]'
@@ -378,12 +378,13 @@ export default function MapPage() {
                 }
                 hover:scale-[1.02] active:scale-[0.98] cursor-pointer
               `}
+              style={{ paddingTop: '5px', paddingBottom: '5px' }}
             >
               <div 
-                className={`w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0 ${openNow ? 'bg-white' : 'bg-emerald-500'}`}
-                style={{ marginTop: '0px' }}
+                className={`w-1.5 h-1.5 rounded-full animate-pulse ${openNow ? 'bg-white' : 'bg-emerald-500'}`}
+                style={{ position: 'relative', top: '3.5px' }}
               />
-              <span className="leading-[1]">Open Now</span>
+              <span style={{ lineHeight: '1', position: 'relative', top: '0px' }}>Open Now</span>
             </button>
 
             {/* Following / All Dropup Selector */}
