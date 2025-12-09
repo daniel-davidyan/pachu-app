@@ -270,8 +270,14 @@ export default function MapPage() {
       `}</style>
 
       {/* Category Carousel - Top */}
-      <div className="absolute top-4 left-0 right-0 z-20">
-        <div className="flex gap-2 px-4 overflow-x-auto scrollbar-hide">
+      <div 
+        className="absolute top-4 left-0 right-0 z-20"
+        style={{
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        }}
+      >
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {categories.map((cat) => {
             const Icon = cat.icon;
             const isActive = activeCategory === cat.id;
@@ -335,12 +341,13 @@ export default function MapPage() {
       <button
         onClick={handleRecenterMap}
         disabled={isRecentering}
-        className={`fixed right-4 z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+        className={`fixed z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
           isRecentering 
             ? 'bg-gray-100 scale-95' 
             : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
         }`}
         style={{
+          right: 'max(1rem, env(safe-area-inset-right))',
           bottom: chatActive ? `${chatHeight + 88}px` : '132px',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
         }}
@@ -356,8 +363,9 @@ export default function MapPage() {
       {/* Filter Controls - Above Search */}
       {showChat && (
         <div 
-          className="fixed left-4 z-50"
+          className="fixed z-50"
           style={{
+            left: 'max(1rem, env(safe-area-inset-left))',
             bottom: chatActive ? `${chatHeight + 88}px` : '140px',
             transition: 'bottom 0.3s ease'
           }}

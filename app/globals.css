@@ -28,6 +28,12 @@
     --color-secondary-800: 34 92 117;
     --color-secondary-900: 26 69 88;
     --color-secondary-950: 17 46 58;
+    
+    /* Safe area insets for mobile devices (iPhone notch, etc.) */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
 }
 
@@ -48,6 +54,9 @@ body {
     background: linear-gradient(180deg, #fafafa 0%, #f5f5f7 100%);
     color: #1d1d1f;
     min-height: 100vh;
+    /* Ensure body respects safe areas on mobile */
+    padding: 0;
+    margin: 0;
   }
 
   /* Hide scrollbar but keep functionality */

@@ -119,7 +119,13 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
       />
       
       {/* Modern Card */}
-      <div className="fixed bottom-[72px] left-3 right-3 z-50 animate-slide-up">
+      <div 
+        className="fixed bottom-[72px] z-50 animate-slide-up"
+        style={{
+          left: 'max(0.75rem, env(safe-area-inset-left))',
+          right: 'max(0.75rem, env(safe-area-inset-right))',
+        }}
+      >
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
           {/* Main Content */}
           <div className="p-4">
