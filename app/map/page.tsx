@@ -46,6 +46,15 @@ export default function MapPage() {
   const [chatHeight, setChatHeight] = useState(200);
   const [openNow, setOpenNow] = useState(false);
   const [viewMode, setViewMode] = useState<'following' | 'all'>('all');
+  const [isTogglingView, setIsTogglingView] = useState(false);
+
+  const handleViewModeChange = (mode: 'following' | 'all') => {
+    if (mode !== viewMode) {
+      setIsTogglingView(true);
+      setViewMode(mode);
+      setTimeout(() => setIsTogglingView(false), 600);
+    }
+  };
 
   const handleRecenterMap = () => {
     setIsRecentering(true);
@@ -346,52 +355,40 @@ export default function MapPage() {
                 transition-all duration-300 border backdrop-blur-sm
                 ${openNow
                   ? 'bg-emerald-500 text-white border-emerald-500 shadow-[0_2px_8px_rgba(16,185,129,0.3)]'
-                  : 'bg-white/95 text-gray-700 border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)]'
+                  : 'bg-white/95 text-gray-800 border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)]'
                 }
                 hover:scale-[1.02] active:scale-[0.98] cursor-pointer
               `}
             >
-              <div className={`w-1.5 h-1.5 rounded-full ${openNow ? 'bg-white' : 'bg-emerald-500'} animate-pulse`} />
-              <span>Open Now</span>
+              <div 
+                className={`w-1.5 h-1.5 rounded-full animate-pulse ${openNow ? 'bg-white' : 'bg-emerald-500'}`}
+                style={{ alignSelf: 'center' }}
+              />
+              <span className="leading-none">Open Now</span>
             </button>
 
-            {/* Following / All Selector */}
-            <div className="flex items-center gap-0.5 bg-gradient-to-r from-gray-50 to-gray-100 backdrop-blur-sm rounded-full p-0.5 border border-gray-300 shadow-[0_2px_6px_rgba(0,0,0,0.1)]">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewMode('following');
-                }}
-                className={`
-                  px-2.5 py-1 rounded-full text-[10px] font-semibold
-                  transition-all duration-300 cursor-pointer
-                  ${viewMode === 'following'
-                    ? 'bg-primary text-white shadow-[0_2px_6px_rgba(197,69,156,0.3)]'
-                    : 'bg-white/60 hover:bg-white/90'
-                  }
-                `}
-                style={viewMode !== 'following' ? { color: '#C5459C' } : {}}
-              >
-                Following
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewMode('all');
-                }}
-                className={`
-                  px-2.5 py-1 rounded-full text-[10px] font-semibold
-                  transition-all duration-300 cursor-pointer
-                  ${viewMode === 'all'
-                    ? 'bg-primary text-white shadow-[0_2px_6px_rgba(197,69,156,0.3)]'
-                    : 'bg-white/60 hover:bg-white/90'
-                  }
-                `}
-                style={viewMode !== 'all' ? { color: '#C5459C' } : {}}
-              >
-                All
-              </button>
-            </div>
+            {/* Following / All Selector - Show Only Selected */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewModeChange(viewMode === 'following' ? 'all' : 'following');
+              }}
+              disabled={isTogglingView}
+              className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold
+                transition-all duration-300 border backdrop-blur-sm cursor-pointer
+                bg-primary text-white border-primary shadow-[0_2px_8px_rgba(197,69,156,0.4)]
+                hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {/* Loader overlay */}
+              {isTogglingView && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[2px] rounded-full z-10">
+                  <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                </div>
+              )}
+              <span className={isTogglingView ? 'opacity-0' : ''}>
+                {viewMode === 'following' ? 'Following' : 'All'}
+              </span>
+            </button>
           </div>
         </div>
       )}
