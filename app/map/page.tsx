@@ -263,12 +263,15 @@ export default function MapPage() {
                 key={cat.id}
                 onClick={() => cat.active && setActiveCategory(cat.id)}
                 disabled={isDisabled}
+                style={{
+                  backgroundColor: 'transparent'
+                }}
                 className={`
                   flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold
                   whitespace-nowrap transition-all duration-300 flex-shrink-0 border-2
                   ${isActive 
-                    ? 'bg-transparent text-[#C5459C] border-primary shadow-[0_6px_20px_rgba(197,69,156,0.3)]' 
-                    : 'bg-transparent text-gray-600 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
+                    ? 'text-[#C5459C] border-primary shadow-[0_6px_20px_rgba(197,69,156,0.3)]' 
+                    : 'text-gray-600 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
                   }
                   ${isDisabled 
                     ? 'cursor-not-allowed opacity-60' 
@@ -381,12 +384,9 @@ export default function MapPage() {
                 className={`
                   relative z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold
                   transition-all duration-200 cursor-pointer
-                  ${viewMode === 'following' 
-                    ? 'text-primary' 
-                    : 'text-gray-500 hover:text-gray-700'
-                  }
                   ${isTogglingView ? 'opacity-50' : ''}
                 `}
+                style={{ color: viewMode === 'following' ? '#C5459C' : '#6B7280' }}
               >
                 Following
               </button>
@@ -402,12 +402,9 @@ export default function MapPage() {
                 className={`
                   relative z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold
                   transition-all duration-200 cursor-pointer
-                  ${viewMode === 'all' 
-                    ? 'text-primary' 
-                    : 'text-gray-500 hover:text-gray-700'
-                  }
                   ${isTogglingView ? 'opacity-50' : ''}
                 `}
+                style={{ color: viewMode === 'all' ? '#C5459C' : '#6B7280' }}
               >
                 All
               </button>
