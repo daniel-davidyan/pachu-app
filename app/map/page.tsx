@@ -351,7 +351,7 @@ export default function MapPage() {
                 setOpenNow(!openNow);
               }}
               className={`
-                flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold
+                flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold h-[26px]
                 transition-all duration-300 border backdrop-blur-sm
                 ${openNow
                   ? 'bg-emerald-500 text-white border-emerald-500 shadow-[0_2px_8px_rgba(16,185,129,0.3)]'
@@ -360,11 +360,8 @@ export default function MapPage() {
                 hover:scale-[1.02] active:scale-[0.98] cursor-pointer
               `}
             >
-              <div 
-                className={`w-1.5 h-1.5 rounded-full animate-pulse ${openNow ? 'bg-white' : 'bg-emerald-500'}`}
-                style={{ alignSelf: 'center' }}
-              />
-              <span className="leading-none">Open Now</span>
+              <div className={`w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0 ${openNow ? 'bg-white' : 'bg-emerald-500'}`} />
+              <span>Open Now</span>
             </button>
 
             {/* Following / All Selector - Show Only Selected */}
@@ -374,12 +371,18 @@ export default function MapPage() {
                 handleViewModeChange(viewMode === 'following' ? 'all' : 'following');
               }}
               disabled={isTogglingView}
-              className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-300 border backdrop-blur-sm cursor-pointer bg-primary text-white border-primary shadow-[0_2px_8px_rgba(197,69,156,0.4)] hover:scale-[1.02] active:scale-[0.98]"
+              className={`
+                relative flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold h-[26px]
+                transition-all duration-300 border backdrop-blur-sm cursor-pointer
+                bg-white/95 border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)]
+                hover:scale-[1.02] active:scale-[0.98]
+                ${viewMode === 'following' ? 'text-primary' : 'text-gray-800'}
+              `}
             >
               {/* Loader overlay */}
               {isTogglingView && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[2px] rounded-full z-10">
-                  <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-full z-10">
+                  <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 </div>
               )}
               <span className={isTogglingView ? 'opacity-0' : ''}>
