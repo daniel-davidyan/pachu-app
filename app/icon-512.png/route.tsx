@@ -2,8 +2,12 @@ import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
 
+// Disable caching to always serve fresh icons
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET() {
-  return new ImageResponse(
+  const response = new ImageResponse(
     (
       <div
         style={{
@@ -37,7 +41,14 @@ export async function GET() {
     {
       width: 512,
       height: 512,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     }
   )
+  
+  return response
 }
 

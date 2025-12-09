@@ -5,21 +5,25 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// Cache busting version - update this when icons change
+const ICON_VERSION = 'v2';
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#FFFFFF',
+  themeColor: '#C5459C',
 };
 
 export const metadata: Metadata = {
   title: "Pachu - Your Personal Taste Recommender",
   description: "Discover restaurants through AI recommendations and friends' reviews",
+  manifest: `/manifest.webmanifest?v=${ICON_VERSION}`,
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Pachu',
   },
   formatDetection: {
@@ -27,12 +31,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon.ico' },
+      { url: `/favicon-32x32.png?v=${ICON_VERSION}`, sizes: '32x32', type: 'image/png' },
+      { url: `/favicon-16x16.png?v=${ICON_VERSION}`, sizes: '16x16', type: 'image/png' },
+      { url: `/favicon.ico?v=${ICON_VERSION}` },
     ],
     apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: `/apple-touch-icon.png?v=${ICON_VERSION}`, sizes: '180x180', type: 'image/png' },
     ],
   },
 };
@@ -45,15 +49,27 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Cache Control - Force Refresh of Icons */}
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
+        
         {/* PWA Meta Tags */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Pachu" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        
+        {/* Favicons with cache busting */}
+        <link rel="apple-touch-icon" sizes="180x180" href={`/apple-touch-icon.png?v=${ICON_VERSION}`} />
+        <link rel="icon" type="image/png" sizes="32x32" href={`/favicon-32x32.png?v=${ICON_VERSION}`} />
+        <link rel="icon" type="image/png" sizes="16x16" href={`/favicon-16x16.png?v=${ICON_VERSION}`} />
+        <link rel="icon" type="image/x-icon" href={`/favicon.ico?v=${ICON_VERSION}`} />
+        <link rel="manifest" href={`/manifest.webmanifest?v=${ICON_VERSION}`} />
+        
+        {/* iOS Splash Screens and Additional Icons */}
+        <link rel="apple-touch-icon-precomposed" sizes="180x180" href={`/apple-touch-icon.png?v=${ICON_VERSION}`} />
+        <link rel="apple-touch-startup-image" href={`/apple-touch-icon.png?v=${ICON_VERSION}`} />
       </head>
       <body className={inter.className}>
         <AuthProvider>

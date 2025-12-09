@@ -6,6 +6,10 @@ export const size = {
   height: 180,
 }
 export const contentType = 'image/png'
+
+// Disable caching to always serve fresh icons
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
  
 // Image generation
 export default function AppleIcon() {
@@ -52,6 +56,11 @@ export default function AppleIcon() {
     ),
     {
       ...size,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     }
   )
 }
