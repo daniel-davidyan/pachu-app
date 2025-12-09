@@ -23,8 +23,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Cache busting for icons and favicon files
-        source: '/:path(favicon.ico|apple-touch-icon.png|android-chrome-:size.png|favicon-:size.png|site.webmanifest|manifest.webmanifest)',
+        // Cache busting for favicon.ico
+        source: '/favicon.ico',
         headers: [
           {
             key: 'Cache-Control',
@@ -41,8 +41,44 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Also apply to icon routes
-        source: '/icon:path*',
+        // Cache busting for all PNG icon files
+        source: '/:file(favicon-16x16|favicon-32x32|apple-touch-icon|android-chrome-192x192|android-chrome-512x512).png',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      {
+        // Cache busting for manifest files
+        source: '/:file(site|manifest).webmanifest',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      {
+        // Dynamic icon routes - match /icon, /icon.png, /icon-192.png, etc.
+        source: '/icon(.*)',
         headers: [
           {
             key: 'Cache-Control',
@@ -51,8 +87,8 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Apple icon routes
-        source: '/apple-icon:path*',
+        // Apple icon routes - match /apple-icon, /apple-icon.png, etc.
+        source: '/apple-icon(.*)',
         headers: [
           {
             key: 'Cache-Control',
