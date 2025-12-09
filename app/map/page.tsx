@@ -367,9 +367,10 @@ export default function MapPage() {
                   transition-all duration-300 cursor-pointer
                   ${viewMode === 'following'
                     ? 'bg-primary text-white shadow-[0_2px_6px_rgba(197,69,156,0.3)]'
-                    : 'bg-white/60 text-primary hover:bg-white/90'
+                    : 'bg-white/60 hover:bg-white/90'
                   }
                 `}
+                style={viewMode !== 'following' ? { color: '#C5459C' } : {}}
               >
                 Following
               </button>
@@ -383,9 +384,10 @@ export default function MapPage() {
                   transition-all duration-300 cursor-pointer
                   ${viewMode === 'all'
                     ? 'bg-primary text-white shadow-[0_2px_6px_rgba(197,69,156,0.3)]'
-                    : 'bg-white/60 text-primary hover:bg-white/90'
+                    : 'bg-white/60 hover:bg-white/90'
                   }
                 `}
+                style={viewMode !== 'all' ? { color: '#C5459C' } : {}}
               >
                 All
               </button>
