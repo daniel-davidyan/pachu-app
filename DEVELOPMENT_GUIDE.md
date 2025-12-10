@@ -197,6 +197,7 @@ API_ROUTES.MAP_CHAT
 ### Client-side (Components)
 
 ```typescript
+// Import Supabase client directly (not from barrel export)
 import { createClient } from '@/lib/supabase/client';
 
 const supabase = createClient();
@@ -215,6 +216,7 @@ const { data, error } = await supabase
 ### Server-side (API Routes, Server Components)
 
 ```typescript
+// Import Supabase server client directly (not from barrel export)
 import { createClient } from '@/lib/supabase/server';
 
 const supabase = await createClient();

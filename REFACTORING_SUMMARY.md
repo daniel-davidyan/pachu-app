@@ -155,7 +155,7 @@ Created `index.ts` files in every folder for cleaner imports.
 - `components/review/`
 - `components/` (top-level)
 - `hooks/`
-- `lib/`
+- `lib/` (utils only - Supabase clients imported directly to avoid naming conflicts)
 
 **Benefits:**
 ```typescript
