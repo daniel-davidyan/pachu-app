@@ -350,7 +350,9 @@ export default function MapPage() {
         }`}
         style={{
           right: 'max(1rem, env(safe-area-inset-right))',
-          bottom: chatActive ? `${chatHeight + 88}px` : '132px',
+          bottom: chatActive 
+            ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
+            : 'calc(8.25rem + env(safe-area-inset-bottom))',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
         }}
         aria-label="Center map on my location"
@@ -368,7 +370,9 @@ export default function MapPage() {
           className="fixed z-50"
           style={{
             left: 'max(1rem, env(safe-area-inset-left))',
-            bottom: chatActive ? `${chatHeight + 88}px` : '140px',
+            bottom: chatActive 
+              ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
+              : 'calc(8.75rem + env(safe-area-inset-bottom))',
             transition: 'bottom 0.3s ease'
           }}
         >

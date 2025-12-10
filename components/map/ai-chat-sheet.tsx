@@ -220,8 +220,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   if (!isActive) {
     return (
       <div 
-        className="fixed bottom-[76px] z-40"
+        className="fixed z-40"
         style={{
+          bottom: 'calc(4.75rem + env(safe-area-inset-bottom))',
           left: 'max(1rem, env(safe-area-inset-left))',
           right: 'max(1rem, env(safe-area-inset-right))',
         }}
@@ -268,8 +269,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   return (
     <div
       ref={sheetRef}
-      className="fixed bottom-[72px] z-40 bg-gradient-to-b from-gray-50 to-white rounded-2xl shadow-2xl border border-gray-200 transition-all duration-200 ease-out overflow-hidden"
+      className="fixed z-40 bg-gradient-to-b from-gray-50 to-white rounded-2xl shadow-2xl border border-gray-200 transition-all duration-200 ease-out overflow-hidden"
       style={{ 
+        bottom: 'calc(4.5rem + env(safe-area-inset-bottom))',
         left: 'max(0.75rem, env(safe-area-inset-left))',
         right: 'max(0.75rem, env(safe-area-inset-right))',
         height: sheetHeight,
