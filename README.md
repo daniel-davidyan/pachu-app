@@ -14,13 +14,13 @@ A mobile-optimized social restaurant discovery platform that combines AI-powered
 - Profile editing
 - Protected routes and session management
 
-#### Social Feed
-- Discover restaurant reviews from friends
-- View nearby restaurant reviews
-- Interactive review cards with photos
-- Like and comment on reviews
-- Following/follower system
-- Real-time feed updates
+#### Social Features
+- **Follow/Unfollow Users** - Build your network of food lovers
+- **Following Feed** - See reviews from people you follow
+- **User Search** - Find and connect with friends
+- **Mutual Friends** - Discover shared connections
+- **Follower/Following Counts** - Track your social stats
+- **Follow Notifications** - Get notified when someone follows you
 
 #### Interactive Map View
 - Mapbox integration with restaurant markers
@@ -31,11 +31,12 @@ A mobile-optimized social restaurant discovery platform that combines AI-powered
 - Photo galleries for restaurants
 
 #### Reviews & Ratings
-- Create reviews with ratings (1-5 stars)
-- Upload multiple photos per review
-- View friends' reviews for each restaurant
-- Full-screen photo viewer
-- Review editing and management
+- **Write Reviews** - Rate restaurants 1-5 stars with detailed reviews
+- **Upload Photos** - Add up to 5 photos per review
+- **Update Reviews** - Edit your existing reviews anytime
+- **Like Reviews** - Show appreciation for helpful reviews
+- **View History** - See all your reviews on your profile
+- **Friends' Reviews** - Discover restaurants through your network
 
 #### Search & Discovery
 - Search for restaurants
@@ -103,15 +104,23 @@ NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-places-api-key
 
 ### 3. Set Up Supabase Database
 
+**Important:** The app is now ready for real data only! See `QUICK_START.md` for a 5-minute setup guide.
+
+#### For Fresh Installation:
 1. Go to your Supabase project dashboard
 2. Navigate to the SQL Editor
-3. Execute the migration files in `database-migrations/` folder in order:
+3. Execute the schema setup files (in order):
    - `02-feed-functions.sql`
-   - `03-feed-following-dummy-data.sql`
-   - `04-feed-dummy-data-daniel-amit.sql`
    - `05-add-review-photos.sql`
 
-This will create all necessary tables, functions, and RLS policies.
+**Note:** Skip the dummy data files (`03-feed-following-dummy-data.sql` and `04-feed-dummy-data-daniel-amit.sql`) - they're no longer needed!
+
+#### To Remove Dummy Data (if already installed):
+1. Open Supabase SQL Editor
+2. Run: `database-migrations/99-remove-dummy-data.sql`
+3. Verify all dummy data is removed (see `QUICK_START.md`)
+
+See `DATABASE_SCHEMA.md` for complete database documentation.
 
 ### 4. Configure OAuth Providers (Optional)
 
@@ -252,6 +261,14 @@ To run this application, you'll need:
    - Enable "Places API" in your Google Cloud project
    - For restaurant data and search
 
+## 📚 Documentation
+
+- **Quick Start:** See `QUICK_START.md` for 5-minute setup guide
+- **Setup Guide:** See `SETUP_REAL_DATA.md` for detailed setup instructions
+- **Features Guide:** See `FRIENDS_AND_REVIEWS_GUIDE.md` for feature documentation
+- **Database Schema:** See `DATABASE_SCHEMA.md` for complete database structure
+- **Recent Changes:** See `CHANGES_SUMMARY.md` for latest updates
+
 ## 🚧 Future Enhancements
 
 ### Planned Features
@@ -260,7 +277,8 @@ To run this application, you'll need:
 - [ ] Group recommendations and planning
 - [ ] Restaurant reservations integration
 - [ ] Push notifications
-- [ ] Progressive Web App (PWA) capabilities
+- [ ] Block/report users
+- [ ] Private profiles
 - [ ] More social features (stories, highlights)
 - [ ] Analytics dashboard
 - [ ] Premium features
@@ -310,6 +328,26 @@ Pachu aims to become the ultimate platform for personalized recommendations by u
 
 ---
 
-**Current Version:** v0.1.0  
-**Last Updated:** December 2025  
-**Status:** Active Development
+## 🎯 Ready for Production
+
+✅ **All core features implemented and tested:**
+- User authentication and profiles
+- Follow/unfollow functionality
+- Write and manage reviews with photos
+- Social feed showing friends' reviews
+- Restaurant search and discovery
+- AI-powered recommendations
+- Location-based features
+- Real-time notifications
+
+🚀 **Next Steps:**
+1. Run `99-remove-dummy-data.sql` to clean dummy data
+2. Follow `QUICK_START.md` for 25-minute setup
+3. Test with real accounts
+4. Deploy to production!
+
+---
+
+**Current Version:** v1.0.0  
+**Last Updated:** December 10, 2025  
+**Status:** ✅ Ready for Production

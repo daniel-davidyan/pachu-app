@@ -7,16 +7,17 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('query');
 
-    if (!query || query.trim().length < 2) {
-      return NextResponse.json({ users: [] });
-    }
-
-    // Search users by username or full name
-    const { data: profiles, error } = await supabase
+    let profilesQuery = supabase
       .from('profiles')
       .select('id, username, full_name, avatar_url')
-      .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
-      .limit(20);
+      .limit(50); // Increased limit to show more users
+
+    // If there's a search query, filter by it
+    if (query && query.trim().length > 0) {
+      profilesQuery = profilesQuery.or(`username.ilike.%${query}%,full_name.ilike.%${query}%`);
+    }
+
+    const { data: profiles, error } = await profilesQuery;
 
     if (error) {
       console.error('Error searching users:', error);

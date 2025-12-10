@@ -93,12 +93,36 @@ export default function ProfilePage() {
   };
 
   const handleFollow = async () => {
-    // TODO: Implement follow/unfollow API call
-    setIsFollowing(!isFollowing);
-    setStats({
-      ...stats,
-      followersCount: isFollowing ? stats.followersCount - 1 : stats.followersCount + 1,
-    });
+    try {
+      const action = isFollowing ? 'unfollow' : 'follow';
+      const response = await fetch('/api/users/follow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: profileId,
+          action,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setIsFollowing(!isFollowing);
+        setStats({
+          ...stats,
+          followersCount: isFollowing ? stats.followersCount - 1 : stats.followersCount + 1,
+        });
+      } else {
+        console.error('Failed to follow/unfollow:', data);
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : data.error;
+        alert(`Failed to ${action}: ${errorMsg}\n\nPlease check the console for more details.`);
+      }
+    } catch (error) {
+      console.error('Error in handleFollow:', error);
+      alert('Failed to update follow status');
+    }
   };
 
   const handleShare = async () => {
@@ -234,20 +258,20 @@ export default function ProfilePage() {
           {!isOwnProfile && (
             <button
               onClick={handleFollow}
-              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
+              className={`w-full py-3 rounded-xl font-bold text-base transition-all shadow-md hover:shadow-lg ${
                 isFollowing
-                  ? 'bg-gray-100 text-gray-700'
-                  : 'bg-primary text-white active:scale-95'
+                  ? 'bg-white border-2 border-gray-300 text-gray-800 hover:bg-gray-50 active:scale-95'
+                  : 'bg-gradient-to-r from-primary to-pink-600 text-white hover:from-primary/90 hover:to-pink-600/90 active:scale-95'
               }`}
             >
               {isFollowing ? (
                 <>
-                  <UserCheck className="w-4 h-4 inline-block mr-2 -mt-0.5" />
+                  <UserCheck className="w-5 h-5 inline-block mr-2 -mt-0.5" />
                   Following
                 </>
               ) : (
                 <>
-                  <UserPlus className="w-4 h-4 inline-block mr-2 -mt-0.5" />
+                  <UserPlus className="w-5 h-5 inline-block mr-2 -mt-0.5" />
                   Follow
                 </>
               )}
