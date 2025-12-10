@@ -114,13 +114,26 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
               </div>
             )}
             
-            {/* Match Percentage Badge */}
-            <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
-                <span className="text-sm font-bold text-gray-900">{restaurant.matchPercentage}%</span>
-                <span className="text-[10px] text-gray-500">match</span>
+            {/* Badges: Match and Distance */}
+            <div className="absolute top-3 right-3 flex flex-col gap-2 items-end z-10">
+              {/* Match Percentage Badge */}
+              <div className="bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
+                  <span className="text-sm font-bold text-gray-900">{restaurant.matchPercentage}%</span>
+                  <span className="text-[10px] text-gray-500">match</span>
+                </div>
               </div>
+              
+              {/* Distance Badge */}
+              {distanceText && (
+                <div className="bg-primary/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+                    <span className="text-xs font-bold text-white">{distanceText}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons - Overlaid on Image */}
@@ -177,18 +190,6 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
               </div>
             </div>
           </Link>
-
-          {/* Rating and Distance */}
-          <div className="flex items-center gap-2 mb-3">
-            <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-lg">
-              <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
-              <span className="font-bold text-sm text-yellow-700">{restaurant.rating.toFixed(1)}</span>
-              <span className="text-xs text-gray-500">({restaurant.totalReviews})</span>
-            </div>
-            {distanceText && (
-              <span className="text-xs text-gray-500">{distanceText}</span>
-            )}
-          </div>
 
           {/* Mutual Friends */}
           {getMutualFriendsText() && (

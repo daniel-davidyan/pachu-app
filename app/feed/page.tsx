@@ -44,13 +44,14 @@ interface RestaurantFeed {
 
 export default function FeedPage() {
   // Always use default values for SSR compatibility
-  const [feedMode, setFeedMode] = useState<'following' | 'all'>('all');
+  const [feedMode, setFeedMode] = useState<'all' | 'following'>('all');
   const [restaurants, setRestaurants] = useState<RestaurantFeed[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationFilterEnabled, setLocationFilterEnabled] = useState(true);
   const [distanceKm, setDistanceKm] = useState(5);
   const [showHeader, setShowHeader] = useState(true);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -70,6 +71,7 @@ export default function FeedPage() {
       if (settings) {
         const data = JSON.parse(settings);
         if (data.feedMode) setFeedMode(data.feedMode);
+        if (data.locationFilterEnabled !== undefined) setLocationFilterEnabled(data.locationFilterEnabled);
         if (data.distanceKm) setDistanceKm(data.distanceKm);
       }
     } catch (error) {
@@ -141,6 +143,7 @@ export default function FeedPage() {
     const saveSettings = () => {
       sessionStorage.setItem('pachu_feed_settings', JSON.stringify({
         feedMode,
+        locationFilterEnabled,
         distanceKm
       }));
     };
@@ -153,7 +156,7 @@ export default function FeedPage() {
       saveScroll();
       saveSettings();
     };
-  }, [feedMode, distanceKm]);
+  }, [feedMode, locationFilterEnabled, distanceKm]);
 
 
   // Prevent Next.js from scrolling to top on navigation
@@ -229,8 +232,9 @@ export default function FeedPage() {
 
       if (feedMode === 'all') {
         // Fetch real restaurants from Google Places
+        const radius = locationFilterEnabled ? distanceKm * 1000 : 50000; // 50km when no location filter
         const googleResponse = await fetch(
-          `/api/restaurants/nearby?latitude=${userLocation.latitude}&longitude=${userLocation.longitude}&radius=${distanceKm * 1000}`
+          `/api/restaurants/nearby?latitude=${userLocation.latitude}&longitude=${userLocation.longitude}&radius=${radius}`
         );
         const googleData = await googleResponse.json();
 
@@ -352,7 +356,7 @@ export default function FeedPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [userLocation, feedMode, distanceKm]);
+  }, [userLocation, feedMode, locationFilterEnabled, distanceKm]);
 
   // Initial load and when mode or distance changes
   useEffect(() => {
@@ -367,7 +371,7 @@ export default function FeedPage() {
     
     // For subsequent changes (mode or distance), fetch new data
     fetchRestaurants(0);
-  }, [userLocation, feedMode, distanceKm, fetchRestaurants]);
+  }, [userLocation, feedMode, locationFilterEnabled, distanceKm, fetchRestaurants]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -406,68 +410,116 @@ export default function FeedPage() {
             top: 'calc(3.5rem + env(safe-area-inset-top))',
           }}
         >
-          <div className="px-4 pt-4 pb-3">
-            <h1 className="text-xl font-bold text-gray-900 mb-4">Discover</h1>
+          <div className="px-4 pt-3 pb-2 space-y-3">
+            <h1 className="text-xl font-bold text-gray-900">Discover</h1>
             
-            {/* Following / All Tabs */}
+            {/* Feed Mode Selector - Map Category Style */}
             <div className="flex gap-2">
               <button
-                onClick={() => setFeedMode('following')}
-                className={`
-                  flex-1 px-4 py-2.5 rounded-full text-sm font-semibold
-                  transition-all duration-300 border-2
-                  ${feedMode === 'following'
-                    ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                    : 'bg-white text-gray-600 border-gray-200 shadow-sm hover:border-gray-300'
-                  }
-                `}
-              >
-                <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" strokeWidth={2} />
-                Following
-              </button>
-              <button
                 onClick={() => setFeedMode('all')}
-                className={`
-                  flex-1 px-4 py-2.5 rounded-full text-sm font-semibold
-                  transition-all duration-300 border-2
-                  ${feedMode === 'all'
+                className={`flex-1 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                  feedMode === 'all'
                     ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                    : 'bg-white text-gray-600 border-gray-200 shadow-sm hover:border-gray-300'
-                  }
-                `}
+                    : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                }`}
               >
-                <MapPin className="w-4 h-4 inline-block mr-1.5 -mt-0.5" strokeWidth={2} />
                 All
               </button>
+              <button
+                onClick={() => setFeedMode('following')}
+                className={`flex-1 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                  feedMode === 'following'
+                    ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                    : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                }`}
+              >
+                Following
+              </button>
             </div>
-          </div>
 
-          {/* Distance Slider for All mode */}
-          {feedMode === 'all' && (
-            <div className="px-4 pb-3">
-              <div className="bg-gray-50 rounded-2xl p-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-gray-700">Distance</span>
-                  <span className="text-xs font-bold text-primary">{distanceKm} km</span>
+            {/* Location Filter - Only show for "All" mode */}
+            {feedMode === 'all' && (
+              <div className="space-y-2">
+                {/* Location Filter Label */}
+                <div className="flex items-center gap-1.5 px-1">
+                  <MapPin className="w-3.5 h-3.5 text-gray-500" strokeWidth={2} />
+                  <span className="text-xs font-semibold text-gray-700">Location</span>
                 </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  value={distanceKm}
-                  onChange={(e) => setDistanceKm(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer slider-thumb"
-                  style={{
-                    background: `linear-gradient(to right, #C5459C 0%, #C5459C ${(distanceKm - 1) / 19 * 100}%, #e5e7eb ${(distanceKm - 1) / 19 * 100}%, #e5e7eb 100%)`
-                  }}
-                />
-                <div className="flex justify-between mt-0.5">
-                  <span className="text-[10px] text-gray-400">1 km</span>
-                  <span className="text-[10px] text-gray-400">20 km</span>
+
+                {/* Distance Options - All in one row */}
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                  <button
+                    onClick={() => {
+                      setLocationFilterEnabled(false);
+                    }}
+                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                      !locationFilterEnabled
+                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                    }`}
+                  >
+                    No distance
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setLocationFilterEnabled(true);
+                      setDistanceKm(1);
+                    }}
+                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                      locationFilterEnabled && distanceKm === 1
+                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                    }`}
+                  >
+                    1 km
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setLocationFilterEnabled(true);
+                      setDistanceKm(3);
+                    }}
+                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                      locationFilterEnabled && distanceKm === 3
+                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                    }`}
+                  >
+                    3 km
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setLocationFilterEnabled(true);
+                      setDistanceKm(5);
+                    }}
+                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                      locationFilterEnabled && distanceKm === 5
+                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                    }`}
+                  >
+                    5 km
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setLocationFilterEnabled(true);
+                      setDistanceKm(10);
+                    }}
+                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                      locationFilterEnabled && distanceKm === 10
+                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                    }`}
+                  >
+                    10+ km
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Feed Content */}
@@ -477,7 +529,7 @@ export default function FeedPage() {
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
               <p className="text-sm text-gray-500">
-                {feedMode === 'following' ? 'Loading restaurants from people you follow...' : 'Finding restaurants near you...'}
+                {feedMode === 'following' ? 'Loading restaurants from people you follow...' : 'Finding restaurants...'}
               </p>
             </div>
           )}
@@ -510,7 +562,9 @@ export default function FeedPage() {
               <p className="text-sm text-gray-400 mt-1">
                 {feedMode === 'following' 
                   ? 'Follow people to see their favorite restaurants' 
-                  : 'Try increasing the distance range'}
+                  : locationFilterEnabled 
+                    ? 'Try increasing the distance range or disable location filter'
+                    : 'No restaurants available at the moment'}
               </p>
             </div>
           )}
