@@ -46,7 +46,7 @@ export function BottomNav({ show = true }: BottomNavProps) {
         show ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0"
       )}
       style={{
-        bottom: 'calc(0.5rem + env(safe-area-inset-bottom))',
+        bottom: 'calc(0rem + env(safe-area-inset-bottom))',
       }}
     >
       <div className="bg-white rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.3)] border-2 border-gray-300 px-2">
