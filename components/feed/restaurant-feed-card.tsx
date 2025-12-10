@@ -140,9 +140,8 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
               </div>
             )}
             
-            {/* Badges: Match and Distance */}
-            <div className="absolute top-3 right-3 flex flex-col gap-2 items-end z-10">
-              {/* Match Percentage Badge */}
+            {/* Match Percentage Badge - Top Right */}
+            <div className="absolute top-3 right-3 z-10">
               <div className="bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
@@ -150,17 +149,19 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                   <span className="text-[10px] text-gray-500">match</span>
                 </div>
               </div>
-              
-              {/* Distance Badge */}
-              {distanceText && (
+            </div>
+            
+            {/* Distance Badge - Bottom Right */}
+            {distanceText && (
+              <div className="absolute bottom-3 right-3 z-10">
                 <div className="bg-primary/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
                   <div className="flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
                     <span className="text-xs font-bold text-white">{distanceText}</span>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Action Buttons - Overlaid on Image */}
             <div className="absolute top-3 left-3 flex gap-2">
@@ -210,14 +211,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                 {restaurant.address && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                    <p className="text-xs text-gray-500 truncate flex-1 min-w-0">
-                      {restaurant.address}
-                    </p>
-                    {distanceText && (
-                      <span className="text-xs text-primary font-semibold flex-shrink-0">
-                        · {distanceText}
-                      </span>
-                    )}
+                    <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
                   </div>
                 )}
               </div>
