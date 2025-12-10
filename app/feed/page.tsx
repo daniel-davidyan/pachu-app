@@ -54,6 +54,7 @@ export default function FeedPage() {
   const [locationFilterEnabled, setLocationFilterEnabled] = useState(true);
   const [distanceKm, setDistanceKm] = useState(5);
   const [showHeader, setShowHeader] = useState(true);
+  const [showLocationFilter, setShowLocationFilter] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
@@ -440,82 +441,111 @@ export default function FeedPage() {
             {/* Location Filter - Only show for "All" mode */}
             {feedMode === 'all' && (
               <div className="space-y-2">
-                {/* Location Filter Label */}
-                <div className="flex items-center gap-1.5 px-1">
-                  <MapPin className="w-3.5 h-3.5 text-gray-500" strokeWidth={2} />
-                  <span className="text-xs font-semibold text-gray-700">Location</span>
-                </div>
+                {/* Location Filter Toggle Button */}
+                <button
+                  onClick={() => setShowLocationFilter(!showLocationFilter)}
+                  className="flex items-center justify-between w-full px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm bg-white/90 text-gray-700 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-gray-500" strokeWidth={2} />
+                    <span>Location</span>
+                    {locationFilterEnabled && (
+                      <span className="text-[10px] text-primary font-bold">
+                        ({distanceKm} km)
+                      </span>
+                    )}
+                  </div>
+                  <svg 
+                    className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-300 ${showLocationFilter ? 'rotate-180' : ''}`}
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
 
-                {/* Distance Options - All in one row */}
-                <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(false);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      !locationFilterEnabled
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    No distance
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(1);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 1
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    1 km
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(3);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 3
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    3 km
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(5);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 5
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    5 km
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(10);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 10
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    10+ km
-                  </button>
+                {/* Distance Options - Expandable */}
+                <div 
+                  className={`overflow-hidden transition-all duration-300 ease-out ${
+                    showLocationFilter ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pt-1">
+                    <button
+                      onClick={() => {
+                        setLocationFilterEnabled(false);
+                        setShowLocationFilter(false);
+                      }}
+                      className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                        !locationFilterEnabled
+                          ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                          : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                      }`}
+                    >
+                      No distance
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setLocationFilterEnabled(true);
+                        setDistanceKm(1);
+                        setShowLocationFilter(false);
+                      }}
+                      className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                        locationFilterEnabled && distanceKm === 1
+                          ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                          : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                      }`}
+                    >
+                      1 km
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setLocationFilterEnabled(true);
+                        setDistanceKm(3);
+                        setShowLocationFilter(false);
+                      }}
+                      className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                        locationFilterEnabled && distanceKm === 3
+                          ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                          : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                      }`}
+                    >
+                      3 km
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setLocationFilterEnabled(true);
+                        setDistanceKm(5);
+                        setShowLocationFilter(false);
+                      }}
+                      className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                        locationFilterEnabled && distanceKm === 5
+                          ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                          : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                      }`}
+                    >
+                      5 km
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setLocationFilterEnabled(true);
+                        setDistanceKm(10);
+                        setShowLocationFilter(false);
+                      }}
+                      className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
+                        locationFilterEnabled && distanceKm === 10
+                          ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
+                          : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                      }`}
+                    >
+                      10+ km
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
