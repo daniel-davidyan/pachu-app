@@ -157,11 +157,6 @@ export default function ProfilePage() {
   return (
     <MainLayout>
       <div className="pb-24 bg-gradient-to-b from-white to-gray-50 min-h-screen">
-        {/* Header */}
-        <div className="px-4 pt-2 pb-4">
-          <h1 className="text-xl font-bold text-gray-900">Profile</h1>
-        </div>
-
         {/* Profile Card */}
         <div className="px-4">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">

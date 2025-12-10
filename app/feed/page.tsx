@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react
 import { MainLayout } from '@/components/layout/main-layout';
 import { Star, Heart, MapPin, Loader2, Users, Plus, Bookmark } from 'lucide-react';
 import { RestaurantFeedCard } from '@/components/feed/restaurant-feed-card';
+import { CitySelector } from '@/components/feed/city-selector';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MutualFriend {
@@ -42,9 +43,18 @@ interface RestaurantFeed {
   longitude: number;
 }
 
+interface City {
+  id: string;
+  name: string;
+  country?: string;
+  latitude: number;
+  longitude: number;
+}
+
 export default function FeedPage() {
   // Always use default values for SSR compatibility
   const [feedMode, setFeedMode] = useState<'all' | 'following'>('all');
+  const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [restaurants, setRestaurants] = useState<RestaurantFeed[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -232,10 +242,13 @@ export default function FeedPage() {
       }
 
       if (feedMode === 'all') {
+        // Use selected city location or user location
+        const searchLocation = selectedCity || userLocation;
+        
         // Fetch real restaurants from Google Places
         const radius = locationFilterEnabled ? distanceKm * 1000 : 50000; // 50km when no location filter
         const googleResponse = await fetch(
-          `/api/restaurants/nearby?latitude=${userLocation.latitude}&longitude=${userLocation.longitude}&radius=${radius}`
+          `/api/restaurants/nearby?latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}`
         );
         const googleData = await googleResponse.json();
 
@@ -325,10 +338,13 @@ export default function FeedPage() {
           setPage(pageNum);
         }
       } else {
+        // Use selected city location or user location
+        const searchLocation = selectedCity || userLocation;
+        
         // Following mode - fetch from database with mutual friends
         const radius = locationFilterEnabled ? distanceKm * 1000 : 50000; // 50km when no location filter
         const response = await fetch(
-          `/api/feed/following?page=${pageNum}&limit=5&latitude=${userLocation.latitude}&longitude=${userLocation.longitude}&radius=${radius}`
+          `/api/feed/following?page=${pageNum}&limit=5&latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}`
         );
         const data = await response.json();
 
@@ -358,9 +374,9 @@ export default function FeedPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [userLocation, feedMode, locationFilterEnabled, distanceKm]);
+  }, [userLocation, feedMode, locationFilterEnabled, distanceKm, selectedCity]);
 
-  // Initial load and when mode or distance changes
+  // Initial load and when mode, distance, or city changes
   useEffect(() => {
     if (!userLocation) return;
     
@@ -371,9 +387,9 @@ export default function FeedPage() {
       return;
     }
     
-    // For subsequent changes (mode or distance), fetch new data
+    // For subsequent changes (mode, distance, or city), fetch new data
     fetchRestaurants(0);
-  }, [userLocation, feedMode, locationFilterEnabled, distanceKm, fetchRestaurants]);
+  }, [userLocation, feedMode, locationFilterEnabled, distanceKm, selectedCity, fetchRestaurants]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -413,7 +429,8 @@ export default function FeedPage() {
           }}
         >
           <div className="px-4 pt-3 pb-2 space-y-3">
-            <h1 className="text-xl font-bold text-gray-900">Discover</h1>
+            {/* City Selector */}
+            <CitySelector selectedCity={selectedCity} onSelectCity={setSelectedCity} />
             
             {/* Feed Mode Selector - Map Category Style */}
             <div className="flex gap-2">

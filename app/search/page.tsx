@@ -90,8 +90,6 @@ export default function SearchPage() {
       <div className="container mx-auto px-4 py-3">
         {/* Search Header */}
         <div className="mb-4">
-          <h1 className="text-lg font-bold text-gray-900 mb-3">Discover</h1>
-          
           {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
