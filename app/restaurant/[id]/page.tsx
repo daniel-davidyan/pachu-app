@@ -196,6 +196,12 @@ export default function RestaurantPage() {
           {/* Action Buttons */}
           <div className="absolute top-4 right-4 flex gap-2">
             <button
+              onClick={() => setShowWriteReview(true)}
+              className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center transition-all hover:bg-white"
+            >
+              <PenLine className="w-5 h-5 text-gray-700" />
+            </button>
+            <button
               onClick={handleWishlist}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg ${
                 isWishlisted 
@@ -224,11 +230,14 @@ export default function RestaurantPage() {
         <div className="bg-white px-4 py-5 border-b border-gray-200">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{restaurant.name}</h1>
           
-          {/* Rating */}
+          {/* Match Percentage */}
           <div className="flex items-center gap-3 mb-3">
-            <div className="flex items-center gap-1.5 bg-yellow-50 px-3 py-1.5 rounded-lg">
-              <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-              <span className="font-bold text-yellow-700">{restaurant.averageRating.toFixed(1)}</span>
+            <div className="bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
+                <span className="text-sm font-bold text-gray-900">{Math.round((restaurant.averageRating / 5) * 100)}%</span>
+                <span className="text-[10px] text-gray-500 font-medium">match</span>
+              </div>
             </div>
             <span className="text-sm text-gray-500">
               {restaurant.totalReviews} {restaurant.totalReviews === 1 ? 'review' : 'reviews'}
