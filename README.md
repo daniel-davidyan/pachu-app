@@ -11,6 +11,7 @@ A mobile-optimized social restaurant discovery platform that combines AI-powered
 - Social OAuth (Google, Facebook, Microsoft ready)
 - Login, signup, and password recovery flows
 - User profiles with avatars and bio
+- **Profile Photo Upload** - Upload and update your profile picture
 - Profile editing
 - Protected routes and session management
 
@@ -112,6 +113,7 @@ NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-places-api-key
 3. Execute the schema setup files (in order):
    - `02-feed-functions.sql`
    - `05-add-review-photos.sql`
+   - `102-setup-avatars-storage.sql` (for profile photo uploads)
 
 **Note:** Skip the dummy data files (`03-feed-following-dummy-data.sql` and `04-feed-dummy-data-daniel-amit.sql`) - they're no longer needed!
 
@@ -266,6 +268,7 @@ To run this application, you'll need:
 - **Quick Start:** See `QUICK_START.md` for 5-minute setup guide
 - **Setup Guide:** See `SETUP_REAL_DATA.md` for detailed setup instructions
 - **Features Guide:** See `FRIENDS_AND_REVIEWS_GUIDE.md` for feature documentation
+- **Profile Photos:** See `PROFILE_PHOTO_UPLOAD_GUIDE.md` for photo upload instructions
 - **Database Schema:** See `DATABASE_SCHEMA.md` for complete database structure
 - **Recent Changes:** See `CHANGES_SUMMARY.md` for latest updates
 
