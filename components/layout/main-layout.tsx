@@ -12,7 +12,12 @@ export function MainLayout({ children, showBottomNav = true }: MainLayoutProps) 
   return (
     <div className="min-h-screen bg-gray-100">
       <TopBar />
-      <main className="pt-14 pb-20">
+      <main 
+        className="pb-20"
+        style={{
+          paddingTop: 'calc(3.5rem + env(safe-area-inset-top))',
+        }}
+      >
         {children}
       </main>
       <BottomNav show={showBottomNav} />

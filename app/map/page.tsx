@@ -271,8 +271,9 @@ export default function MapPage() {
 
       {/* Category Carousel - Top */}
       <div 
-        className="absolute top-4 left-0 right-0 z-20"
+        className="absolute left-0 right-0 z-20"
         style={{
+          top: 'calc(1rem + env(safe-area-inset-top))',
           paddingLeft: 'max(1rem, env(safe-area-inset-left))',
           paddingRight: 'max(1rem, env(safe-area-inset-right))',
         }}
@@ -321,8 +322,9 @@ export default function MapPage() {
       {/* Loading Indicator */}
       {loading && (
         <div 
-          className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-2 z-30 animate-fade-in"
+          className="absolute left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-2 z-30 animate-fade-in"
           style={{
+            top: 'calc(4rem + env(safe-area-inset-top))',
             boxShadow: '0 4px 16px rgba(197, 69, 156, 0.2), 0 0 0 2px white',
           }}
         >

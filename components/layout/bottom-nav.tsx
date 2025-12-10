@@ -42,9 +42,12 @@ export function BottomNav({ show = true }: BottomNavProps) {
   return (
     <nav 
       className={cn(
-        "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out",
+        "fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out",
         show ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0"
       )}
+      style={{
+        bottom: 'calc(1rem + env(safe-area-inset-bottom))',
+      }}
     >
       <div className="bg-white rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.3)] border-2 border-gray-300 px-2">
         <div className="flex items-center justify-center gap-1 h-12">

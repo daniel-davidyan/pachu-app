@@ -399,9 +399,12 @@ export default function FeedPage() {
       <div className="pb-24 min-h-screen bg-gray-50">
         {/* Header with Tabs */}
         <div 
-          className={`sticky top-0 z-20 bg-white border-b border-gray-200 transition-transform duration-300 ease-in-out ${
+          className={`sticky z-20 bg-white border-b border-gray-200 transition-transform duration-300 ease-in-out ${
             showHeader ? 'translate-y-0' : '-translate-y-full'
           }`}
+          style={{
+            top: 'calc(3.5rem + env(safe-area-inset-top))',
+          }}
         >
           <div className="px-4 pt-4 pb-3">
             <h1 className="text-xl font-bold text-gray-900 mb-4">Discover</h1>

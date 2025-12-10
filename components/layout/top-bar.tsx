@@ -5,9 +5,14 @@ import Link from 'next/link';
 
 export function TopBar() {
   return (
-    <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-50">
+    <header 
+      className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+      }}
+    >
       <div 
-        className="flex items-center justify-between h-full px-4"
+        className="flex items-center justify-between h-14 px-4"
         style={{
           paddingLeft: 'max(1rem, env(safe-area-inset-left))',
           paddingRight: 'max(1rem, env(safe-area-inset-right))',
