@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react
 import { MainLayout } from '@/components/layout/main-layout';
 import { Star, Heart, MapPin, Loader2, Users, Plus, Bookmark } from 'lucide-react';
 import { RestaurantFeedCard } from '@/components/feed/restaurant-feed-card';
-import { CitySelector } from '@/components/feed/city-selector';
+import { FiltersDropdown } from '@/components/feed/filters-dropdown';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MutualFriend {
@@ -64,7 +64,6 @@ export default function FeedPage() {
   const [locationFilterEnabled, setLocationFilterEnabled] = useState(true);
   const [distanceKm, setDistanceKm] = useState(5);
   const [showHeader, setShowHeader] = useState(true);
-  const [showLocationFilter, setShowLocationFilter] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
@@ -428,141 +427,62 @@ export default function FeedPage() {
             top: 'calc(3.5rem + env(safe-area-inset-top))',
           }}
         >
-          <div className="px-4 pt-3 pb-2 space-y-3">
-            {/* City Selector */}
-            <CitySelector selectedCity={selectedCity} onSelectCity={setSelectedCity} />
-            
-            {/* Feed Mode Selector - Map Category Style */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFeedMode('all')}
-                className={`flex-1 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                  feedMode === 'all'
-                    ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                    : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFeedMode('following')}
-                className={`flex-1 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                  feedMode === 'following'
-                    ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                    : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                }`}
-              >
-                Following
-              </button>
+          <div className="px-4 pt-3 pb-2 space-y-1">
+            {/* Nearby Dropdown - Centered */}
+            <div className="flex justify-center">
+              <FiltersDropdown
+                selectedCity={selectedCity}
+                onSelectCity={setSelectedCity}
+                locationFilterEnabled={locationFilterEnabled}
+                setLocationFilterEnabled={setLocationFilterEnabled}
+                distanceKm={distanceKm}
+                setDistanceKm={setDistanceKm}
+              />
             </div>
-
-            {/* Location Filter - Available for both All and Following */}
-            <div className="space-y-2">
-              {/* Location Filter Toggle Button */}
-              <button
-                onClick={() => setShowLocationFilter(!showLocationFilter)}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm bg-white/90 text-gray-700 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]"
-              >
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-gray-500" strokeWidth={2} />
-                  <span>Location</span>
-                  {locationFilterEnabled && (
-                    <span className="text-[10px] text-primary font-bold">
-                      ({distanceKm} km)
-                    </span>
-                  )}
-                </div>
-                <svg 
-                  className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-300 ${showLocationFilter ? 'rotate-180' : ''}`}
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
+            
+            {/* Feed Mode Tabs - Minimal Design with Sliding Underline */}
+            <div className="relative border-b border-gray-100">
+              {/* Text Buttons */}
+              <div className="relative w-full h-10 flex items-center">
+                <button
+                  onClick={() => setFeedMode('all')}
+                  className="absolute transition-colors"
+                  style={{ left: '25%', transform: 'translateX(-50%)' }}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {/* Distance Options - Expandable */}
-              <div 
-                className={`overflow-hidden transition-all duration-300 ease-out ${
-                  showLocationFilter ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
-                }`}
-              >
-                <div className="flex gap-2 overflow-x-auto scrollbar-hide pt-1">
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(false);
-                      setShowLocationFilter(false);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      !locationFilterEnabled
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                  <span 
+                    className={`text-base font-medium transition-all duration-300 ${
+                      feedMode === 'all' ? 'text-[#C5459C]' : 'text-black'
                     }`}
                   >
-                    No distance
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(1);
-                      setShowLocationFilter(false);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 1
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
+                    All
+                  </span>
+                </button>
+                <button
+                  onClick={() => setFeedMode('following')}
+                  className="absolute transition-colors"
+                  style={{ left: '75%', transform: 'translateX(-50%)' }}
+                >
+                  <span 
+                    className={`text-base font-medium transition-all duration-300 ${
+                      feedMode === 'following' ? 'text-[#C5459C]' : 'text-black'
                     }`}
                   >
-                    1 km
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(3);
-                      setShowLocationFilter(false);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 3
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    3 km
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(5);
-                      setShowLocationFilter(false);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 5
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    5 km
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setLocationFilterEnabled(true);
-                      setDistanceKm(10);
-                      setShowLocationFilter(false);
-                    }}
-                    className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-sm ${
-                      locationFilterEnabled && distanceKm === 10
-                        ? 'bg-primary/10 text-[#C5459C] border-primary shadow-[0_4px_12px_rgba(197,69,156,0.25)]'
-                        : 'bg-white/90 text-gray-600 border-gray-200 shadow-sm hover:shadow-md active:scale-[0.98]'
-                    }`}
-                  >
-                    10+ km
-                  </button>
-                </div>
+                    Following
+                  </span>
+                </button>
+              </div>
+              
+              {/* Animated Underline - Below Text */}
+              <div className="relative w-full">
+                <div 
+                  className="h-0.5 rounded-full transition-all duration-300 ease-out"
+                  style={{
+                    backgroundColor: '#C5459C',
+                    boxShadow: '0 0 8px rgba(197, 69, 156, 0.4)',
+                    marginLeft: feedMode === 'all' ? '0%' : '50%',
+                    width: '50%'
+                  }}
+                />
               </div>
             </div>
           </div>

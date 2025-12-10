@@ -389,8 +389,8 @@ export function CitySelector({ selectedCity, onSelectCity }: CitySelectorProps) 
                     </div>
                   </div>
                 )}
-              </div>
             </div>
+          </div>
         </>
       )}
 
