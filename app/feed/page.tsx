@@ -58,7 +58,7 @@ export default function FeedPage() {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
-  const scrollThreshold = 10; // Minimum scroll distance to trigger hide/show
+  const scrollThreshold = 50; // Minimum scroll distance to trigger hide/show
   const hasFetchedOnMount = useRef(false);
   const scrollRestored = useRef(false);
 
@@ -185,15 +185,15 @@ export default function FeedPage() {
       }
       
       // Scrolling down - hide
-      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
         setShowHeader(false);
+        lastScrollY.current = currentScrollY;
       }
-      // Scrolling up - show
-      else if (currentScrollY < lastScrollY.current) {
+      // Scrolling up - show (only if scrolled up significantly)
+      else if (currentScrollY < lastScrollY.current - scrollThreshold) {
         setShowHeader(true);
+        lastScrollY.current = currentScrollY;
       }
-      
-      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });

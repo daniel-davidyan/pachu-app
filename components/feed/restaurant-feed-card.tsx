@@ -53,6 +53,22 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
 
+  // Calculate distance using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+  };
+
   // Check if a user ID is a valid UUID (real user vs Google review author)
   const isRealUser = (userId: string) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -90,10 +106,20 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
     }
   };
 
-  const distanceText = restaurant.distance 
-    ? restaurant.distance < 1000 
-      ? `${Math.round(restaurant.distance)}m from you`
-      : `${(restaurant.distance / 1000).toFixed(1)}km from you`
+  // Calculate distance from user to restaurant
+  const distance = userLocation 
+    ? calculateDistance(
+        userLocation.latitude, 
+        userLocation.longitude, 
+        restaurant.latitude, 
+        restaurant.longitude
+      )
+    : restaurant.distance; // Fallback to provided distance if no user location
+
+  const distanceText = distance 
+    ? distance < 1000 
+      ? `${Math.round(distance)}m from you`
+      : `${(distance / 1000).toFixed(1)}km from you`
     : null;
 
   return (
@@ -184,7 +210,14 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                 {restaurant.address && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                    <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
+                    <p className="text-xs text-gray-500 truncate flex-1 min-w-0">
+                      {restaurant.address}
+                    </p>
+                    {distanceText && (
+                      <span className="text-xs text-primary font-semibold flex-shrink-0">
+                        · {distanceText}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
