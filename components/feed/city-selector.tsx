@@ -43,13 +43,34 @@ export function CitySelector({ selectedCity, onSelectCity }: CitySelectorProps) 
     );
   }, []);
 
-  // Focus search input when modal opens
+  // Focus search input when modal opens and prevent body scroll
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 100);
+      // Prevent body scroll when modal is open (mobile-friendly)
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restore body scroll when modal closes
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
     }
+    
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+    };
   }, [isOpen]);
 
   // Search cities via Google Places API

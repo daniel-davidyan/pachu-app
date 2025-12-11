@@ -36,16 +36,31 @@ export function FiltersDropdown({
   const [tempLocationFilterEnabled, setTempLocationFilterEnabled] = useState(locationFilterEnabled);
   const [tempDistanceKm, setTempDistanceKm] = useState(distanceKm);
   
-  // Hide bottom nav when modal is open
+  // Hide bottom nav and prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
+      const scrollY = window.scrollY;
       document.body.classList.add('filters-modal-open');
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
     } else {
+      const scrollY = document.body.style.top;
       document.body.classList.remove('filters-modal-open');
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
     }
     
     return () => {
       document.body.classList.remove('filters-modal-open');
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
     };
   }, [isOpen]);
   
@@ -104,7 +119,7 @@ export function FiltersDropdown({
       {isOpen && (
         <>
           {/* Full Screen Overlay */}
-          <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-gray-50 to-white animate-fade-in flex flex-col w-screen" style={{ height: '100dvh' }}>
+          <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-gray-50 to-white animate-fade-in flex flex-col w-screen overflow-hidden" style={{ height: '100dvh', overscrollBehavior: 'contain' }}>
             {/* Header */}
             <div className="flex-shrink-0 px-6 py-5 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl" style={{ paddingTop: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-top)))' }}>
               <div className="flex items-center justify-between">
@@ -118,9 +133,9 @@ export function FiltersDropdown({
               </div>
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="px-6 py-6 pb-32 space-y-8">
+            {/* Content (no scroll) */}
+            <div className="flex-1 overflow-hidden">
+              <div className="px-6 pt-6 pb-32 space-y-8 h-full">
                 {/* City Filter */}
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 mb-4">City</h3>
@@ -206,11 +221,7 @@ export function FiltersDropdown({
             >
               <button
                 onClick={handleApply}
-                className="w-full py-4 text-white rounded-2xl font-medium text-base transition-all duration-200 active:scale-[0.98] hover:shadow-xl hover:shadow-primary/20"
-                style={{ 
-                  backgroundColor: '#C5459C',
-                  boxShadow: '0 4px 16px rgba(197, 69, 156, 0.15)'
-                }}
+                className="w-full py-4 bg-white text-black rounded-2xl font-medium text-base transition-all duration-200 active:scale-[0.98] border-2 border-gray-200 hover:bg-gray-50"
               >
                 Apply Filters
               </button>
