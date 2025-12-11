@@ -7,6 +7,7 @@ import {
   ArrowLeft, Star, MapPin, Users, Calendar, UserPlus, UserCheck, 
   Loader2, Settings, Share2 
 } from 'lucide-react';
+import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
 
@@ -246,10 +247,10 @@ export default function ProfilePage() {
 
           {/* Average Rating */}
           {stats.reviewsCount > 0 && (
-            <div className="flex items-center justify-center gap-2 mb-4 py-3 bg-yellow-50 rounded-xl">
-              <Star className="w-5 h-5 fill-yellow-500 text-yellow-500" />
-              <span className="font-bold text-lg text-yellow-700">
-                {stats.averageRating.toFixed(1)} avg rating
+            <div className="flex items-center justify-center gap-2 mb-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl">
+              <CompactRating rating={stats.averageRating} showEmoji={false} />
+              <span className="font-bold text-sm text-gray-600">
+                avg rating
               </span>
             </div>
           )}
@@ -387,16 +388,7 @@ export default function ProfilePage() {
                           )}
                         </div>
                         <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-3.5 h-3.5 ${
-                                i < review.rating
-                                  ? 'fill-yellow-400 text-yellow-400'
-                                  : 'fill-gray-200 text-gray-200'
-                              }`}
-                            />
-                          ))}
+                          <CompactRating rating={review.rating} showEmoji={true} />
                         </div>
                       </div>
                     )}

@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
-  ArrowLeft, Star, Heart, MapPin, Phone, Globe, DollarSign, 
+  ArrowLeft, Heart, MapPin, Phone, Globe, DollarSign, 
   Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp
 } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
+import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
 
@@ -405,19 +406,8 @@ export default function RestaurantPage() {
                           <p className="font-semibold text-gray-900">{review.user.fullName}</p>
                           <p className="text-xs text-gray-500">@{review.user.username}</p>
                         </div>
-                        <div className="text-right">
-                          <div className="flex items-center gap-0.5 mb-0.5">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3.5 h-3.5 ${
-                                  i < review.rating
-                                    ? 'fill-yellow-400 text-yellow-400'
-                                    : 'fill-gray-200 text-gray-200'
-                                }`}
-                              />
-                            ))}
-                          </div>
+                        <div className="text-right flex flex-col items-end gap-1">
+                          <CompactRating rating={review.rating} showEmoji={true} />
                           <p className="text-xs text-gray-400">
                             {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
                           </p>

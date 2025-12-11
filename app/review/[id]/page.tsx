@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
-  ArrowLeft, Star, MapPin, Calendar, ThumbsUp, UserPlus, UserCheck, 
+  ArrowLeft, MapPin, Calendar, ThumbsUp, UserPlus, UserCheck, 
   Loader2, Share2, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import { ModernRating, CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
 
@@ -265,10 +266,7 @@ export default function ReviewPage() {
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 mt-1">
-                  <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
-                  <span className="text-sm font-semibold text-yellow-700">
-                    {review.restaurant.averageRating.toFixed(1)}
-                  </span>
+                  <CompactRating rating={review.restaurant.averageRating} showEmoji={false} />
                   <span className="text-xs text-gray-400">
                     ({review.restaurant.totalReviews} reviews)
                   </span>
@@ -281,17 +279,8 @@ export default function ReviewPage() {
         {/* Review Content */}
         <div className="bg-white border-b border-gray-200 p-4">
           {/* Rating */}
-          <div className="flex items-center gap-1 mb-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star
-                key={i}
-                className={`w-6 h-6 ${
-                  i < review.rating
-                    ? 'fill-yellow-400 text-yellow-400'
-                    : 'fill-gray-200 text-gray-200'
-                }`}
-              />
-            ))}
+          <div className="flex items-start mb-3">
+            <ModernRating rating={review.rating} size="md" showLabel={true} animated={false} />
           </div>
 
           {/* Title */}
@@ -443,18 +432,7 @@ export default function ReviewPage() {
                         {recentReview.restaurant?.name}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-2.5 h-2.5 ${
-                                i < recentReview.rating
-                                  ? 'fill-yellow-400 text-yellow-400'
-                                  : 'fill-gray-200 text-gray-200'
-                              }`}
-                            />
-                          ))}
-                        </div>
+                        <CompactRating rating={recentReview.rating} showEmoji={true} />
                         <span className="text-xs text-gray-400">
                           {formatDistanceToNow(new Date(recentReview.createdAt), { addSuffix: true })}
                         </span>

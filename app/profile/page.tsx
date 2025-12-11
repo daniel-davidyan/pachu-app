@@ -5,6 +5,7 @@ import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
 import { User, Calendar, Edit, Heart, Users, Star, Camera, ChevronRight, Award, Settings } from 'lucide-react';
+import { CompactRating } from '@/components/ui/modern-rating';
 import Link from 'next/link';
 
 interface Profile {
@@ -364,17 +365,7 @@ export default function ProfilePage() {
                         {review.restaurants?.address || 'Location no longer available'}
                       </p>
                       <div className="flex items-center gap-1 mt-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-3.5 h-3.5 ${
-                              i < review.rating
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'fill-gray-200 text-gray-200'
-                            }`}
-                          />
-                        ))}
-                        <span className="text-xs font-semibold text-gray-600 ml-1">({review.rating}/5)</span>
+                        <CompactRating rating={review.rating} showEmoji={true} />
                       </div>
                     </div>
                   </div>

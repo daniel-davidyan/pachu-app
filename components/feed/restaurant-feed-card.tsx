@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Star, Heart, PenLine, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, PenLine, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
+import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 
@@ -268,72 +269,54 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                       {/* Reviewer Info */}
                       {userIsReal ? (
                         <Link href={`/profile/${review.user.id}`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            {review.user.avatarUrl ? (
-                              <img
-                                src={review.user.avatarUrl}
-                                alt={review.user.fullName}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs">
-                                {review.user.fullName.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-gray-900 truncate hover:text-primary transition-colors">
-                                {review.user.fullName}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-0.5">
-                                  {Array.from({ length: 5 }).map((_, i) => (
-                                    <Star
-                                      key={i}
-                                      className={`w-2.5 h-2.5 ${
-                                        i < review.rating
-                                          ? 'fill-yellow-400 text-yellow-400'
-                                          : 'fill-gray-200 text-gray-200'
-                                      }`}
-                                    />
-                                  ))}
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {review.user.avatarUrl ? (
+                                <img
+                                  src={review.user.avatarUrl}
+                                  alt={review.user.fullName}
+                                  className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                                  {review.user.fullName.charAt(0).toUpperCase()}
                                 </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-gray-900 truncate hover:text-primary transition-colors">
+                                  {review.user.fullName}
+                                </p>
                                 <span className="text-[10px] text-gray-400">{timeAgo}</span>
                               </div>
+                            </div>
+                            <div className="flex-shrink-0">
+                              <CompactRating rating={review.rating} showEmoji={true} />
                             </div>
                           </div>
                         </Link>
                       ) : (
-                        <div className="flex items-center gap-2 mb-2">
-                          {review.user.avatarUrl ? (
-                            <img
-                              src={review.user.avatarUrl}
-                              alt={review.user.fullName}
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs">
-                              {review.user.fullName.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-gray-900 truncate">
-                              {review.user.fullName}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-0.5">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`w-2.5 h-2.5 ${
-                                      i < review.rating
-                                        ? 'fill-yellow-400 text-yellow-400'
-                                        : 'fill-gray-200 text-gray-200'
-                                    }`}
-                                  />
-                                ))}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {review.user.avatarUrl ? (
+                              <img
+                                src={review.user.avatarUrl}
+                                alt={review.user.fullName}
+                                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                                {review.user.fullName.charAt(0).toUpperCase()}
                               </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-gray-900 truncate">
+                                {review.user.fullName}
+                              </p>
                               <span className="text-[10px] text-gray-400">{timeAgo}</span>
                             </div>
+                          </div>
+                          <div className="flex-shrink-0">
+                            <CompactRating rating={review.rating} showEmoji={true} />
                           </div>
                         </div>
                       )}

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Heart, MessageCircle, Share2, Star, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Heart, MessageCircle, Share2, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Review {
@@ -203,10 +204,7 @@ export function FullScreenReviewViewer({
           <div className="mb-4">
             <h2 className="text-white font-bold text-2xl mb-2">{currentReview.restaurant.name}</h2>
             <div className="flex items-center gap-3 text-white/80 text-sm">
-              <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                <span>{currentReview.rating}/5</span>
-              </div>
+              <CompactRating rating={currentReview.rating} showEmoji={true} />
               {currentReview.restaurant.address && (
                 <>
                   <span>•</span>

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Star, Heart, Navigation, Phone, Globe, ChevronRight, Edit3 } from 'lucide-react';
+import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3 } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
+import { CompactRating } from '@/components/ui/modern-rating';
 
 interface RestaurantCardProps {
   restaurant: Restaurant | null;
@@ -167,10 +168,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                 
                 {/* Rating & Meta */}
                 <div className="flex items-center gap-1.5 mt-1">
-                  <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded-md">
-                    <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                    <span className="font-bold text-xs text-yellow-700">{restaurant.rating.toFixed(1)}</span>
-                  </div>
+                  <CompactRating rating={restaurant.rating} showEmoji={false} />
                   <span className="text-xs text-gray-400">({restaurant.totalReviews})</span>
                   {priceSymbols && (
                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">{priceSymbols}</span>
@@ -238,8 +236,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                     </div>
                     <p className="text-xs font-medium text-gray-900 truncate">{place.name}</p>
                     <div className="flex items-center gap-0.5 mt-0.5">
-                      <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-[10px] font-medium text-gray-600">{place.rating.toFixed(1)}</span>
+                      <CompactRating rating={place.rating} showEmoji={false} />
                     </div>
                   </div>
                 ))}
