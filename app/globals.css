@@ -1,40 +1,32 @@
 @import "tailwindcss";
 @import "mapbox-gl/dist/mapbox-gl.css";
 
-@layer theme {
-  :root {
-    --color-primary: 197 69 156;
-    --color-primary-50: 252 242 249;
-    --color-primary-100: 248 226 242;
-    --color-primary-200: 241 197 229;
-    --color-primary-300: 234 168 216;
-    --color-primary-400: 220 110 191;
-    --color-primary-500: 197 69 156;
-    --color-primary-600: 177 55 140;
-    --color-primary-700: 147 43 116;
-    --color-primary-800: 117 34 92;
-    --color-primary-900: 88 26 69;
-    --color-primary-950: 58 17 46;
-    
-    --color-secondary: 69 156 197;
-    --color-secondary-50: 242 249 252;
-    --color-secondary-100: 226 242 248;
-    --color-secondary-200: 197 229 241;
-    --color-secondary-300: 168 216 234;
-    --color-secondary-400: 110 191 220;
-    --color-secondary-500: 69 156 197;
-    --color-secondary-600: 55 140 177;
-    --color-secondary-700: 43 116 147;
-    --color-secondary-800: 34 92 117;
-    --color-secondary-900: 26 69 88;
-    --color-secondary-950: 17 46 58;
-    
-    /* Safe area insets for mobile devices (iPhone notch, etc.) */
-    --safe-area-inset-top: env(safe-area-inset-top, 0px);
-    --safe-area-inset-right: env(safe-area-inset-right, 0px);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-area-inset-left: env(safe-area-inset-left, 0px);
-  }
+@theme {
+  --color-primary: #C5459C;
+  --color-primary-50: #FCF2F9;
+  --color-primary-100: #F8E2F2;
+  --color-primary-200: #F1C5E5;
+  --color-primary-300: #EAA8D8;
+  --color-primary-400: #DC6EBF;
+  --color-primary-500: #C5459C;
+  --color-primary-600: #B1378C;
+  --color-primary-700: #932B74;
+  --color-primary-800: #75225C;
+  --color-primary-900: #581A45;
+  --color-primary-950: #3A112E;
+  
+  --color-secondary: #459CC5;
+  --color-secondary-50: #F2F9FC;
+  --color-secondary-100: #E2F2F8;
+  --color-secondary-200: #C5E5F1;
+  --color-secondary-300: #A8D8EA;
+  --color-secondary-400: #6EBFDC;
+  --color-secondary-500: #459CC5;
+  --color-secondary-600: #378CB1;
+  --color-secondary-700: #2B7493;
+  --color-secondary-800: #225C75;
+  --color-secondary-900: #1A4558;
+  --color-secondary-950: #112E3A;
 }
 
 @layer base {
