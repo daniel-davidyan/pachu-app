@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
   ArrowLeft, Heart, MapPin, Phone, Globe, DollarSign, 
-  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp
+  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star
 } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { CompactRating } from '@/components/ui/modern-rating';
