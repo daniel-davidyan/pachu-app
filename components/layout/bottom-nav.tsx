@@ -42,7 +42,7 @@ export function BottomNav({ show = true }: BottomNavProps) {
   return (
     <nav 
       className={cn(
-        "fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out",
+        "bottom-nav-container fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out",
         show ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0"
       )}
       style={{
