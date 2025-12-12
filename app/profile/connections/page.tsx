@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { UserPlus, UserCheck, Loader2, Users, ArrowLeft } from 'lucide-react';
@@ -16,7 +16,7 @@ interface User {
   isFollowing: boolean;
 }
 
-export default function ConnectionsPage() {
+function ConnectionsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as ConnectionTab) || 'followers';
@@ -243,5 +243,19 @@ export default function ConnectionsPage() {
         </div>
       </div>
     </MainLayout>
+  );
+}
+
+export default function ConnectionsPage() {
+  return (
+    <Suspense fallback={
+      <MainLayout>
+        <div className="min-h-screen bg-gray-50 pb-24 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    }>
+      <ConnectionsContent />
+    </Suspense>
   );
 }
