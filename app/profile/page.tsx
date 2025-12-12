@@ -4,9 +4,10 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
-import { User, Calendar, Edit, Heart, Users, Star, Camera, ChevronRight, Award, Settings } from 'lucide-react';
+import { Calendar, Camera, X, Check, Edit2, Heart, MapPin, Loader2 } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Profile {
   id: string;
@@ -18,9 +19,9 @@ interface Profile {
 }
 
 interface Stats {
-  reviews: number;
-  friends: number;
-  wishlist: number;
+  experiences: number;
+  followers: number;
+  following: number;
 }
 
 interface Review {
@@ -33,28 +34,64 @@ interface Review {
     name: string;
     address: string;
     image_url?: string;
+    google_place_id?: string;
   };
   review_photos: Array<{ photo_url: string }>;
 }
 
+interface WishlistItem {
+  id: string;
+  created_at: string;
+  restaurants: {
+    id: string;
+    google_place_id: string;
+    name: string;
+    address: string;
+    image_url?: string;
+  };
+}
+
+type ProfileTab = 'experiences' | 'wishlist';
+
 export default function ProfilePage() {
+  const router = useRouter();
   const { user } = useUser();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [stats, setStats] = useState<Stats>({ reviews: 0, friends: 0, wishlist: 0 });
+  const [stats, setStats] = useState<Stats>({ experiences: 0, followers: 0, following: 0 });
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [loadingTab, setLoadingTab] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>('experiences');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+
+  // Edit mode states
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    username: '',
+    bio: ''
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchProfile();
       fetchStats();
-      fetchReviews();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      if (activeTab === 'experiences') {
+        fetchReviews();
+      } else {
+        fetchWishlist();
+      }
+    }
+  }, [user, activeTab]);
 
   const fetchProfile = async () => {
     try {
@@ -66,6 +103,11 @@ export default function ProfilePage() {
 
       if (error) throw error;
       setProfile(data);
+      setEditForm({
+        full_name: data.full_name || '',
+        username: data.username || '',
+        bio: data.bio || ''
+      });
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -77,28 +119,40 @@ export default function ProfilePage() {
     try {
       if (!user?.id) return;
 
-      // Get review count
-      const { count: reviewsCount } = await supabase
+      // Get experiences (reviews) count
+      const { count: experiencesCount } = await supabase
         .from('reviews')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
-      // Get friends count (following)
-      const { count: friendsCount } = await supabase
+      // Get followers count
+      let followersCount = 0;
+      const { count: count1 } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', user.id);
+      
+      if (count1 !== null) {
+        followersCount = count1;
+      } else {
+        // Try legacy column name
+        const { count: count2 } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('followed_id', user.id);
+        followersCount = count2 || 0;
+      }
+
+      // Get following count
+      const { count: followingCount } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
         .eq('follower_id', user.id);
 
-      // Get wishlist count
-      const { count: wishlistCount } = await supabase
-        .from('wishlist')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
       setStats({
-        reviews: reviewsCount || 0,
-        friends: friendsCount || 0,
-        wishlist: wishlistCount || 0,
+        experiences: experiencesCount || 0,
+        followers: followersCount,
+        following: followingCount || 0,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -108,12 +162,10 @@ export default function ProfilePage() {
   const fetchReviews = async () => {
     if (!user?.id) return;
     
-    setLoadingReviews(true);
+    setLoadingTab(true);
     try {
       const response = await fetch(`/api/reviews?userId=${user.id}`);
       const data = await response.json();
-      
-      console.log('Fetched reviews:', data); // Debug log
       
       if (data.error) {
         console.error('API error:', data.error);
@@ -125,7 +177,44 @@ export default function ProfilePage() {
       console.error('Error fetching reviews:', error);
       setReviews([]);
     } finally {
-      setLoadingReviews(false);
+      setLoadingTab(false);
+    }
+  };
+
+  const fetchWishlist = async () => {
+    if (!user?.id) return;
+    
+    setLoadingTab(true);
+    try {
+      const response = await fetch('/api/wishlist');
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('API error:', data.error);
+        setWishlist([]);
+      } else {
+        setWishlist(data.wishlist || []);
+      }
+    } catch (error) {
+      console.error('Error fetching wishlist:', error);
+      setWishlist([]);
+    } finally {
+      setLoadingTab(false);
+    }
+  };
+
+  const handleRemoveFromWishlist = async (restaurantId: string) => {
+    try {
+      const response = await fetch(`/api/wishlist?restaurantId=${restaurantId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setWishlist(prev => prev.filter(item => item.restaurants.id !== restaurantId));
+        fetchStats(); // Refresh stats
+      }
+    } catch (error) {
+      console.error('Error removing from wishlist:', error);
     }
   };
 
@@ -138,13 +227,11 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file || !user?.id) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('Image must be less than 5MB');
       return;
@@ -152,12 +239,10 @@ export default function ProfilePage() {
 
     setUploadingAvatar(true);
     try {
-      // Generate unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      // Upload to Supabase storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, {
@@ -167,12 +252,10 @@ export default function ProfilePage() {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Update profile with new avatar URL
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
@@ -180,20 +263,41 @@ export default function ProfilePage() {
 
       if (updateError) throw updateError;
 
-      // Update local state
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
-      
-      // Success message
-      alert('Profile photo updated! 📸');
     } catch (error) {
       console.error('Error uploading avatar:', error);
       alert('Failed to upload photo. Please try again.');
     } finally {
       setUploadingAvatar(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      const response = await fetch('/api/profile/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to update profile');
+        return;
+      }
+
+      setProfile(data.profile);
+      setIsEditingProfile(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -201,7 +305,7 @@ export default function ProfilePage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
       </MainLayout>
     );
@@ -222,256 +326,352 @@ export default function ProfilePage() {
 
   return (
     <MainLayout>
-      <div className="pb-24 bg-gradient-to-b from-white to-gray-50 min-h-screen">
-        {/* Profile Card */}
-        <div className="px-4">
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            {/* Cover + Avatar */}
-            <div className="relative">
-              <div className="h-24 bg-gradient-to-r from-primary/80 via-primary to-primary/80" />
-              <div className="absolute -bottom-12 left-1/2 -translate-x-1/2">
-                <div className="relative">
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.full_name || profile.username}
-                      className="w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-                      <span className="text-3xl font-bold text-white">
-                        {(profile.full_name || profile.username).charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
+      <div className="pb-24 bg-gray-50 min-h-screen">
+        {/* Compact Profile Header */}
+        <div className="bg-white border-b border-gray-200 px-4 py-4">
+          {isEditingProfile ? (
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={editForm.full_name}
+                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary text-sm"
+              />
+              <input
+                type="text"
+                placeholder="Username"
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary text-sm"
+              />
+              <textarea
+                placeholder="Bio"
+                value={editForm.bio}
+                onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary text-sm resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={savingProfile}
+                  className="flex-1 bg-primary text-white py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditingProfile(false);
+                    setEditForm({
+                      full_name: profile.full_name || '',
+                      username: profile.username || '',
+                      bio: profile.bio || ''
+                    });
+                  }}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-medium text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-5">
+              {/* Avatar - Left Side */}
+              <div className="relative flex-shrink-0">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.full_name || profile.username}
+                    className="w-20 h-20 rounded-full object-cover"
                   />
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                    className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-100 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Upload profile photo"
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-white">
+                      {(profile.full_name || profile.username).charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute bottom-0 right-0 w-7 h-7 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-100 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  {uploadingAvatar ? (
+                    <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                  ) : (
+                    <Camera className="w-3 h-3 text-gray-600" />
+                  )}
+                </button>
+              </div>
+
+              {/* Info - Right Side - Centered & Spread */}
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                {/* Name and Username - Centered */}
+                <div className="text-center">
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {profile.full_name || profile.username}
+                  </h2>
+                  <p className="text-sm text-gray-500">@{profile.username}</p>
+                </div>
+
+                {/* Stats Row - Spread Across Width */}
+                <div className="flex justify-around items-center mt-3">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.experiences}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Experiences</p>
+                  </div>
+                  <button
+                    onClick={() => router.push('/profile/connections?tab=followers')}
+                    className="text-center hover:bg-gray-50 px-2 py-1 rounded transition-colors"
                   >
-                    {uploadingAvatar ? (
-                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Camera className="w-4 h-4 text-gray-600" />
-                    )}
+                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.followers}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Followers</p>
+                  </button>
+                  <button
+                    onClick={() => router.push('/profile/connections?tab=following')}
+                    className="text-center hover:bg-gray-50 px-2 py-1 rounded transition-colors"
+                  >
+                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.following}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Following</p>
                   </button>
                 </div>
               </div>
-            </div>
 
-            {/* Info */}
-            <div className="pt-14 pb-5 px-5 text-center">
-              <h2 className="text-xl font-bold text-gray-900">
-                {profile.full_name || profile.username}
-              </h2>
-              <p className="text-sm text-gray-500">@{profile.username}</p>
-              
-              {profile.bio ? (
-                <p className="text-sm text-gray-600 mt-3 leading-relaxed">{profile.bio}</p>
-              ) : (
-                <button className="text-sm text-primary font-medium mt-3 hover:underline">
-                  + Add bio
-                </button>
-              )}
-
-              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mt-3">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Joined {formatDate(profile.created_at)}</span>
-              </div>
-
-              {/* Stats Row */}
-              <div className="flex justify-center gap-8 mt-5 pt-5 border-t border-gray-100">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{stats.reviews}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Reviews</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{stats.friends}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Following</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{stats.wishlist}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Saved</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="px-4 mt-4">
-          <div className="grid grid-cols-2 gap-3">
-            <button className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]">
-              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                <Star className="w-5 h-5 text-primary" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold text-gray-900">My Reviews</p>
-                <p className="text-xs text-gray-500">{stats.reviews} places</p>
-              </div>
-            </button>
-            <button className="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]">
-              <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-                <Heart className="w-5 h-5 text-red-500" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold text-gray-900">Wishlist</p>
-                <p className="text-xs text-gray-500">{stats.wishlist} saved</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* My Reviews Section */}
-        <div className="px-4 mt-6 mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold text-gray-900">My Reviews</h2>
-            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {stats.reviews} {stats.reviews === 1 ? 'review' : 'reviews'}
-            </span>
-          </div>
-          
-          {loadingReviews ? (
-            <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <p className="text-sm text-gray-500">Loading your reviews...</p>
-            </div>
-          ) : reviews.length > 0 ? (
-            <div className="space-y-3">
-              {reviews.map((review) => (
-                <div key={review.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                  {/* Restaurant Header */}
-                  <div className="p-4 flex items-center gap-3">
-                    <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
-                      {review.restaurants?.image_url ? (
-                        <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 truncate">
-                        {review.restaurants?.name || 'Restaurant (Deleted)'}
-                      </h3>
-                      <p className="text-xs text-gray-500 truncate">
-                        {review.restaurants?.address || 'Location no longer available'}
-                      </p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <CompactRating rating={review.rating} showEmoji={true} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Review Photos */}
-                  {review.review_photos && review.review_photos.length > 0 && (
-                    <div className="px-4 pb-3">
-                      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-                        {review.review_photos.map((photo, index) => (
-                          <img
-                            key={index}
-                            src={photo.photo_url}
-                            alt=""
-                            className="w-24 h-24 rounded-xl object-cover flex-shrink-0 border border-gray-200"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Review Text */}
-                  {review.content && (
-                    <div className="px-4 pb-3">
-                      <p className="text-sm text-gray-700 leading-relaxed">{review.content}</p>
-                    </div>
-                  )}
-
-                  {/* Date */}
-                  <div className="px-4 pb-3 border-t border-gray-50 pt-3">
-                    <p className="text-xs text-gray-400">
-                      📅 {new Date(review.created_at).toLocaleDateString('en-US', { 
-                        month: 'long', 
-                        day: 'numeric', 
-                        year: 'numeric' 
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                <Star className="w-8 h-8 text-primary" />
-              </div>
-              <p className="text-gray-900 font-bold text-lg">No reviews yet</p>
-              <p className="text-sm text-gray-600 mt-2 mb-4">Start sharing your restaurant experiences!</p>
-              <Link 
-                href="/map" 
-                className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+              {/* Edit Button - Top Right */}
+              <button
+                onClick={() => setIsEditingProfile(true)}
+                className="w-7 h-7 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors self-start"
               >
-                ✍️ Write Your First Review
-              </Link>
+                <Edit2 className="w-3.5 h-3.5 text-gray-600" />
+              </button>
             </div>
+          )}
+
+          {/* Bio - Full Width Below */}
+          {!isEditingProfile && (
+            profile.bio ? (
+              <p className="text-xs text-gray-600 mt-3 leading-relaxed">{profile.bio}</p>
+            ) : (
+              <button 
+                onClick={() => setIsEditingProfile(true)}
+                className="text-xs text-primary font-medium mt-2 hover:underline"
+              >
+                + Add bio
+              </button>
+            )
           )}
         </div>
 
-        {/* Menu Items */}
-        <div className="px-4 mt-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
-            <Link href="/profile/edit" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
-                  <Edit className="w-4 h-4 text-blue-600" />
-                </div>
-                <span className="text-sm font-medium text-gray-900">Edit Profile</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
+        {/* Tab Selector */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+          <div className="relative">
+            {/* Text Buttons */}
+            <div className="relative w-full h-12 flex items-center">
+              <button
+                onClick={() => setActiveTab('experiences')}
+                className="absolute transition-colors"
+                style={{ left: '25%', transform: 'translateX(-50%)' }}
+              >
+                <span 
+                  className={`text-base font-medium transition-all duration-300 ${
+                    activeTab === 'experiences' ? 'text-[#C5459C]' : 'text-black'
+                  }`}
+                >
+                  My Experiences
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('wishlist')}
+                className="absolute transition-colors"
+                style={{ left: '75%', transform: 'translateX(-50%)' }}
+              >
+                <span 
+                  className={`text-base font-medium transition-all duration-300 ${
+                    activeTab === 'wishlist' ? 'text-[#C5459C]' : 'text-black'
+                  }`}
+                >
+                  My Wishlist
+                </span>
+              </button>
+            </div>
             
-            <Link href="/search" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center">
-                  <Users className="w-4 h-4 text-purple-600" />
-                </div>
-                <span className="text-sm font-medium text-gray-900">Find Friends</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-
-            <Link href="/settings" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Settings className="w-4 h-4 text-gray-600" />
-                </div>
-                <span className="text-sm font-medium text-gray-900">Settings</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
+            {/* Animated Underline */}
+            <div className="relative w-full">
+              <div 
+                className="h-0.5 rounded-full transition-all duration-300 ease-out"
+                style={{
+                  backgroundColor: '#C5459C',
+                  boxShadow: '0 0 8px rgba(197, 69, 156, 0.4)',
+                  marginLeft: activeTab === 'experiences' ? '0%' : '50%',
+                  width: '50%'
+                }}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Achievement Banner */}
-        <div className="px-4 mt-4">
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-4 border border-amber-100">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-                <Award className="w-6 h-6 text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">Start your journey!</p>
-                <p className="text-xs text-gray-600 mt-0.5">Write your first review to unlock badges</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-amber-600" />
+        {/* Tab Content */}
+        <div className="px-4 py-4">
+          {loadingTab ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-2" />
+              <p className="text-sm text-gray-500">Loading...</p>
             </div>
-          </div>
+          ) : activeTab === 'experiences' ? (
+            // My Experiences
+            reviews.length > 0 ? (
+              <div className="space-y-3">
+                {reviews.map((review) => (
+                  <Link
+                    key={review.id}
+                    href={`/restaurant/${review.restaurants?.google_place_id || review.restaurants?.id}`}
+                    className="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    {/* Restaurant Header */}
+                    <div className="p-4 flex items-center gap-3">
+                      <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
+                        {review.restaurants?.image_url ? (
+                          <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-gray-900 truncate">
+                          {review.restaurants?.name || 'Restaurant'}
+                        </h3>
+                        <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {review.restaurants?.address || 'Address not available'}
+                        </p>
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <CompactRating rating={review.rating} showEmoji={true} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Review Photos */}
+                    {review.review_photos && review.review_photos.length > 0 && (
+                      <div className="px-4 pb-3">
+                        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                          {review.review_photos.map((photo, index) => (
+                            <img
+                              key={index}
+                              src={photo.photo_url}
+                              alt=""
+                              className="w-28 h-28 rounded-xl object-cover flex-shrink-0 border border-gray-200"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Review Text */}
+                    {review.content && (
+                      <div className="px-4 pb-3">
+                        <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">{review.content}</p>
+                      </div>
+                    )}
+
+                    {/* Date */}
+                    <div className="px-4 pb-4 pt-2 border-t border-gray-50">
+                      <p className="text-xs text-gray-400">
+                        📅 {new Date(review.created_at).toLocaleDateString('en-US', { 
+                          month: 'long', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        })}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <span className="text-3xl">✨</span>
+                </div>
+                <p className="text-gray-900 font-bold text-lg">No experiences yet</p>
+                <p className="text-sm text-gray-600 mt-2 mb-4">Start sharing your restaurant experiences!</p>
+                <Link 
+                  href="/map" 
+                  className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+                >
+                  ✍️ Write Your First Review
+                </Link>
+              </div>
+            )
+          ) : (
+            // My Wishlist
+            wishlist.length > 0 ? (
+              <div className="space-y-3">
+                {wishlist.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    <Link
+                      href={`/restaurant/${item.restaurants?.google_place_id || item.restaurants?.id}`}
+                      className="block p-4 flex items-center gap-3"
+                    >
+                      <div className="w-16 h-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-xl overflow-hidden flex-shrink-0">
+                        {item.restaurants?.image_url ? (
+                          <img src={item.restaurants.image_url} alt={item.restaurants.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-gray-900 truncate">
+                          {item.restaurants?.name || 'Restaurant'}
+                        </h3>
+                        <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {item.restaurants?.address || 'Address not available'}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Added {formatDate(item.created_at)}
+                        </p>
+                      </div>
+                    </Link>
+                    <div className="px-4 pb-4">
+                      <button
+                        onClick={() => handleRemoveFromWishlist(item.restaurants.id)}
+                        className="w-full bg-red-50 text-red-600 py-2 rounded-lg font-medium text-sm hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Heart className="w-4 h-4 fill-current" />
+                        Remove from Wishlist
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl border-2 border-dashed border-red-200 p-10 text-center">
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <Heart className="w-8 h-8 text-red-500" />
+                </div>
+                <p className="text-gray-900 font-bold text-lg">Your wishlist is empty</p>
+                <p className="text-sm text-gray-600 mt-2 mb-4">Save restaurants you want to try!</p>
+                <Link 
+                  href="/map" 
+                  className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+                >
+                  Explore Restaurants
+                </Link>
+              </div>
+            )
+          )}
         </div>
       </div>
     </MainLayout>

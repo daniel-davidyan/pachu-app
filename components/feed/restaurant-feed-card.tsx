@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Heart, PenLine, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, PenLine, MapPin, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow } from 'date-fns';
@@ -52,6 +52,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
+  const [loadingWishlist, setLoadingWishlist] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   // Calculate distance using Haversine formula
@@ -77,8 +78,54 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
   };
 
   const handleWishlist = async () => {
-    setIsWishlisted(!isWishlisted);
-    // TODO: Call API to add/remove from wishlist
+    if (loadingWishlist) return;
+    
+    setLoadingWishlist(true);
+    const newWishlistState = !isWishlisted;
+    setIsWishlisted(newWishlistState);
+    
+    try {
+      if (newWishlistState) {
+        // Add to wishlist
+        const response = await fetch('/api/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            googlePlaceId: restaurant.googlePlaceId || restaurant.id,
+            name: restaurant.name,
+            address: restaurant.address,
+            imageUrl: restaurant.imageUrl,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add to wishlist');
+        }
+      } else {
+        // Remove from wishlist - we need to get the restaurant ID first
+        const wishlistResponse = await fetch('/api/wishlist');
+        const wishlistData = await wishlistResponse.json();
+        const wishlistItem = wishlistData.wishlist?.find(
+          (item: any) => item.restaurants?.google_place_id === (restaurant.googlePlaceId || restaurant.id)
+        );
+
+        if (wishlistItem) {
+          const response = await fetch(`/api/wishlist?restaurantId=${wishlistItem.restaurants.id}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to remove from wishlist');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating wishlist:', error);
+      // Revert on error
+      setIsWishlisted(!newWishlistState);
+    } finally {
+      setLoadingWishlist(false);
+    }
   };
 
   const scrollCarousel = (direction: 'left' | 'right') => {
@@ -169,19 +216,24 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
               {/* Wishlist Button */}
               <button
                 onClick={handleWishlist}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg ${
+                disabled={loadingWishlist}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg disabled:opacity-50 ${
                   isWishlisted 
                     ? 'bg-red-50 backdrop-blur-sm' 
                     : 'bg-white/95 backdrop-blur-sm hover:bg-white'
                 }`}
               >
-                <Heart 
-                  className={`w-5 h-5 transition-all ${
-                    isWishlisted 
-                      ? 'fill-red-500 text-red-500' 
-                      : 'text-gray-600'
-                  }`} 
-                />
+                {loadingWishlist ? (
+                  <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+                ) : (
+                  <Heart 
+                    className={`w-5 h-5 transition-all ${
+                      isWishlisted 
+                        ? 'fill-red-500 text-red-500' 
+                        : 'text-gray-600'
+                    }`} 
+                  />
+                )}
               </button>
               
               {/* Add Review Button */}

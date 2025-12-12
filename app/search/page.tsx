@@ -3,9 +3,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
-import { Search, MapPin, User, Star, Loader2 } from 'lucide-react';
+import { Search, MapPin, User, Star, Loader2, UserPlus, UserCheck } from 'lucide-react';
 
 type SearchTab = 'places' | 'users';
+
+interface VisitedUser {
+  id: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+}
 
 interface PlaceResult {
   googlePlaceId: string;
@@ -13,6 +20,14 @@ interface PlaceResult {
   address: string;
   rating: number;
   photoUrl?: string;
+  visitedByFollowing?: VisitedUser[];
+}
+
+interface MutualFriend {
+  id: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
 }
 
 interface UserResult {
@@ -20,6 +35,8 @@ interface UserResult {
   username: string;
   full_name: string;
   avatar_url?: string;
+  mutualFriends?: MutualFriend[];
+  isFollowing?: boolean;
 }
 
 export default function SearchPage() {
@@ -33,6 +50,7 @@ export default function SearchPage() {
   const [suggestedUsers, setSuggestedUsers] = useState<UserResult[]>([]);
   const [loadingTrending, setLoadingTrending] = useState(false);
   const [loadingSuggested, setLoadingSuggested] = useState(false);
+  const [followingUsers, setFollowingUsers] = useState<Set<string>>(new Set());
 
   // Search for places
   useEffect(() => {
@@ -160,6 +178,42 @@ export default function SearchPage() {
     router.push(`/profile/${user.id}`);
   };
 
+  const handleFollow = async (userId: string, currentlyFollowing: boolean, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation to profile
+    
+    try {
+      const action = currentlyFollowing ? 'unfollow' : 'follow';
+      const response = await fetch('/api/users/follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, action }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update follow status');
+      }
+
+      // Update local state
+      const newFollowingUsers = new Set(followingUsers);
+      if (currentlyFollowing) {
+        newFollowingUsers.delete(userId);
+      } else {
+        newFollowingUsers.add(userId);
+      }
+      setFollowingUsers(newFollowingUsers);
+
+      // Update the user in the results
+      setUsersResults(prev => prev.map(user => 
+        user.id === userId ? { ...user, isFollowing: !currentlyFollowing } : user
+      ));
+      setSuggestedUsers(prev => prev.map(user => 
+        user.id === userId ? { ...user, isFollowing: !currentlyFollowing } : user
+      ));
+    } catch (error) {
+      console.error('Error updating follow status:', error);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-3">
@@ -254,8 +308,8 @@ export default function SearchPage() {
                           <div className="flex-1 min-w-0 overflow-hidden">
                             <h3 className="font-semibold text-sm text-gray-900 truncate">{place.name}</h3>
                             <p className="text-xs text-gray-500 truncate">{place.address}</p>
-                            {place.rating > 0 && (
-                              <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {place.rating > 0 && (
                                 <div className="bg-white border border-gray-200 rounded-full px-2 py-0.5 shadow-sm">
                                   <div className="flex items-center gap-1">
                                     <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
@@ -263,8 +317,35 @@ export default function SearchPage() {
                                     <span className="text-[9px] text-gray-500">match</span>
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
+                              {place.visitedByFollowing && place.visitedByFollowing.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <div className="flex -space-x-1.5">
+                                    {place.visitedByFollowing.slice(0, 3).map((user, idx) => (
+                                      <div 
+                                        key={user.id} 
+                                        className="w-5 h-5 rounded-full border-2 border-white bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-[10px] font-bold"
+                                        style={{ zIndex: 3 - idx }}
+                                      >
+                                        {user.avatarUrl ? (
+                                          <img src={user.avatarUrl} alt={user.username} className="w-full h-full rounded-full object-cover" />
+                                        ) : (
+                                          <span>{user.fullName.charAt(0).toUpperCase()}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <span className="text-[10px] text-gray-600 ml-0.5">
+                                    {place.visitedByFollowing.length === 1 
+                                      ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} reviewed`
+                                      : place.visitedByFollowing.length === 2
+                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} reviewed`
+                                        : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others reviewed`
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </button>
                       ))}
@@ -310,8 +391,8 @@ export default function SearchPage() {
                             <div className="flex-1 min-w-0 overflow-hidden">
                               <h3 className="font-semibold text-sm text-gray-900 truncate">{place.name}</h3>
                               <p className="text-xs text-gray-500 truncate">{place.address}</p>
-                              {place.rating > 0 && (
-                                <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {place.rating > 0 && (
                                   <div className="bg-white border border-gray-200 rounded-full px-2 py-0.5 shadow-sm">
                                     <div className="flex items-center gap-1">
                                       <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
@@ -319,8 +400,35 @@ export default function SearchPage() {
                                       <span className="text-[9px] text-gray-500">match</span>
                                     </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
+                                {place.visitedByFollowing && place.visitedByFollowing.length > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex -space-x-1.5">
+                                      {place.visitedByFollowing.slice(0, 3).map((user, idx) => (
+                                        <div 
+                                          key={user.id} 
+                                          className="w-5 h-5 rounded-full border-2 border-white bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-[10px] font-bold"
+                                          style={{ zIndex: 3 - idx }}
+                                        >
+                                          {user.avatarUrl ? (
+                                            <img src={user.avatarUrl} alt={user.username} className="w-full h-full rounded-full object-cover" />
+                                          ) : (
+                                            <span>{user.fullName.charAt(0).toUpperCase()}</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <span className="text-[10px] text-gray-600 ml-0.5">
+                                      {place.visitedByFollowing.length === 1 
+                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} reviewed`
+                                        : place.visitedByFollowing.length === 2
+                                          ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} reviewed`
+                                          : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others reviewed`
+                                      }
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </button>
                         ))}
@@ -349,23 +457,74 @@ export default function SearchPage() {
                   ) : usersResults.length > 0 ? (
                     <div className="space-y-2.5">
                       {usersResults.map((user) => (
-                        <button
+                        <div
                           key={user.id}
-                          onClick={() => handleUserClick(user)}
-                          className="w-full bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 hover:border-primary/30 hover:shadow-md transition-all text-left"
+                          className="w-full bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:border-primary/30 hover:shadow-md transition-all"
                         >
-                          <div className="w-11 h-11 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                            {user.avatar_url ? (
-                              <img src={user.avatar_url} alt={user.username} className="w-full h-full rounded-full object-cover" />
-                            ) : (
-                              <span>{(user.full_name || user.username).charAt(0).toUpperCase()}</span>
-                            )}
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleUserClick(user)}
+                              className="flex items-center gap-3 flex-1 text-left"
+                            >
+                              <div className="w-11 h-11 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                {user.avatar_url ? (
+                                  <img src={user.avatar_url} alt={user.username} className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                  <span>{(user.full_name || user.username).charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-sm text-gray-900 truncate">{user.full_name || user.username}</h3>
+                                <p className="text-xs text-gray-500 truncate">@{user.username}</p>
+                                {user.mutualFriends && user.mutualFriends.length > 0 && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <div className="flex -space-x-1.5">
+                                      {user.mutualFriends.slice(0, 3).map((friend, idx) => (
+                                        <div 
+                                          key={friend.id} 
+                                          className="w-4 h-4 rounded-full border border-white bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-[8px] font-bold"
+                                          style={{ zIndex: 3 - idx }}
+                                        >
+                                          {friend.avatarUrl ? (
+                                            <img src={friend.avatarUrl} alt={friend.username} className="w-full h-full rounded-full object-cover" />
+                                          ) : (
+                                            <span>{friend.fullName.charAt(0).toUpperCase()}</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <span className="text-[10px] text-gray-600">
+                                      {user.mutualFriends.length === 1
+                                        ? `${user.mutualFriends[0].fullName.split(' ')[0]} follows`
+                                        : `${user.mutualFriends.length} mutual friends`
+                                      }
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => handleFollow(user.id, user.isFollowing || false, e)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                                user.isFollowing
+                                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  : 'bg-primary text-white hover:bg-primary/90'
+                              }`}
+                            >
+                              {user.isFollowing ? (
+                                <>
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  <span>Following</span>
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus className="w-3.5 h-3.5" />
+                                  <span>Follow</span>
+                                </>
+                              )}
+                            </button>
                           </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-sm text-gray-900">{user.full_name || user.username}</h3>
-                            <p className="text-xs text-gray-500">@{user.username}</p>
-                          </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -392,23 +551,74 @@ export default function SearchPage() {
                     ) : suggestedUsers.length > 0 ? (
                       <div className="space-y-2.5">
                         {suggestedUsers.map((user) => (
-                          <button
+                          <div
                             key={user.id}
-                            onClick={() => handleUserClick(user)}
-                            className="w-full bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 hover:border-primary/30 hover:shadow-md transition-all text-left"
+                            className="w-full bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:border-primary/30 hover:shadow-md transition-all"
                           >
-                            <div className="w-11 h-11 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                              {user.avatar_url ? (
-                                <img src={user.avatar_url} alt={user.username} className="w-full h-full rounded-full object-cover" />
-                              ) : (
-                                <span>{(user.full_name || user.username).charAt(0).toUpperCase()}</span>
-                              )}
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => handleUserClick(user)}
+                                className="flex items-center gap-3 flex-1 text-left"
+                              >
+                                <div className="w-11 h-11 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                  {user.avatar_url ? (
+                                    <img src={user.avatar_url} alt={user.username} className="w-full h-full rounded-full object-cover" />
+                                  ) : (
+                                    <span>{(user.full_name || user.username).charAt(0).toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-sm text-gray-900 truncate">{user.full_name || user.username}</h3>
+                                  <p className="text-xs text-gray-500 truncate">@{user.username}</p>
+                                  {user.mutualFriends && user.mutualFriends.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <div className="flex -space-x-1.5">
+                                        {user.mutualFriends.slice(0, 3).map((friend, idx) => (
+                                          <div 
+                                            key={friend.id} 
+                                            className="w-4 h-4 rounded-full border border-white bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-[8px] font-bold"
+                                            style={{ zIndex: 3 - idx }}
+                                          >
+                                            {friend.avatarUrl ? (
+                                              <img src={friend.avatarUrl} alt={friend.username} className="w-full h-full rounded-full object-cover" />
+                                            ) : (
+                                              <span>{friend.fullName.charAt(0).toUpperCase()}</span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <span className="text-[10px] text-gray-600">
+                                        {user.mutualFriends.length === 1
+                                          ? `${user.mutualFriends[0].fullName.split(' ')[0]} follows`
+                                          : `${user.mutualFriends.length} mutual friends`
+                                        }
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </button>
+                              <button
+                                onClick={(e) => handleFollow(user.id, user.isFollowing || false, e)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                                  user.isFollowing
+                                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    : 'bg-primary text-white hover:bg-primary/90'
+                                }`}
+                              >
+                                {user.isFollowing ? (
+                                  <>
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                    <span>Following</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus className="w-3.5 h-3.5" />
+                                    <span>Follow</span>
+                                  </>
+                                )}
+                              </button>
                             </div>
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-sm text-gray-900">{user.full_name || user.username}</h3>
-                              <p className="text-xs text-gray-500">@{user.username}</p>
-                            </div>
-                          </button>
+                          </div>
                         ))}
                       </div>
                     ) : (

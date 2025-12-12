@@ -67,6 +67,8 @@ export default function RestaurantPage() {
   const [loading, setLoading] = useState(true);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
+  const [loadingWishlist, setLoadingWishlist] = useState(false);
+  const [restaurantDbId, setRestaurantDbId] = useState<string | null>(null);
   
   const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -88,6 +90,7 @@ export default function RestaurantPage() {
         setFriendsWhoReviewed(data.friendsWhoReviewed || []);
         setIsWishlisted(data.isWishlisted || false);
         setUserHasReviewed(data.userHasReviewed || false);
+        setRestaurantDbId(data.restaurant.id);
       }
     } catch (error) {
       console.error('Error fetching restaurant:', error);
@@ -97,8 +100,48 @@ export default function RestaurantPage() {
   };
 
   const handleWishlist = async () => {
-    // TODO: Implement wishlist API call
-    setIsWishlisted(!isWishlisted);
+    if (loadingWishlist || !restaurant) return;
+    
+    setLoadingWishlist(true);
+    const newWishlistState = !isWishlisted;
+    setIsWishlisted(newWishlistState);
+    
+    try {
+      if (newWishlistState) {
+        // Add to wishlist
+        const response = await fetch('/api/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            googlePlaceId: restaurant.googlePlaceId || restaurantId,
+            name: restaurant.name,
+            address: restaurant.address,
+            imageUrl: restaurant.imageUrl,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add to wishlist');
+        }
+      } else {
+        // Remove from wishlist
+        if (restaurantDbId) {
+          const response = await fetch(`/api/wishlist?restaurantId=${restaurantDbId}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to remove from wishlist');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating wishlist:', error);
+      // Revert on error
+      setIsWishlisted(!newWishlistState);
+    } finally {
+      setLoadingWishlist(false);
+    }
   };
 
   const handleLikeReview = async (reviewId: string) => {
@@ -204,19 +247,24 @@ export default function RestaurantPage() {
             </button>
             <button
               onClick={handleWishlist}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                isWishlisted 
-                  ? 'bg-red-50 backdrop-blur-sm' 
+              disabled={loadingWishlist}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg disabled:opacity-50 ${
+                isWishlisted
+                  ? 'bg-red-50 backdrop-blur-sm'
                   : 'bg-white/95 backdrop-blur-sm'
               }`}
             >
-              <Heart 
-                className={`w-5 h-5 ${
-                  isWishlisted 
-                    ? 'fill-red-500 text-red-500' 
+              {loadingWishlist ? (
+                <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+              ) : (
+                <Heart
+                  className={`w-5 h-5 ${
+                    isWishlisted
+                      ? 'fill-red-500 text-red-500'
                     : 'text-gray-700'
-                }`} 
-              />
+                  }`}
+                />
+              )}
             </button>
             <button
               onClick={handleShare}
