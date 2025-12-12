@@ -155,10 +155,10 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
             {/* Distance Badge - Bottom Right */}
             {distanceText && (
               <div className="absolute bottom-3 right-3 z-10">
-                <div className="bg-primary/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
+                <div className="bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
                   <div className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
-                    <span className="text-xs font-bold text-white">{distanceText}</span>
+                    <MapPin className="w-3.5 h-3.5 text-gray-600" strokeWidth={2.5} />
+                    <span className="text-xs font-bold text-gray-900">{distanceText}</span>
                   </div>
                 </div>
               </div>

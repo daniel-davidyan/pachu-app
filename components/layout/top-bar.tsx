@@ -29,7 +29,7 @@ export function TopBar() {
 
         {/* Logo - Center */}
         <Link href="/feed" className="absolute left-1/2 -translate-x-1/2">
-          <h1 className="text-2xl font-bold text-primary">Pachu</h1>
+          <h1 className="text-3xl text-primary" style={{ fontFamily: 'Pacifico, cursive' }}>Pachu</h1>
         </Link>
 
         {/* Notifications - Right side */}
