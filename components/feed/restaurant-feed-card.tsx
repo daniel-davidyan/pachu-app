@@ -235,14 +235,6 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                   />
                 )}
               </button>
-              
-              {/* Add Review Button */}
-              <button
-                onClick={() => setShowWriteReview(true)}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm hover:bg-white transition-all shadow-lg active:scale-95"
-              >
-                <PenLine className="w-5 h-5 text-gray-600" strokeWidth={2} />
-              </button>
             </div>
           </div>
 

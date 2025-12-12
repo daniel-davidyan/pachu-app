@@ -98,8 +98,11 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       // Upload photos first
       const uploadedPhotoUrls: string[] = [];
       
-      for (const photo of photos) {
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        const fileExt = photo.name.split('.').pop() || 'jpg';
+        const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
         const { data, error } = await supabase.storage
           .from('review-photos')
           .upload(`reviews/${fileName}`, photo);

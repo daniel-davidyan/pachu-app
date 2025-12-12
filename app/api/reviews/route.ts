@@ -260,3 +260,72 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Delete a review
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const reviewId = searchParams.get('reviewId');
+
+    if (!reviewId) {
+      return NextResponse.json(
+        { error: 'Review ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if review belongs to user
+    const { data: review } = await supabase
+      .from('reviews')
+      .select('user_id')
+      .eq('id', reviewId)
+      .single();
+
+    if (!review || review.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Review not found or unauthorized' },
+        { status: 404 }
+      );
+    }
+
+    // Delete review photos first
+    await supabase
+      .from('review_photos')
+      .delete()
+      .eq('review_id', reviewId);
+
+    // Delete review
+    const { error: deleteError } = await supabase
+      .from('reviews')
+      .delete()
+      .eq('id', reviewId);
+
+    if (deleteError) {
+      console.error('Error deleting review:', deleteError);
+      throw deleteError;
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Review deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error in delete review API:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+

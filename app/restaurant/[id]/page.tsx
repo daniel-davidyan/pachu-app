@@ -240,12 +240,6 @@ export default function RestaurantPage() {
           {/* Action Buttons */}
           <div className="absolute top-4 right-4 flex gap-2">
             <button
-              onClick={() => setShowWriteReview(true)}
-              className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center transition-all hover:bg-white"
-            >
-              <PenLine className="w-5 h-5 text-gray-700" />
-            </button>
-            <button
               onClick={handleWishlist}
               disabled={loadingWishlist}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg disabled:opacity-50 ${

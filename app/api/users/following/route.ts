@@ -23,45 +23,33 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId') || user.id;
 
     // Get following - people this user follows
-    // Try both column names for compatibility
-    let followingData = null;
+    let followingIds: string[] = [];
     
     // Try with following_id first (standard)
-    const { data: data1, error: error1 } = await supabase
+    const { data: followsData, error: followsError } = await supabase
       .from('follows')
-      .select(`
-        following_id,
-        profiles:following_id (
-          id,
-          username,
-          full_name,
-          avatar_url,
-          bio
-        )
-      `)
+      .select('following_id')
       .eq('follower_id', userId);
 
-    followingData = data1;
-    
-    // If column doesn't exist, try with followed_id (legacy)
-    if (error1 && error1.code === '42703') {
-      const { data: data2 } = await supabase
+    if (followsError && followsError.code === '42703') {
+      // Try legacy column name
+      const { data: followsData2 } = await supabase
         .from('follows')
-        .select(`
-          followed_id,
-          profiles:followed_id (
-            id,
-            username,
-            full_name,
-            avatar_url,
-            bio
-          )
-        `)
+        .select('followed_id')
         .eq('follower_id', userId);
-      followingData = data2;
-    } else if (error1) {
-      throw error1;
+      followingIds = followsData2?.map(f => f.followed_id) || [];
+    } else if (followsError) {
+      console.error('Error fetching follows:', followsError);
+      throw followsError;
+    } else {
+      followingIds = followsData?.map(f => f.following_id) || [];
     }
+
+    // Get profile details for all following
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, avatar_url, bio')
+      .in('id', followingIds.length > 0 ? followingIds : ['00000000-0000-0000-0000-000000000000']); // Use dummy ID if empty
 
     // Check which users the current user is following (for the follow button state)
     const { data: currentUserFollowing } = await supabase
@@ -69,22 +57,19 @@ export async function GET(request: NextRequest) {
       .select('following_id, followed_id')
       .eq('follower_id', user.id);
 
-    const followingIds = new Set(
+    const currentFollowingIds = new Set(
       currentUserFollowing?.map(f => f.following_id || f.followed_id) || []
     );
 
     // Format the response
-    const following = (followingData || []).map((follow: any) => {
-      const profile = follow.profiles;
-      return {
-        id: profile.id,
-        username: profile.username,
-        full_name: profile.full_name,
-        avatar_url: profile.avatar_url,
-        bio: profile.bio,
-        isFollowing: followingIds.has(profile.id),
-      };
-    });
+    const following = (profilesData || []).map((profile: any) => ({
+      id: profile.id,
+      username: profile.username,
+      full_name: profile.full_name,
+      avatar_url: profile.avatar_url,
+      bio: profile.bio,
+      isFollowing: currentFollowingIds.has(profile.id),
+    }));
 
     return NextResponse.json({ 
       following,

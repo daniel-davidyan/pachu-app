@@ -4,10 +4,11 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, Camera, X, Check, Edit2, Heart, MapPin, Loader2 } from 'lucide-react';
+import { Calendar, Camera, X, Check, Edit2, Heart, MapPin, Loader2, Trash2, MoreVertical } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { WriteReviewModal } from '@/components/review/write-review-modal';
 
 interface Profile {
   id: string;
@@ -64,6 +65,9 @@ export default function ProfilePage() {
   const [loadingTab, setLoadingTab] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('experiences');
+  const [showReviewMenu, setShowReviewMenu] = useState<string | null>(null);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -119,40 +123,64 @@ export default function ProfilePage() {
     try {
       if (!user?.id) return;
 
+      console.log('Fetching stats for user:', user.id);
+
       // Get experiences (reviews) count
       const { count: experiencesCount } = await supabase
         .from('reviews')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
-
-      // Get followers count
-      let followersCount = 0;
-      const { count: count1 } = await supabase
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('following_id', user.id);
       
-      if (count1 !== null) {
-        followersCount = count1;
-      } else {
-        // Try legacy column name
-        const { count: count2 } = await supabase
+      console.log('Experiences count:', experiencesCount);
+
+      // Get followers count - people who follow this user
+      let followersCount = 0;
+      try {
+        // Try standard column name first
+        const { count: count1, error: error1 } = await supabase
           .from('follows')
           .select('*', { count: 'exact', head: true })
-          .eq('followed_id', user.id);
-        followersCount = count2 || 0;
+          .eq('following_id', user.id);
+        
+        if (!error1 && count1 !== null) {
+          followersCount = count1;
+        } else {
+          // Try legacy column name
+          const { count: count2 } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('followed_id', user.id);
+          followersCount = count2 || 0;
+        }
+      } catch (err) {
+        console.error('Error fetching followers:', err);
       }
 
-      // Get following count
-      const { count: followingCount } = await supabase
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('follower_id', user.id);
+      // Get following count - people this user follows
+      let followingCount = 0;
+      try {
+        const { count, error } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', user.id);
+        
+        if (!error && count !== null) {
+          followingCount = count;
+        }
+      } catch (err) {
+        console.error('Error fetching following:', err);
+      }
+
+      console.log('Final stats:', { 
+        experiences: experiencesCount || 0, 
+        followers: followersCount, 
+        following: followingCount 
+      });
 
       setStats({
         experiences: experiencesCount || 0,
         followers: followersCount,
-        following: followingCount || 0,
+        following: followingCount,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -216,6 +244,35 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error removing from wishlist:', error);
     }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Are you sure you want to delete this review?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/reviews?reviewId=${reviewId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setReviews(prev => prev.filter(review => review.id !== reviewId));
+        fetchStats(); // Refresh stats
+        setShowReviewMenu(null);
+      } else {
+        alert('Failed to delete review');
+      }
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      alert('Failed to delete review');
+    }
+  };
+
+  const handleEditReview = (review: Review) => {
+    setEditingReview(review);
+    setShowEditModal(true);
+    setShowReviewMenu(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -532,33 +589,79 @@ export default function ProfilePage() {
             reviews.length > 0 ? (
               <div className="space-y-3">
                 {reviews.map((review) => (
-                  <Link
+                  <div
                     key={review.id}
-                    href={`/restaurant/${review.restaurants?.google_place_id || review.restaurants?.id}`}
-                    className="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+                    className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
                   >
                     {/* Restaurant Header */}
-                    <div className="p-4 flex items-center gap-3">
-                      <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
-                        {review.restaurants?.image_url ? (
-                          <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-gray-900 truncate">
-                          {review.restaurants?.name || 'Restaurant'}
-                        </h3>
-                        <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {review.restaurants?.address || 'Address not available'}
-                        </p>
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <CompactRating rating={review.rating} showEmoji={true} />
+                    <Link
+                      href={`/restaurant/${review.restaurants?.google_place_id || review.restaurants?.id}`}
+                      className="block p-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
+                          {review.restaurants?.image_url ? (
+                            <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-gray-900 truncate">
+                            {review.restaurants?.name || 'Restaurant'}
+                          </h3>
+                          <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {review.restaurants?.address || 'Address not available'}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <CompactRating rating={review.rating} showEmoji={true} />
+                          </div>
+                        </div>
+                        <div className="relative flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
+                            }}
+                            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4 text-gray-600" />
+                          </button>
+                          
+                          {showReviewMenu === review.id && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-10"
+                                onClick={() => setShowReviewMenu(null)}
+                              />
+                              <div className="absolute right-0 top-10 z-20 bg-white rounded-lg shadow-lg border border-gray-200 py-1 w-32">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleEditReview(review);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleDeleteReview(review.id);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </Link>
 
                     {/* Review Photos */}
                     {review.review_photos && review.review_photos.length > 0 && (
@@ -593,7 +696,7 @@ export default function ProfilePage() {
                         })}
                       </p>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -674,6 +777,31 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Edit Review Modal */}
+      {editingReview && (
+        <WriteReviewModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingReview(null);
+          }}
+          restaurant={{
+            googlePlaceId: editingReview.restaurants?.google_place_id || editingReview.restaurants?.id || '',
+            name: editingReview.restaurants?.name || '',
+            address: editingReview.restaurants?.address || '',
+            latitude: 0,
+            longitude: 0,
+            photoUrl: editingReview.restaurants?.image_url,
+          }}
+          onSuccess={() => {
+            setShowEditModal(false);
+            setEditingReview(null);
+            fetchReviews();
+            fetchStats();
+          }}
+        />
+      )}
     </MainLayout>
   );
 }
