@@ -47,7 +47,7 @@ export default function ConnectionsPage() {
       setFollowing(followingData.following || []);
 
       // Create set of users we're following
-      const followingIds = new Set(
+      const followingIds = new Set<string>(
         (followingData.following || []).map((u: User) => u.id)
       );
       setFollowingUsers(followingIds);
