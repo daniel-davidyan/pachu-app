@@ -120,7 +120,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
   const distanceText = distance 
     ? distance < 1000 
       ? `${Math.round(distance)}m from you`
-      : `${(distance / 1000).toFixed(1)}km from you`
+      : `${Math.round(distance / 1000)}km from you`
     : null;
 
   return (
