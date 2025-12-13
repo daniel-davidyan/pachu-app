@@ -192,7 +192,7 @@ export default function MapPage() {
 
   // Handle restaurant click from chat - zoom to location
   const handleRestaurantClickFromChat = (restaurant: Restaurant) => {
-    if (restaurant.latitude && restaurant.longitude && mapRef.current) {
+    if (mapRef.current) {
       // Zoom to restaurant with smooth animation
       mapRef.current.flyTo({
         center: [restaurant.longitude, restaurant.latitude],

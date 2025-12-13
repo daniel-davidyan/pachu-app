@@ -13,15 +13,15 @@ interface Message {
 interface Restaurant {
   id: string;
   name: string;
-  address?: string;
-  rating?: number;
-  totalReviews?: number;
+  address: string;
+  latitude: number;
+  longitude: number;
+  rating: number;
+  totalReviews: number;
   photoUrl?: string;
-  latitude?: number;
-  longitude?: number;
   priceLevel?: number;
   cuisineTypes?: string[];
-  source?: 'google' | 'friends' | 'own';
+  source: 'google' | 'friends' | 'own';
   googlePlaceId?: string;
 }
 
@@ -202,7 +202,7 @@ export function AIChatSheet({
   };
 
   const handleRestaurantCardClick = (restaurant: Restaurant) => {
-    if (onRestaurantClick && restaurant.latitude && restaurant.longitude) {
+    if (onRestaurantClick) {
       onRestaurantClick(restaurant);
     }
   };
@@ -462,23 +462,17 @@ export function AIChatSheet({
                           <h4 className="font-bold text-gray-900 text-sm mb-1 truncate">{restaurant.name}</h4>
                           
                           {/* Rating */}
-                          {restaurant.rating && (
-                            <div className="flex items-center gap-1 mb-1">
-                              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-                              <span className="text-xs font-semibold text-gray-700">{restaurant.rating.toFixed(1)}</span>
-                              {restaurant.totalReviews && (
-                                <span className="text-xs text-gray-400">({restaurant.totalReviews})</span>
-                              )}
-                              {restaurant.priceLevel && (
-                                <span className="text-xs text-gray-600 ml-1">{'₪'.repeat(restaurant.priceLevel)}</span>
-                              )}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1 mb-1">
+                            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                            <span className="text-xs font-semibold text-gray-700">{restaurant.rating.toFixed(1)}</span>
+                            <span className="text-xs text-gray-400">({restaurant.totalReviews})</span>
+                            {restaurant.priceLevel && (
+                              <span className="text-xs text-gray-600 ml-1">{'₪'.repeat(restaurant.priceLevel)}</span>
+                            )}
+                          </div>
                           
                           {/* Address */}
-                          {restaurant.address && (
-                            <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
-                          )}
+                          <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
                           
                           {/* Cuisines */}
                           {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
