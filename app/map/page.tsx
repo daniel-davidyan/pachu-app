@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
 import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
-import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, MapPin } from 'lucide-react';
+import { Loader2, UtensilsCrossed, Hotel, Home, Landmark, Car, MapPin } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 import type mapboxgl from 'mapbox-gl';
 
@@ -23,11 +23,11 @@ const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.M
 });
 
 const categories = [
-  { id: 'restaurants', name: 'Restaurants', icon: UtensilsCrossed, active: true, color: '#C5459C' },
-  { id: 'cafes', name: 'Cafés', icon: Coffee, active: false, color: '#8B4513' },
-  { id: 'bars', name: 'Bars', icon: Wine, active: false, color: '#F97316' },
+  { id: 'food-drinks', name: 'Food & Drinks', icon: UtensilsCrossed, active: true, color: '#C5459C' },
   { id: 'hotels', name: 'Hotels', icon: Hotel, active: false, color: '#6366F1' },
-  { id: 'services', name: 'Services', icon: Briefcase, active: false, color: '#10B981' },
+  { id: 'cabins', name: 'Cabins', icon: Home, active: false, color: '#8B4513' },
+  { id: 'attractions', name: 'Attractions', icon: Landmark, active: false, color: '#F97316' },
+  { id: 'car-services', name: 'Car Services', icon: Car, active: false, color: '#10B981' },
 ];
 
 export default function MapPage() {
@@ -37,7 +37,7 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [filters, setFilters] = useState<RestaurantFilters>({ query: '' });
-  const [activeCategory, setActiveCategory] = useState('restaurants');
+  const [activeCategory, setActiveCategory] = useState('food-drinks');
   const [showChat, setShowChat] = useState(true);
   const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
   const mapRef = useRef<mapboxgl.Map | null>(null);
