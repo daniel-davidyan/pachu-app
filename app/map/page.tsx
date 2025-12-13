@@ -43,7 +43,6 @@ export default function MapPage() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isRecentering, setIsRecentering] = useState(false);
   const [chatActive, setChatActive] = useState(false);
-  const [chatHeight, setChatHeight] = useState(200);
   const [openNow, setOpenNow] = useState(false);
   const [viewMode, setViewMode] = useState<'following' | 'all'>('all');
   const [isTogglingView, setIsTogglingView] = useState(false);
@@ -187,9 +186,8 @@ export default function MapPage() {
     });
   };
 
-  const handleChatStateChange = (isActive: boolean, height: number) => {
+  const handleChatStateChange = (isActive: boolean) => {
     setChatActive(isActive);
-    setChatHeight(height);
   };
 
   // Handle restaurant click from chat - zoom to location

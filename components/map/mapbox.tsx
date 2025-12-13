@@ -27,14 +27,6 @@ interface MapboxProps {
   suggestedRestaurants?: Restaurant[];
 }
 
-interface Cluster {
-  id: string;
-  latitude: number;
-  longitude: number;
-  count: number;
-  restaurants: Restaurant[];
-}
-
 // Enhanced icon mapping with more categories and variety
 const getRestaurantIcon = (restaurant: Restaurant): { emoji: string; color: string; bg: string } => {
   const cuisines = restaurant.cuisineTypes || [];
@@ -215,7 +207,6 @@ export function Mapbox({
     
     // Smart de-duplication: keep best restaurant when too close
     const filtered: Restaurant[] = [];
-    const positions = new Set<string>();
     
     for (const restaurant of sorted) {
       // Check if too close to any existing marker
@@ -613,7 +604,6 @@ export function Mapbox({
       `;
 
       const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
-      const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
       el.addEventListener('mouseenter', () => {
         if (markerCircle) {
           markerCircle.style.transform = 'scale(1.1)';

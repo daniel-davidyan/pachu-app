@@ -21,6 +21,8 @@ interface Restaurant {
   longitude?: number;
   priceLevel?: number;
   cuisineTypes?: string[];
+  source?: 'google' | 'friends' | 'own';
+  googlePlaceId?: string;
 }
 
 interface AIChatSheetProps {
@@ -28,7 +30,7 @@ interface AIChatSheetProps {
   onRestaurantsFound?: (restaurants: Restaurant[]) => void;
   matchedCount?: number;
   userLocation?: { lat: number; lng: number } | null;
-  onChatStateChange?: (isActive: boolean, height: number) => void;
+  onChatStateChange?: (isActive: boolean) => void;
   onRestaurantClick?: (restaurant: Restaurant) => void;
 }
 
@@ -58,7 +60,6 @@ export function AIChatSheet({
   const [isLoading, setIsLoading] = useState(false);
   const [maxHeight, setMaxHeight] = useState(700);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-  const [suggestedRestaurants, setSuggestedRestaurants] = useState<Restaurant[]>([]);
   
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -84,7 +85,6 @@ export function AIChatSheet({
       if (heightDiff > 150) {
         setIsKeyboardOpen(true);
         // When keyboard opens: chat takes 40% of remaining space
-        const keyboardHeight = heightDiff;
         const remainingHeight = currentHeight;
         const chatHeight = remainingHeight * 0.4; // 40% for chat, 10% will be map
         setSheetHeight(Math.max(minHeight, chatHeight));
@@ -124,9 +124,9 @@ export function AIChatSheet({
   // Notify parent of chat state changes
   useEffect(() => {
     if (onChatStateChange) {
-      onChatStateChange(isActive, sheetHeight);
+      onChatStateChange(isActive);
     }
-  }, [isActive, sheetHeight, onChatStateChange]);
+  }, [isActive, onChatStateChange]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -263,7 +263,6 @@ export function AIChatSheet({
       setMessages(prev => [...prev, assistantMessage]);
 
       if (data.restaurants && data.restaurants.length > 0) {
-        setSuggestedRestaurants(data.restaurants);
         onRestaurantsFound?.(data.restaurants);
       }
 
