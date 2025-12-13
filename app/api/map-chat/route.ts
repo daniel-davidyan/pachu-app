@@ -119,7 +119,7 @@ Examples:
           { headers: request.headers }
         );
         const nearbyData = await nearbyResponse.json();
-        restaurants = (nearbyData.restaurants || []).slice(0, 5); // Top 5 restaurants
+        restaurants = (nearbyData.restaurants || []).slice(0, 3); // Top 3 restaurants for AI suggestions
       } catch (error) {
         console.error('Error fetching restaurants:', error);
       }

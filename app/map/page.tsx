@@ -39,7 +39,7 @@ export default function MapPage() {
   const [filters, setFilters] = useState<RestaurantFilters>({ query: '' });
   const [activeCategory, setActiveCategory] = useState('restaurants');
   const [showChat, setShowChat] = useState(true);
-  const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
+  const [suggestedRestaurants, setSuggestedRestaurants] = useState<Restaurant[]>([]);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isRecentering, setIsRecentering] = useState(false);
   const [chatActive, setChatActive] = useState(false);
@@ -176,15 +176,38 @@ export default function MapPage() {
     setFilters(newFilters);
   };
 
-  const handleRestaurantsFound = (restaurants: any[]) => {
-    // Add AI-suggested restaurants to the map
-    setAllRestaurants(restaurants);
-    setHighlightedRestaurants(restaurants.map(r => r.id));
+  const handleRestaurantsFound = (restaurants: Restaurant[]) => {
+    // Store AI-suggested restaurants
+    setSuggestedRestaurants(restaurants);
+    // Also add them to the map
+    setAllRestaurants(prev => {
+      const existingIds = new Set(prev.map(r => r.id));
+      const newRestaurants = restaurants.filter(r => !existingIds.has(r.id));
+      return [...prev, ...newRestaurants];
+    });
   };
 
   const handleChatStateChange = (isActive: boolean, height: number) => {
     setChatActive(isActive);
     setChatHeight(height);
+  };
+
+  // Handle restaurant click from chat - zoom to location
+  const handleRestaurantClickFromChat = (restaurant: Restaurant) => {
+    if (restaurant.latitude && restaurant.longitude && mapRef.current) {
+      // Zoom to restaurant with smooth animation
+      mapRef.current.flyTo({
+        center: [restaurant.longitude, restaurant.latitude],
+        zoom: 17,
+        duration: 2000,
+        essential: true
+      });
+      
+      // Optionally show the restaurant card after zoom
+      setTimeout(() => {
+        setSelectedRestaurant(restaurant);
+      }, 1500);
+    }
   };
 
   // Hide chat when restaurant is selected
@@ -221,6 +244,7 @@ export default function MapPage() {
             restaurants={filteredRestaurants}
             onRestaurantClick={setSelectedRestaurant}
             mapRef={mapRef}
+            suggestedRestaurants={suggestedRestaurants}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-500">
@@ -266,6 +290,20 @@ export default function MapPage() {
         
         .animate-fade-in {
           animation: fade-in 0.3s ease-in-out;
+        }
+
+        /* Pulse animation for suggested restaurants */
+        @keyframes suggested-pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(197, 69, 156, 0.7);
+          }
+          50% {
+            box-shadow: 0 0 0 8px rgba(197, 69, 156, 0);
+          }
+        }
+        
+        .suggested-marker {
+          animation: suggested-pulse 2s ease-in-out infinite;
         }
       `}</style>
 
@@ -340,39 +378,37 @@ export default function MapPage() {
       )}
 
       {/* Custom Location Button - Above chat, right side */}
-      <button
-        onClick={handleRecenterMap}
-        disabled={isRecentering}
-        className={`fixed z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-          isRecentering 
-            ? 'bg-gray-100 scale-95' 
-            : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
-        }`}
-        style={{
-          right: 'max(1rem, env(safe-area-inset-right))',
-          bottom: chatActive 
-            ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
-            : 'calc(8.25rem + env(safe-area-inset-bottom))',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-        }}
-        aria-label="Center map on my location"
-      >
-        {isRecentering ? (
-          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <MapPin className="w-5 h-5 text-gray-700" strokeWidth={2} fill="gray-700" />
-        )}
-      </button>
+      {!chatActive && (
+        <button
+          onClick={handleRecenterMap}
+          disabled={isRecentering}
+          className={`fixed z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+            isRecentering 
+              ? 'bg-gray-100 scale-95' 
+              : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
+          }`}
+          style={{
+            right: 'max(1rem, env(safe-area-inset-right))',
+            bottom: 'calc(8.25rem + env(safe-area-inset-bottom))',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+          }}
+          aria-label="Center map on my location"
+        >
+          {isRecentering ? (
+            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <MapPin className="w-5 h-5 text-gray-700" strokeWidth={2} fill="gray-700" />
+          )}
+        </button>
+      )}
 
       {/* Filter Controls - Above Search */}
-      {showChat && (
+      {showChat && !chatActive && (
         <div 
           className="fixed z-50"
           style={{
             left: 'max(1rem, env(safe-area-inset-left))',
-            bottom: chatActive 
-              ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
-              : 'calc(8.75rem + env(safe-area-inset-bottom))',
+            bottom: 'calc(8.75rem + env(safe-area-inset-bottom))',
             transition: 'bottom 0.3s ease'
           }}
         >
@@ -474,6 +510,7 @@ export default function MapPage() {
           matchedCount={filteredRestaurants.length}
           userLocation={userLocation}
           onChatStateChange={handleChatStateChange}
+          onRestaurantClick={handleRestaurantClickFromChat}
         />
       )}
 
@@ -487,9 +524,8 @@ export default function MapPage() {
         userLocation={userLocation}
       />
 
-      {/* Bottom Navigation */}
-      <BottomNav />
+      {/* Bottom Navigation - Hide when chat is active */}
+      <BottomNav show={!chatActive} />
     </div>
   );
 }
-
