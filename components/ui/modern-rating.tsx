@@ -16,6 +16,48 @@ export function ModernRating({
   // Normalize rating to 0-100 scale for easier calculations
   const percentage = (rating / 5) * 100;
   
+  // Dynamic gradient colors based on rating - lighter for low, darker for high
+  const getGradientColors = () => {
+    if (rating >= 4.5) {
+      // Very high rating - darkest colors
+      return {
+        start: '#C026D3', // fuchsia-600
+        middle: '#A21CAF', // fuchsia-700
+        end: '#86198F' // fuchsia-800
+      };
+    } else if (rating >= 4) {
+      // High rating - dark colors
+      return {
+        start: '#D946EF', // fuchsia-500
+        middle: '#C026D3', // fuchsia-600
+        end: '#A21CAF' // fuchsia-700
+      };
+    } else if (rating >= 3) {
+      // Medium rating - medium colors
+      return {
+        start: '#EC4899', // pink-500
+        middle: '#D946EF', // fuchsia-500
+        end: '#C026D3' // fuchsia-600
+      };
+    } else if (rating >= 2) {
+      // Low-medium rating - light colors
+      return {
+        start: '#F9A8D4', // pink-300
+        middle: '#F472B6', // pink-400
+        end: '#EC4899' // pink-500
+      };
+    } else {
+      // Very low rating - lightest colors
+      return {
+        start: '#FBE7F3', // pink-100
+        middle: '#FBCFE8', // pink-200
+        end: '#F9A8D4' // pink-300
+      };
+    }
+  };
+
+  const colors = getGradientColors();
+  
   // Size configurations
   const sizeConfig = {
     sm: {
@@ -46,33 +88,21 @@ export function ModernRating({
   const content = (
     <div className="flex items-center gap-2">
       <div 
-        className="relative inline-flex items-center justify-center transition-all duration-500 ease-out hover:scale-110 hover:shadow-xl hover:shadow-pink-500/30"
-        style={{ 
-          width: config.size, 
-          height: config.size,
-          filter: 'drop-shadow(0 4px 12px rgba(236, 72, 153, 0.15))'
-        }}
+        className="relative inline-flex items-center justify-center transition-all duration-300 hover:scale-105"
+        style={{ width: config.size, height: config.size }}
       >
         <svg
           width={config.size}
           height={config.size}
-          className="transform -rotate-90 transition-transform duration-700 ease-in-out"
+          className="transform -rotate-90"
         >
           {/* Gradient Definition */}
           <defs>
-            <linearGradient id="ratingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#EC4899" />
-              <stop offset="50%" stopColor="#D946EF" />
-              <stop offset="100%" stopColor="#C026D3" />
+            <linearGradient id={`ratingGradient-${rating}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={colors.start} />
+              <stop offset="50%" stopColor={colors.middle} />
+              <stop offset="100%" stopColor={colors.end} />
             </linearGradient>
-            {/* Glow filter */}
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-              <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
-            </filter>
           </defs>
           
           {/* Background Circle */}
@@ -83,7 +113,6 @@ export function ModernRating({
             fill="none"
             stroke="#E5E7EB"
             strokeWidth={config.strokeWidth}
-            className="transition-all duration-300"
           />
           
           {/* Progress Circle */}
@@ -92,32 +121,25 @@ export function ModernRating({
             cy={config.size / 2}
             r={radius}
             fill="none"
-            stroke="url(#ratingGradient)"
+            stroke={`url(#ratingGradient-${rating})`}
             strokeWidth={config.strokeWidth}
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
-            filter="url(#glow)"
-            className="transition-all duration-1000 ease-out"
-            style={{
-              animation: 'drawProgress 1.5s ease-out forwards'
-            }}
+            className="transition-all duration-500 ease-out"
           />
         </svg>
         
         {/* Rating number */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`font-bold text-gray-700 ${config.textSize} leading-none transition-all duration-300`}>
+          <span className={`font-bold text-gray-700 ${config.textSize} leading-none`}>
             {rating.toFixed(1)}
           </span>
         </div>
-
-        {/* Subtle pulse glow on hover */}
-        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500/10 to-purple-600/10 opacity-0 hover:opacity-100 transition-opacity duration-500 blur-xl" />
       </div>
 
       {showLabel && (
-        <div className="flex flex-col transition-all duration-300">
+        <div className="flex flex-col">
           <span className={`font-bold text-gray-900 ${config.labelSize}`}>
             {rating >= 4 ? 'Amazing' : rating >= 3 ? 'Good' : rating >= 2 ? 'Okay' : 'Meh'}
           </span>
@@ -131,7 +153,7 @@ export function ModernRating({
 
   if (animated) {
     return (
-      <div className="animate-in fade-in zoom-in duration-700 slide-in-from-bottom-4">
+      <div className="animate-in fade-in zoom-in duration-300">
         {content}
       </div>
     );
@@ -148,6 +170,48 @@ interface CompactRatingProps {
 export function CompactRating({ rating }: CompactRatingProps) {
   const percentage = (rating / 5) * 100;
   
+  // Dynamic gradient colors based on rating - lighter for low, darker for high
+  const getGradientColors = () => {
+    if (rating >= 4.5) {
+      // Very high rating - darkest colors
+      return {
+        start: '#C026D3', // fuchsia-600
+        middle: '#A21CAF', // fuchsia-700
+        end: '#86198F' // fuchsia-800
+      };
+    } else if (rating >= 4) {
+      // High rating - dark colors
+      return {
+        start: '#D946EF', // fuchsia-500
+        middle: '#C026D3', // fuchsia-600
+        end: '#A21CAF' // fuchsia-700
+      };
+    } else if (rating >= 3) {
+      // Medium rating - medium colors
+      return {
+        start: '#EC4899', // pink-500
+        middle: '#D946EF', // fuchsia-500
+        end: '#C026D3' // fuchsia-600
+      };
+    } else if (rating >= 2) {
+      // Low-medium rating - light colors
+      return {
+        start: '#F9A8D4', // pink-300
+        middle: '#F472B6', // pink-400
+        end: '#EC4899' // pink-500
+      };
+    } else {
+      // Very low rating - lightest colors
+      return {
+        start: '#FBE7F3', // pink-100
+        middle: '#FBCFE8', // pink-200
+        end: '#F9A8D4' // pink-300
+      };
+    }
+  };
+
+  const colors = getGradientColors();
+  
   // Compact size configuration
   const size = 40;
   const strokeWidth = 4;
@@ -157,33 +221,21 @@ export function CompactRating({ rating }: CompactRatingProps) {
 
   return (
     <div 
-      className="relative inline-flex items-center justify-center transition-all duration-500 ease-out hover:scale-110 hover:shadow-lg hover:shadow-pink-500/20 group"
-      style={{ 
-        width: size, 
-        height: size,
-        filter: 'drop-shadow(0 2px 8px rgba(236, 72, 153, 0.12))'
-      }}
+      className="relative inline-flex items-center justify-center transition-all duration-300 hover:scale-105"
+      style={{ width: size, height: size }}
     >
       <svg
         width={size}
         height={size}
-        className="transform -rotate-90 transition-transform duration-700 ease-in-out"
+        className="transform -rotate-90"
       >
         {/* Gradient Definition */}
         <defs>
-          <linearGradient id="compactRatingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#EC4899" />
-            <stop offset="50%" stopColor="#D946EF" />
-            <stop offset="100%" stopColor="#C026D3" />
+          <linearGradient id={`compactRatingGradient-${rating}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={colors.start} />
+            <stop offset="50%" stopColor={colors.middle} />
+            <stop offset="100%" stopColor={colors.end} />
           </linearGradient>
-          {/* Glow filter */}
-          <filter id="compactGlow">
-            <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
         </defs>
         
         {/* Background Circle */}
@@ -194,7 +246,6 @@ export function CompactRating({ rating }: CompactRatingProps) {
           fill="none"
           stroke="#E5E7EB"
           strokeWidth={strokeWidth}
-          className="transition-all duration-300"
         />
         
         {/* Progress Circle */}
@@ -203,25 +254,21 @@ export function CompactRating({ rating }: CompactRatingProps) {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="url(#compactRatingGradient)"
+          stroke={`url(#compactRatingGradient-${rating})`}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
-          filter="url(#compactGlow)"
-          className="transition-all duration-1000 ease-out"
+          className="transition-all duration-500 ease-out"
         />
       </svg>
       
       {/* Rating number */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-xs font-bold text-gray-700 leading-none transition-all duration-300 group-hover:scale-110">
+        <span className="text-xs font-bold text-gray-700 leading-none">
           {rating.toFixed(1)}
         </span>
       </div>
-
-      {/* Subtle glow on hover */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md" />
     </div>
   );
 }
