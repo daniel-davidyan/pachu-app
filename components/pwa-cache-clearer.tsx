@@ -7,7 +7,16 @@ const APP_VERSION = 'v11';
 const VERSION_KEY = 'pachu_app_version';
 
 export function PWACacheClearer() {
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(() => {
+    // Initial status calculation
+    if (typeof window === 'undefined') return null;
+    
+    const storedVersion = localStorage.getItem(VERSION_KEY);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    
+    return `Mode: ${isStandalone ? 'PWA' : 'Browser'} | Stored: ${storedVersion || 'none'} | Current: ${APP_VERSION}`;
+  });
 
   useEffect(() => {
     // Only run on client side
@@ -15,7 +24,6 @@ export function PWACacheClearer() {
 
     // Detect browser
     const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
-    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
 
     // Check if running as PWA (standalone mode)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
@@ -26,8 +34,6 @@ export function PWACacheClearer() {
 
     // CHROME FIX: Force clear on Chrome if version doesn't match
     if (isChrome && storedVersion !== APP_VERSION) {
-      setStatus('🔧 Chrome: Clearing all caches...');
-      
       // Nuclear option: Clear EVERYTHING
       try {
         localStorage.clear();
@@ -39,20 +45,15 @@ export function PWACacheClearer() {
         }
         localStorage.setItem(VERSION_KEY, APP_VERSION);
         setTimeout(() => window.location.reload(), 1000);
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
       return;
     }
 
-    // Show status for debugging
-    setStatus(`Mode: ${isStandalone ? 'PWA' : 'Browser'} | Stored: ${storedVersion || 'none'} | Current: ${APP_VERSION}`);
-
     if (!isStandalone) {
       // Even in browser mode, if version mismatch, clear caches
       if (storedVersion && storedVersion !== APP_VERSION) {
-        setStatus('🔄 Clearing browser cache...');
-        
         // Clear all localStorage (except auth)
         const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -87,8 +88,6 @@ export function PWACacheClearer() {
 
     // PWA Mode - clear if version mismatch
     if (storedVersion !== APP_VERSION) {
-      setStatus('🔄 PWA cache clearing...');
-      
       // Clear all localStorage (except auth)
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -115,9 +114,14 @@ export function PWACacheClearer() {
       setTimeout(() => {
         window.location.reload();
       }, 500);
-    } else {
-      setTimeout(() => setStatus(null), 3000);
     }
+    
+    // Hide status after 3 seconds
+    const timer = setTimeout(() => {
+      setStatus(null);
+    }, 3000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   if (!status) return null;
