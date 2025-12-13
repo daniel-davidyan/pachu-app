@@ -298,11 +298,6 @@ export function AIChatSheet({
         throw new Error(String(data.error));
       }
 
-      // Debug: Check what keys exist in the response
-      const responseKeys = Object.keys(data).join(', ');
-      const hasRestaurantsKey = 'restaurants' in data;
-      const restaurantsType = data.restaurants ? (Array.isArray(data.restaurants) ? `array(${(data.restaurants as unknown[]).length})` : typeof data.restaurants) : 'undefined';
-
       // Parse restaurants with explicit validation
       const parsedRestaurants: Restaurant[] = [];
       
@@ -328,9 +323,7 @@ export function AIChatSheet({
         }
       }
 
-      // Debug: Include full diagnostic info in message
-      let messageContent = String(data.message || '');
-      messageContent += `\n\n[API: keys=${responseKeys}, hasR=${hasRestaurantsKey}, type=${restaurantsType}, parsed=${parsedRestaurants.length}]`;
+      const messageContent = String(data.message || '');
 
       const assistantMessage: Message = {
         id: String(Date.now() + 1),
@@ -499,17 +492,12 @@ export function AIChatSheet({
                 
                 {/* Restaurant cards - INLINE RENDERING */}
                 {message.role === 'assistant' && hasRestaurants && (
-                  <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-2">
                     <div className="flex items-center gap-2 px-2">
                       <MapPin className="w-4 h-4 text-pink-500" />
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Suggested For You ({restaurants.length})
                       </p>
-                    </div>
-                    
-                    {/* Debug: Show restaurant names as text (always visible) */}
-                    <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">
-                      📍 {restaurants.map(r => r.name).join(' | ')}
                     </div>
                     
                     {restaurants.map((restaurant, idx) => (

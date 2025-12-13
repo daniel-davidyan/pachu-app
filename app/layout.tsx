@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from '@/components/auth/auth-provider';
+import { PWACacheClearer } from '@/components/pwa-cache-clearer';
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 // Cache busting version - update this when icons change
-const ICON_VERSION = 'v2';
+const ICON_VERSION = 'v3';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -77,6 +78,7 @@ export default function RootLayout({
         <link rel="apple-touch-startup-image" href={`/apple-touch-icon.png?v=${ICON_VERSION}`} />
       </head>
       <body className={inter.className}>
+        <PWACacheClearer />
         <AuthProvider>
         {children}
         </AuthProvider>
