@@ -532,22 +532,23 @@ export function AIChatSheet({
               
               {/* Restaurant Suggestion Cards - Force render if restaurants exist */}
               {(() => {
+                const restaurants = message.restaurants;
                 const hasRestaurants = message.role === 'assistant' && 
-                                      message.restaurants && 
-                                      Array.isArray(message.restaurants) && 
-                                      message.restaurants.length > 0;
+                                      restaurants && 
+                                      Array.isArray(restaurants) && 
+                                      restaurants.length > 0;
                 
-                if (!hasRestaurants) return null;
+                if (!hasRestaurants || !restaurants) return null;
                 
                 return (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center gap-2 px-2">
                       <MapPin className="w-4 h-4 text-primary" />
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Suggested For You ({message.restaurants.length})
+                        Suggested For You ({restaurants.length})
                       </p>
                     </div>
-                    {message.restaurants.map((restaurant) => (
+                    {restaurants.map((restaurant) => (
                     <div
                       key={restaurant.id}
                       onClick={() => handleRestaurantCardClick(restaurant)}
