@@ -16,42 +16,43 @@ export function ModernRating({
   // Normalize rating to 0-100 scale for easier calculations
   const percentage = (rating / 5) * 100;
   
-  // Dynamic gradient colors based on rating - lighter for low, darker for high
+  // Dynamic gradient colors based on rating
+  // 5 = Full primary color #C5459C, 1 = Desaturated gray-ish
   const getGradientColors = () => {
     if (rating >= 4.5) {
-      // Very high rating - darkest colors
+      // Very high rating - full vibrant primary color
       return {
-        start: '#C026D3', // fuchsia-600
-        middle: '#A21CAF', // fuchsia-700
-        end: '#86198F' // fuchsia-800
+        start: '#C5459C', // Primary color
+        middle: '#C5459C', // Primary color
+        end: '#C5459C' // Primary color
       };
     } else if (rating >= 4) {
-      // High rating - dark colors
+      // High rating - slightly desaturated
       return {
-        start: '#D946EF', // fuchsia-500
-        middle: '#C026D3', // fuchsia-600
-        end: '#A21CAF' // fuchsia-700
+        start: '#B8548E', // Slightly desaturated
+        middle: '#C5459C', // Primary color
+        end: '#B8548E' // Slightly desaturated
       };
     } else if (rating >= 3) {
-      // Medium rating - medium colors
+      // Medium rating - moderately desaturated
       return {
-        start: '#EC4899', // pink-500
-        middle: '#D946EF', // fuchsia-500
-        end: '#C026D3' // fuchsia-600
+        start: '#A86B8A', // Moderately desaturated
+        middle: '#B8548E', // Slightly desaturated
+        end: '#A86B8A' // Moderately desaturated
       };
     } else if (rating >= 2) {
-      // Low-medium rating - light colors
+      // Low-medium rating - quite desaturated
       return {
-        start: '#F9A8D4', // pink-300
-        middle: '#F472B6', // pink-400
-        end: '#EC4899' // pink-500
+        start: '#9A7F8E', // Quite desaturated
+        middle: '#A86B8A', // Moderately desaturated
+        end: '#9A7F8E' // Quite desaturated
       };
     } else {
-      // Very low rating - lightest colors
+      // Very low rating - very desaturated (grayish with hint of primary)
       return {
-        start: '#FBE7F3', // pink-100
-        middle: '#FBCFE8', // pink-200
-        end: '#F9A8D4' // pink-300
+        start: '#8B8B8B', // Gray
+        middle: '#9A8090', // Gray with hint of primary
+        end: '#9A7F8E' // Quite desaturated
       };
     }
   };
@@ -170,42 +171,43 @@ interface CompactRatingProps {
 export function CompactRating({ rating }: CompactRatingProps) {
   const percentage = (rating / 5) * 100;
   
-  // Dynamic gradient colors based on rating - lighter for low, darker for high
+  // Dynamic gradient colors based on rating
+  // 5 = Full primary color #C5459C, 1 = Desaturated gray-ish
   const getGradientColors = () => {
     if (rating >= 4.5) {
-      // Very high rating - darkest colors
+      // Very high rating - full vibrant primary color
       return {
-        start: '#C026D3', // fuchsia-600
-        middle: '#A21CAF', // fuchsia-700
-        end: '#86198F' // fuchsia-800
+        start: '#C5459C', // Primary color
+        middle: '#C5459C', // Primary color
+        end: '#C5459C' // Primary color
       };
     } else if (rating >= 4) {
-      // High rating - dark colors
+      // High rating - slightly desaturated
       return {
-        start: '#D946EF', // fuchsia-500
-        middle: '#C026D3', // fuchsia-600
-        end: '#A21CAF' // fuchsia-700
+        start: '#B8548E', // Slightly desaturated
+        middle: '#C5459C', // Primary color
+        end: '#B8548E' // Slightly desaturated
       };
     } else if (rating >= 3) {
-      // Medium rating - medium colors
+      // Medium rating - moderately desaturated
       return {
-        start: '#EC4899', // pink-500
-        middle: '#D946EF', // fuchsia-500
-        end: '#C026D3' // fuchsia-600
+        start: '#A86B8A', // Moderately desaturated
+        middle: '#B8548E', // Slightly desaturated
+        end: '#A86B8A' // Moderately desaturated
       };
     } else if (rating >= 2) {
-      // Low-medium rating - light colors
+      // Low-medium rating - quite desaturated
       return {
-        start: '#F9A8D4', // pink-300
-        middle: '#F472B6', // pink-400
-        end: '#EC4899' // pink-500
+        start: '#9A7F8E', // Quite desaturated
+        middle: '#A86B8A', // Moderately desaturated
+        end: '#9A7F8E' // Quite desaturated
       };
     } else {
-      // Very low rating - lightest colors
+      // Very low rating - very desaturated (grayish with hint of primary)
       return {
-        start: '#FBE7F3', // pink-100
-        middle: '#FBCFE8', // pink-200
-        end: '#F9A8D4' // pink-300
+        start: '#8B8B8B', // Gray
+        middle: '#9A8090', // Gray with hint of primary
+        end: '#9A7F8E' // Quite desaturated
       };
     }
   };
