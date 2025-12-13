@@ -538,23 +538,23 @@ export function Mapbox({
           position: relative;
           z-index: 1000;
         ">
-          <!-- White circle with icon - special styling for AI suggestions -->
+          <!-- White circle with icon - simple ring for AI suggestions -->
           <div class="marker-circle" style="
-            width: ${isSuggested ? '48px' : '40px'};
-            height: ${isSuggested ? '48px' : '40px'};
-            background: ${isSuggested ? 'linear-gradient(135deg, #C5459C 0%, #E85CA8 100%)' : 'white'};
+            width: 40px;
+            height: 40px;
+            background: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: ${isSuggested ? '0 4px 16px rgba(197, 69, 156, 0.4), 0 0 0 3px white, 0 0 0 5px rgba(197, 69, 156, 0.3)' : '0 2px 8px rgba(0,0,0,0.15)'};
-            border: ${isSuggested ? '3px solid white' : `2px solid ${isFriendOrOwn ? '#C5459C' : '#e5e7eb'}`};
+            box-shadow: ${isSuggested ? '0 2px 8px rgba(0,0,0,0.15), 0 0 0 3px #C5459C' : '0 2px 8px rgba(0,0,0,0.15)'};
+            border: 2px solid ${isSuggested || isFriendOrOwn ? '#C5459C' : '#e5e7eb'};
             transition: all 0.2s ease;
             flex-shrink: 0;
             position: relative;
             z-index: ${isSuggested ? '1001' : '1000'};
           ">
-            <span style="font-size: ${isSuggested ? '24px' : '20px'}; line-height: 1; ${isSuggested ? 'filter: brightness(0) invert(1);' : ''}">${iconData.emoji}</span>
+            <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
           </div>
           
           <!-- Text labels (fully transparent, no background) -->
@@ -567,11 +567,11 @@ export function Mapbox({
             position: relative;
             z-index: 1000;
           ">
-            <!-- Restaurant name (FIRST - above) - highlighted for suggestions -->
+            <!-- Restaurant name (FIRST - above) -->
             <div style="
-              font-size: ${isSuggested ? '13px' : '12px'};
-              color: ${isSuggested ? '#C5459C' : '#1f2937'};
-              font-weight: ${isSuggested ? '700' : '600'};
+              font-size: 12px;
+              color: #1f2937;
+              font-weight: 600;
               white-space: nowrap;
               max-width: 120px;
               overflow: hidden;

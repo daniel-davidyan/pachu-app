@@ -25,24 +25,23 @@ export async function POST(request: NextRequest) {
 
     // Count how many questions we've asked
     const questionCount = conversationHistory.filter((m: any) => m.role === 'assistant').length;
-    const shouldSuggestRestaurants = questionCount >= 2; // After 2-3 exchanges, suggest restaurants
+    const shouldSuggestRestaurants = questionCount >= 1; // After 1-2 exchanges, suggest restaurants (was >= 2)
 
     // System prompt for conversational restaurant finding
     const systemPrompt = `You are Pachu, a friendly AI restaurant finder. Your goal is to understand the user's dining preferences through a natural conversation, then help them find perfect restaurants.
 
 ## Your Process:
-1️⃣ **First message**: Ask about cuisine type
-2️⃣ **Second message**: Ask about budget and any special preferences (romantic, family-friendly, outdoor, etc.)
-3️⃣ **Third message**: Acknowledge their preferences and tell them you're showing matching restaurants on the map
+1️⃣ **First message**: Ask about cuisine type and preferences (budget, romantic, etc.) in ONE message
+2️⃣ **Second message**: Show 3 restaurant recommendations with brief descriptions
 
 ## Rules:
 - Keep responses conversational and friendly (2-3 sentences max)
 - Use emojis naturally 🍽️ 💰 ❤️ 🏡
-- Ask ONE clear question at a time
-- After 2-3 exchanges, say you'll show restaurants on the map
+- Ask MULTIPLE questions in your FIRST message (cuisine AND budget/preferences)
+- After user responds once, ALWAYS show restaurants with descriptions
 - Be encouraging and positive
 
-## Current stage: ${questionCount === 0 ? 'Initial greeting' : questionCount === 1 ? 'Second question (budget/preferences)' : 'Ready to suggest restaurants'}
+## Current stage: ${questionCount === 0 ? 'Ask about cuisine, budget, and preferences in ONE message' : 'Show 3 restaurant recommendations NOW'}
 
 ## Extract Information:
 After each response, include this JSON block (user won't see it):
@@ -110,8 +109,11 @@ Examples:
     }
 
     // If ready to show restaurants, fetch some
+    // ALWAYS fetch restaurants after first assistant message (more aggressive)
     let restaurants: any[] = [];
-    if (extractedData.readyToShow && location) {
+    const shouldFetchRestaurants = shouldSuggestRestaurants || extractedData.readyToShow;
+    
+    if (shouldFetchRestaurants && location) {
       // Call nearby restaurants API
       try {
         const nearbyResponse = await fetch(
@@ -120,9 +122,12 @@ Examples:
         );
         const nearbyData = await nearbyResponse.json();
         restaurants = (nearbyData.restaurants || []).slice(0, 3); // Top 3 restaurants for AI suggestions
+        console.log(`Fetched ${restaurants.length} restaurants for suggestions`);
       } catch (error) {
         console.error('Error fetching restaurants:', error);
       }
+    } else {
+      console.log(`Not fetching restaurants: shouldFetchRestaurants=${shouldFetchRestaurants}, location=${!!location}`);
     }
 
     return NextResponse.json({

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
 import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
-import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, MapPin } from 'lucide-react';
+import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, MapPin, ArrowLeft, MessageCircle } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 import type mapboxgl from 'mapbox-gl';
 
@@ -208,12 +208,8 @@ export default function MapPage() {
     }
   };
 
-  // Hide chat when restaurant is selected
-  useEffect(() => {
-    if (selectedRestaurant) {
-      setShowChat(false);
-    }
-  }, [selectedRestaurant]);
+  // Don't automatically hide chat when restaurant is selected
+  // Let user control chat visibility manually
 
   // Close dropup when clicking outside
   useEffect(() => {
@@ -305,15 +301,40 @@ export default function MapPage() {
         }
       `}</style>
 
+      {/* Return to Chat Button - Shows when restaurant is selected */}
+      {selectedRestaurant && (
+        <div 
+          className="absolute left-0 right-0 z-30"
+          style={{
+            top: 'calc(1rem + env(safe-area-inset-top))',
+            paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+            paddingRight: 'max(1rem, env(safe-area-inset-right))',
+          }}
+        >
+          <button
+            onClick={() => {
+              setSelectedRestaurant(null);
+              setChatActive(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-primary hover:bg-white transition-all active:scale-95"
+          >
+            <ArrowLeft className="w-4 h-4 text-primary" strokeWidth={2.5} />
+            <MessageCircle className="w-4 h-4 text-primary" strokeWidth={2} />
+            <span className="text-sm font-semibold text-primary">Return to chat</span>
+          </button>
+        </div>
+      )}
+
       {/* Category Carousel - Top */}
-      <div 
-        className="absolute left-0 right-0 z-20"
-        style={{
-          top: 'calc(1rem + env(safe-area-inset-top))',
-          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
-          paddingRight: 'max(1rem, env(safe-area-inset-right))',
-        }}
-      >
+      {!selectedRestaurant && (
+        <div 
+          className="absolute left-0 right-0 z-20"
+          style={{
+            top: 'calc(1rem + env(safe-area-inset-top))',
+            paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+            paddingRight: 'max(1rem, env(safe-area-inset-right))',
+          }}
+        >
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {categories.map((cat) => {
             const Icon = cat.icon;
@@ -354,6 +375,7 @@ export default function MapPage() {
           })}
         </div>
       </div>
+      )}
 
       {/* Loading Indicator */}
       {loading && (
@@ -517,9 +539,12 @@ export default function MapPage() {
         restaurant={selectedRestaurant}
         onClose={() => {
           setSelectedRestaurant(null);
-          setShowChat(true);
         }}
         userLocation={userLocation}
+        onBackToChat={() => {
+          setSelectedRestaurant(null);
+          setChatActive(true);
+        }}
       />
 
       {/* Bottom Navigation - Hide when chat is active */}

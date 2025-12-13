@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Loader2, ChevronDown, MapPin, Star, Navigation } from 'lucide-react';
+import { Send, Sparkles, Loader2, ChevronDown, MapPin, Star, Navigation, Plus } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -44,6 +44,8 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
+const STORAGE_KEY = 'pachu_chat_messages';
+
 export function AIChatSheet({ 
   onFilterChange, 
   onRestaurantsFound, 
@@ -70,27 +72,58 @@ export function AIChatSheet({
 
   const minHeight = 200;
 
+  // Load messages from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setMessages(parsed);
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      } catch (error) {
+        console.error('Error saving chat history:', error);
+      }
+    }
+  }, [messages]);
+
+  // Clear conversation and start fresh
+  const handleNewConversation = () => {
+    setMessages([]);
+    setInputValue('');
+    localStorage.removeItem(STORAGE_KEY);
+    // Auto-focus input for new conversation
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
+
   // Detect keyboard open/close by monitoring viewport height changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Store initial height
     initialViewportHeight.current = window.visualViewport?.height || window.innerHeight;
     
     const handleResize = () => {
       const currentHeight = window.visualViewport?.height || window.innerHeight;
       const heightDiff = initialViewportHeight.current - currentHeight;
       
-      // If viewport shrunk by more than 150px, keyboard is likely open
       if (heightDiff > 150) {
         setIsKeyboardOpen(true);
-        // When keyboard opens: chat takes 40% of remaining space
         const remainingHeight = currentHeight;
-        const chatHeight = remainingHeight * 0.4; // 40% for chat, 10% will be map
+        const chatHeight = remainingHeight * 0.4;
         setSheetHeight(Math.max(minHeight, chatHeight));
       } else {
         if (isKeyboardOpen) {
-          // Keyboard closed, adjust to 50/50 split if chat was active
           if (isActive) {
             const halfScreen = (window.visualViewport?.height || window.innerHeight) * 0.5;
             setSheetHeight(halfScreen);
@@ -100,7 +133,6 @@ export function AIChatSheet({
       }
     };
 
-    // Listen to both visualViewport and window resize
     window.visualViewport?.addEventListener('resize', handleResize);
     window.addEventListener('resize', handleResize);
     
@@ -110,11 +142,11 @@ export function AIChatSheet({
     };
   }, [isActive, isKeyboardOpen]);
 
-  // Calculate max height
+  // Calculate max height (80% of screen)
   useEffect(() => {
     const updateMaxHeight = () => {
       const vh = window.visualViewport?.height || window.innerHeight;
-      setMaxHeight(vh - 100);
+      setMaxHeight(vh * 0.8); // Allow up to 80% of screen
     };
     updateMaxHeight();
     window.addEventListener('resize', updateMaxHeight);
@@ -150,18 +182,18 @@ export function AIChatSheet({
     const handleEnd = () => {
       setIsDragging(false);
       
-      // Snap to positions
       if (sheetHeight < 150) {
         handleClose();
       } else if (isKeyboardOpen) {
-        // Keep current height when keyboard is open
         return;
       } else if (sheetHeight < 350) {
-        setSheetHeight(200);
-      } else {
-        // Snap to 50% when keyboard is closed
+        setSheetHeight(minHeight);
+      } else if (sheetHeight < 600) {
         const halfScreen = (window.visualViewport?.height || window.innerHeight) * 0.5;
         setSheetHeight(halfScreen);
+      } else {
+        // Snap to 80% when dragged high
+        setSheetHeight(maxHeight);
       }
     };
 
@@ -187,7 +219,6 @@ export function AIChatSheet({
 
   const handleActivate = () => {
     setIsActive(true);
-    // Start with smaller height, will adjust based on keyboard
     setSheetHeight(minHeight);
     setTimeout(() => {
       inputRef.current?.focus();
@@ -196,9 +227,8 @@ export function AIChatSheet({
 
   const handleClose = () => {
     setIsActive(false);
-    setInputValue('');
     setIsKeyboardOpen(false);
-    inputRef.current?.blur();
+    // Don't blur input - let user close keyboard manually
   };
 
   const handleRestaurantCardClick = (restaurant: Restaurant) => {
@@ -230,6 +260,9 @@ export function AIChatSheet({
         setSheetHeight(halfScreen);
       }
     }
+
+    // DON'T blur the input - keep keyboard open
+    // inputRef.current?.blur(); // REMOVED
 
     try {
       const conversationHistory = messages.map(m => ({
@@ -394,12 +427,25 @@ export function AIChatSheet({
               )}
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-          >
-            <ChevronDown className="w-4 h-4 text-gray-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* New Conversation Button */}
+            {messages.length > 0 && (
+              <button
+                onClick={handleNewConversation}
+                className="w-8 h-8 flex items-center justify-center bg-primary/10 hover:bg-primary/20 rounded-full transition-colors"
+                title="Start new conversation"
+              >
+                <Plus className="w-4 h-4 text-primary" />
+              </button>
+            )}
+            {/* Close Button */}
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <ChevronDown className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -444,17 +490,19 @@ export function AIChatSheet({
                       className="bg-gradient-to-br from-white to-primary/5 rounded-2xl p-3 border-2 border-primary/20 shadow-md hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                     >
                       <div className="flex gap-3">
-                        {/* Icon/Image */}
-                        <div className="w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                          {restaurant.photoUrl ? (
-                            <img 
-                              src={restaurant.photoUrl} 
-                              alt={restaurant.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-3xl">{getRestaurantIcon(restaurant)}</span>
-                          )}
+                        {/* Icon/Image with Primary Border Ring */}
+                        <div className="w-16 h-16 flex-shrink-0 rounded-xl flex items-center justify-center p-0.5 bg-primary">
+                          <div className="w-full h-full rounded-xl overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                            {restaurant.photoUrl ? (
+                              <img 
+                                src={restaurant.photoUrl} 
+                                alt={restaurant.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-3xl">{getRestaurantIcon(restaurant)}</span>
+                            )}
+                          </div>
                         </div>
                         
                         {/* Info */}
