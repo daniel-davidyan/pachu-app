@@ -385,38 +385,63 @@ export default function ProfilePage() {
     <MainLayout>
       <div className="pb-24 bg-gray-50 min-h-screen">
         {/* Compact Profile Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <div className="bg-white px-4 py-5">
           {isEditingProfile ? (
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={editForm.full_name}
-                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary text-sm"
-              />
-              <input
-                type="text"
-                placeholder="Username"
-                value={editForm.username}
-                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary text-sm"
-              />
-              <textarea
-                placeholder="Bio"
-                value={editForm.bio}
-                onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary text-sm resize-none"
-              />
-              <div className="flex gap-2">
+            <div className="space-y-4">
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Edit Profile</h3>
+                <p className="text-xs text-gray-500 mt-1">Update your personal information</p>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Your full name"
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm bg-gray-50 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  placeholder="username"
+                  value={editForm.username}
+                  onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm bg-gray-50 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Bio
+                </label>
+                <textarea
+                  placeholder="Tell us about yourself..."
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  rows={3}
+                  maxLength={160}
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm bg-gray-50 focus:bg-white resize-none transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1 text-right">{editForm.bio.length}/160</p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleSaveProfile}
                   disabled={savingProfile}
-                  className="flex-1 bg-primary text-white py-2 rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 bg-primary text-white py-3 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
                 >
                   {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  Save
+                  Save Changes
                 </button>
                 <button
                   onClick={() => {
@@ -427,7 +452,7 @@ export default function ProfilePage() {
                       bio: profile.bio || ''
                     });
                   }}
-                  className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-medium text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                 >
                   <X className="w-4 h-4" />
                   Cancel
@@ -442,11 +467,11 @@ export default function ProfilePage() {
                   <img
                     src={profile.avatar_url}
                     alt={profile.full_name || profile.username}
-                    className="w-20 h-20 rounded-full object-cover"
+                    className="w-32 h-32 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-white">
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                    <span className="text-4xl font-bold text-white">
                       {(profile.full_name || profile.username).charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -461,45 +486,45 @@ export default function ProfilePage() {
                 <button 
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="absolute bottom-0 right-0 w-7 h-7 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-100 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="absolute bottom-1 right-1 w-9 h-9 bg-black rounded-full shadow-lg flex items-center justify-center border-2 border-white hover:bg-gray-900 transition-colors disabled:opacity-50"
                 >
                   {uploadingAvatar ? (
-                    <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
                   ) : (
-                    <Camera className="w-3 h-3 text-gray-600" />
+                    <Camera className="w-4 h-4 text-white" />
                   )}
                 </button>
               </div>
 
-              {/* Info - Right Side - Centered & Spread */}
+              {/* Info - Right Side */}
               <div className="flex-1 min-w-0 flex flex-col justify-center">
-                {/* Name and Username - Centered */}
-                <div className="text-center">
+                {/* Name and Username - Left Aligned */}
+                <div className="text-left mb-3">
                   <h2 className="text-lg font-bold text-gray-900">
                     {profile.full_name || profile.username}
                   </h2>
                   <p className="text-sm text-gray-500">@{profile.username}</p>
                 </div>
 
-                {/* Stats Row - Spread Across Width */}
-                <div className="flex justify-around items-center mt-3">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.experiences}</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Experiences</p>
+                {/* Stats Row - Aligned to Left */}
+                <div className="flex gap-5 items-center">
+                  <div className="text-left">
+                    <p className="text-base font-bold text-gray-900 leading-none">{stats.experiences}</p>
+                    <p className="text-xs text-gray-600 mt-1">experiences</p>
                   </div>
                   <button
                     onClick={() => router.push('/profile/connections?tab=followers')}
-                    className="text-center hover:bg-gray-50 px-2 py-1 rounded transition-colors"
+                    className="text-left hover:opacity-70 transition-opacity"
                   >
-                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.followers}</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Followers</p>
+                    <p className="text-base font-bold text-gray-900 leading-none">{stats.followers}</p>
+                    <p className="text-xs text-gray-600 mt-1">followers</p>
                   </button>
                   <button
                     onClick={() => router.push('/profile/connections?tab=following')}
-                    className="text-center hover:bg-gray-50 px-2 py-1 rounded transition-colors"
+                    className="text-left hover:opacity-70 transition-opacity"
                   >
-                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.following}</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Following</p>
+                    <p className="text-base font-bold text-gray-900 leading-none">{stats.following}</p>
+                    <p className="text-xs text-gray-600 mt-1">following</p>
                   </button>
                 </div>
               </div>
@@ -530,7 +555,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Tab Selector */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+        <div className="sticky top-0 z-10 bg-white">
           <div className="relative">
             {/* Text Buttons */}
             <div className="relative w-full h-12 flex items-center">
