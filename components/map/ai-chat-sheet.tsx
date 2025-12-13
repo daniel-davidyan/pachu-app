@@ -372,11 +372,21 @@ export function AIChatSheet({
         })
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseError) {
+        throw new Error('Failed to parse response');
+      }
 
       if (data.error) {
         throw new Error(data.error);
       }
+
+      // Debug: Log raw restaurant data type
+      const rawRestaurantType = data.restaurants ? (Array.isArray(data.restaurants) ? 'array' : typeof data.restaurants) : 'undefined';
+      const rawRestaurantCount = Array.isArray(data.restaurants) ? data.restaurants.length : 0;
 
       // Parse restaurants - be very defensive
       let parsedRestaurants: Restaurant[] = [];
@@ -405,10 +415,13 @@ export function AIChatSheet({
           }));
       }
 
+      // Add debug info to message content
+      const debugInfo = ` [API: ${rawRestaurantType}/${rawRestaurantCount}, Parsed: ${parsedRestaurants.length}]`;
+      
       const assistantMessage: Message = {
         id: String(Date.now() + 1),
         role: 'assistant',
-        content: String(data.message || ''),
+        content: String(data.message || '') + debugInfo,
         restaurants: parsedRestaurants
       };
 
@@ -566,12 +579,22 @@ export function AIChatSheet({
                 </div>
               </div>
               
-              {/* Restaurant cards - simple conditional */}
-              {message.role === 'assistant' && message.restaurants && message.restaurants.length > 0 && (
-                <RestaurantList 
-                  restaurants={message.restaurants} 
-                  onRestaurantClick={handleRestaurantCardClick}
-                />
+              {/* Restaurant cards - ALWAYS render for assistant messages */}
+              {message.role === 'assistant' && (
+                <div className="mt-2">
+                  {/* Debug: Show what we received */}
+                  <div className="text-[10px] text-gray-400 px-2 mb-1">
+                    [Debug: {message.restaurants ? message.restaurants.length : 0} restaurants]
+                  </div>
+                  
+                  {/* Render cards if we have restaurants */}
+                  {message.restaurants && message.restaurants.length > 0 ? (
+                    <RestaurantList 
+                      restaurants={message.restaurants} 
+                      onRestaurantClick={handleRestaurantCardClick}
+                    />
+                  ) : null}
+                </div>
               )}
             </div>
           ))}
