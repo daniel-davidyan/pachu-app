@@ -1,6 +1,6 @@
 'use client';
 
-import { Image, Search, Map, User } from 'lucide-react';
+import { Newspaper, Plus, Map, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -21,12 +21,12 @@ export function BottomNav({ show = true }: BottomNavProps) {
     {
       name: 'Feed',
       href: '/feed',
-      icon: Image,
+      icon: Newspaper,
     },
     {
       name: 'Search',
       href: '/search',
-      icon: Search,
+      icon: Plus,
     },
     {
       name: 'Profile',
@@ -68,7 +68,8 @@ export function BottomNav({ show = true }: BottomNavProps) {
               >
                 <Icon
                   className={cn(
-                    "w-5 h-5 transition-all duration-200",
+                    "transition-all duration-200",
+                    item.name === 'Search' ? "w-7 h-7" : "w-5 h-5",
                     active ? "text-[#C5459C]" : "text-gray-400"
                   )}
                   strokeWidth={active ? 2.5 : 1.5}
