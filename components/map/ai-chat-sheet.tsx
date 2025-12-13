@@ -44,7 +44,7 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
-const STORAGE_KEY = 'pachu_chat_messages_v2'; // v2 to force refresh in Chrome
+const STORAGE_KEY = 'pachu_chat_messages_v3'; // v3 to force complete refresh in Chrome mobile
 
 export function AIChatSheet({ 
   onFilterChange, 
@@ -286,11 +286,15 @@ export function AIChatSheet({
         content: m.content
       }));
 
-      const response = await fetch('/api/map-chat', {
+      // Add timestamp to URL to bypass Chrome mobile aggressive caching
+      const timestamp = Date.now();
+      const response = await fetch(`/api/map-chat?t=${timestamp}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         },
         cache: 'no-store',
         body: JSON.stringify({
