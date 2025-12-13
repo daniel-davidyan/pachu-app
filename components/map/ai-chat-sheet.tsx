@@ -330,7 +330,7 @@ export function AIChatSheet({
             }}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             onFocus={handleActivate}
-            placeholder="Let Pachu guide you to your perfect taste..."
+            placeholder="Let Pachu find your taste..."
             className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium"
           />
           <button
