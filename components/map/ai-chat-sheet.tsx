@@ -45,7 +45,7 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
-const STORAGE_KEY = 'pachu_chat_v7';
+const STORAGE_KEY = 'pachu_chat_v8';
 
 // Helper function to get restaurant icon
 function getRestaurantIcon(restaurant: Restaurant): string {
@@ -280,11 +280,23 @@ export function AIChatSheet({
         cache: 'no-store'
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: Record<string, unknown>;
+      
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error('JSON parse failed');
+      }
 
       if (data.error) {
-        throw new Error(data.error);
+        throw new Error(String(data.error));
       }
+
+      // Debug: Check what keys exist in the response
+      const responseKeys = Object.keys(data).join(', ');
+      const hasRestaurantsKey = 'restaurants' in data;
+      const restaurantsType = data.restaurants ? (Array.isArray(data.restaurants) ? `array(${(data.restaurants as unknown[]).length})` : typeof data.restaurants) : 'undefined';
 
       // Parse restaurants with explicit validation
       const parsedRestaurants: Restaurant[] = [];
@@ -311,11 +323,9 @@ export function AIChatSheet({
         }
       }
 
-      // Debug: Include restaurant count in message text
+      // Debug: Include full diagnostic info in message
       let messageContent = String(data.message || '');
-      if (parsedRestaurants.length > 0) {
-        messageContent += `\n\n[Found ${parsedRestaurants.length}: ${parsedRestaurants.map(r => r.name).join(', ')}]`;
-      }
+      messageContent += `\n\n[API: keys=${responseKeys}, hasR=${hasRestaurantsKey}, type=${restaurantsType}, parsed=${parsedRestaurants.length}]`;
 
       const assistantMessage: Message = {
         id: String(Date.now() + 1),
@@ -330,8 +340,8 @@ export function AIChatSheet({
         onRestaurantsFound?.(parsedRestaurants);
       }
 
-      if (data.filters) {
-        onFilterChange?.(data.filters);
+      if (data.filters && typeof data.filters === 'object') {
+        onFilterChange?.(data.filters as RestaurantFilters);
       }
 
     } catch {
