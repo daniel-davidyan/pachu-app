@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next'
 
-// Cache busting version - update this to force PWA refresh
-const ICON_VERSION = 'v3'
+// Cache busting version - update this when icons change
+const ICON_VERSION = 'v2'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

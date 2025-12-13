@@ -24,7 +24,14 @@ interface MapboxProps {
   onRestaurantClick?: (restaurant: Restaurant) => void;
   getUserLocation?: boolean;
   mapRef?: React.MutableRefObject<mapboxgl.Map | null>;
-  suggestedRestaurants?: Restaurant[];
+}
+
+interface Cluster {
+  id: string;
+  latitude: number;
+  longitude: number;
+  count: number;
+  restaurants: Restaurant[];
 }
 
 // Enhanced icon mapping with more categories and variety
@@ -168,8 +175,7 @@ export function Mapbox({
   restaurants,
   onRestaurantClick,
   getUserLocation = true,
-  mapRef: externalMapRef,
-  suggestedRestaurants = []
+  mapRef: externalMapRef
 }: MapboxProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const internalMapRef = useRef<mapboxgl.Map | null>(null);
@@ -207,6 +213,7 @@ export function Mapbox({
     
     // Smart de-duplication: keep best restaurant when too close
     const filtered: Restaurant[] = [];
+    const positions = new Set<string>();
     
     for (const restaurant of sorted) {
       // Check if too close to any existing marker
@@ -497,15 +504,11 @@ export function Mapbox({
     // Categorize into main (icons) and secondary (dots)
     const { mainRestaurants, dotRestaurants } = categorizeRestaurants(uniqueRestaurants, currentZoom);
 
-    // Create a set of suggested restaurant IDs for quick lookup
-    const suggestedIds = new Set(suggestedRestaurants.map(r => r.id));
-
     // Render main restaurants as colorful icons
     mainRestaurants.forEach((restaurant) => {
       if (!currentMap) return;
       const el = document.createElement('div');
-      const isSuggested = suggestedIds.has(restaurant.id);
-      el.className = isSuggested ? 'restaurant-marker suggested-marker' : 'restaurant-marker';
+      el.className = 'restaurant-marker';
       const isFriendOrOwn = restaurant.source === 'friends' || restaurant.source === 'own';
       const iconData = getRestaurantIcon(restaurant);
       
@@ -538,7 +541,7 @@ export function Mapbox({
           position: relative;
           z-index: 1000;
         ">
-          <!-- White circle with icon - simple ring for AI suggestions -->
+          <!-- White circle with icon (no extra ring) -->
           <div class="marker-circle" style="
             width: 40px;
             height: 40px;
@@ -547,12 +550,12 @@ export function Mapbox({
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: ${isSuggested ? '0 2px 8px rgba(0,0,0,0.15), 0 0 0 3px #C5459C' : '0 2px 8px rgba(0,0,0,0.15)'};
-            border: 2px solid ${isSuggested || isFriendOrOwn ? '#C5459C' : '#e5e7eb'};
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            border: 2px solid ${isFriendOrOwn ? '#C5459C' : '#e5e7eb'};
             transition: all 0.2s ease;
             flex-shrink: 0;
             position: relative;
-            z-index: ${isSuggested ? '1001' : '1000'};
+            z-index: 1000;
           ">
             <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
           </div>
@@ -604,6 +607,7 @@ export function Mapbox({
       `;
 
       const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
+      const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
       el.addEventListener('mouseenter', () => {
         if (markerCircle) {
           markerCircle.style.transform = 'scale(1.1)';

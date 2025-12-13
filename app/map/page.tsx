@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
 import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
-import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, MapPin, ArrowLeft, MessageCircle } from 'lucide-react';
+import { Loader2, UtensilsCrossed, Hotel, Briefcase, Coffee, Wine, MapPin } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 import type mapboxgl from 'mapbox-gl';
 
@@ -39,10 +39,11 @@ export default function MapPage() {
   const [filters, setFilters] = useState<RestaurantFilters>({ query: '' });
   const [activeCategory, setActiveCategory] = useState('restaurants');
   const [showChat, setShowChat] = useState(true);
-  const [suggestedRestaurants, setSuggestedRestaurants] = useState<Restaurant[]>([]);
+  const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isRecentering, setIsRecentering] = useState(false);
   const [chatActive, setChatActive] = useState(false);
+  const [chatHeight, setChatHeight] = useState(200);
   const [openNow, setOpenNow] = useState(false);
   const [viewMode, setViewMode] = useState<'following' | 'all'>('all');
   const [isTogglingView, setIsTogglingView] = useState(false);
@@ -175,41 +176,23 @@ export default function MapPage() {
     setFilters(newFilters);
   };
 
-  const handleRestaurantsFound = (restaurants: Restaurant[]) => {
-    // Store AI-suggested restaurants
-    setSuggestedRestaurants(restaurants);
-    // Also add them to the map
-    setAllRestaurants(prev => {
-      const existingIds = new Set(prev.map(r => r.id));
-      const newRestaurants = restaurants.filter(r => !existingIds.has(r.id));
-      return [...prev, ...newRestaurants];
-    });
+  const handleRestaurantsFound = (restaurants: any[]) => {
+    // Add AI-suggested restaurants to the map
+    setAllRestaurants(restaurants);
+    setHighlightedRestaurants(restaurants.map(r => r.id));
   };
 
-  const handleChatStateChange = (isActive: boolean) => {
+  const handleChatStateChange = (isActive: boolean, height: number) => {
     setChatActive(isActive);
+    setChatHeight(height);
   };
 
-  // Handle restaurant click from chat - zoom to location
-  const handleRestaurantClickFromChat = (restaurant: Restaurant) => {
-    if (mapRef.current) {
-      // Zoom to restaurant with smooth animation
-      mapRef.current.flyTo({
-        center: [restaurant.longitude, restaurant.latitude],
-        zoom: 17,
-        duration: 2000,
-        essential: true
-      });
-      
-      // Optionally show the restaurant card after zoom
-      setTimeout(() => {
-        setSelectedRestaurant(restaurant);
-      }, 1500);
+  // Hide chat when restaurant is selected
+  useEffect(() => {
+    if (selectedRestaurant) {
+      setShowChat(false);
     }
-  };
-
-  // Don't automatically hide chat when restaurant is selected
-  // Let user control chat visibility manually
+  }, [selectedRestaurant]);
 
   // Close dropup when clicking outside
   useEffect(() => {
@@ -238,7 +221,6 @@ export default function MapPage() {
             restaurants={filteredRestaurants}
             onRestaurantClick={setSelectedRestaurant}
             mapRef={mapRef}
-            suggestedRestaurants={suggestedRestaurants}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-500">
@@ -285,56 +267,17 @@ export default function MapPage() {
         .animate-fade-in {
           animation: fade-in 0.3s ease-in-out;
         }
-
-        /* Pulse animation for suggested restaurants */
-        @keyframes suggested-pulse {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(197, 69, 156, 0.7);
-          }
-          50% {
-            box-shadow: 0 0 0 8px rgba(197, 69, 156, 0);
-          }
-        }
-        
-        .suggested-marker {
-          animation: suggested-pulse 2s ease-in-out infinite;
-        }
       `}</style>
 
-      {/* Return to Chat Button - Shows when restaurant is selected */}
-      {selectedRestaurant && (
-        <div 
-          className="absolute left-0 right-0 z-30"
-          style={{
-            top: 'calc(1rem + env(safe-area-inset-top))',
-            paddingLeft: 'max(1rem, env(safe-area-inset-left))',
-            paddingRight: 'max(1rem, env(safe-area-inset-right))',
-          }}
-        >
-          <button
-            onClick={() => {
-              setSelectedRestaurant(null);
-              setChatActive(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-primary hover:bg-white transition-all active:scale-95"
-          >
-            <ArrowLeft className="w-4 h-4 text-primary" strokeWidth={2.5} />
-            <MessageCircle className="w-4 h-4 text-primary" strokeWidth={2} />
-            <span className="text-sm font-semibold text-primary">Return to chat</span>
-          </button>
-        </div>
-      )}
-
       {/* Category Carousel - Top */}
-      {!selectedRestaurant && (
-        <div 
-          className="absolute left-0 right-0 z-20"
-          style={{
-            top: 'calc(1rem + env(safe-area-inset-top))',
-            paddingLeft: 'max(1rem, env(safe-area-inset-left))',
-            paddingRight: 'max(1rem, env(safe-area-inset-right))',
-          }}
-        >
+      <div 
+        className="absolute left-0 right-0 z-20"
+        style={{
+          top: 'calc(1rem + env(safe-area-inset-top))',
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        }}
+      >
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {categories.map((cat) => {
             const Icon = cat.icon;
@@ -375,7 +318,6 @@ export default function MapPage() {
           })}
         </div>
       </div>
-      )}
 
       {/* Loading Indicator */}
       {loading && (
@@ -398,37 +340,39 @@ export default function MapPage() {
       )}
 
       {/* Custom Location Button - Above chat, right side */}
-      {!chatActive && (
-        <button
-          onClick={handleRecenterMap}
-          disabled={isRecentering}
-          className={`fixed z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-            isRecentering 
-              ? 'bg-gray-100 scale-95' 
-              : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
-          }`}
-          style={{
-            right: 'max(1rem, env(safe-area-inset-right))',
-            bottom: 'calc(8.25rem + env(safe-area-inset-bottom))',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-          }}
-          aria-label="Center map on my location"
-        >
-          {isRecentering ? (
-            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <MapPin className="w-5 h-5 text-gray-700" strokeWidth={2} fill="gray-700" />
-          )}
-        </button>
-      )}
+      <button
+        onClick={handleRecenterMap}
+        disabled={isRecentering}
+        className={`fixed z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+          isRecentering 
+            ? 'bg-gray-100 scale-95' 
+            : 'bg-white hover:bg-gray-50 hover:scale-105 active:scale-95'
+        }`}
+        style={{
+          right: 'max(1rem, env(safe-area-inset-right))',
+          bottom: chatActive 
+            ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
+            : 'calc(8.25rem + env(safe-area-inset-bottom))',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+        }}
+        aria-label="Center map on my location"
+      >
+        {isRecentering ? (
+          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <MapPin className="w-5 h-5 text-gray-700" strokeWidth={2} fill="gray-700" />
+        )}
+      </button>
 
       {/* Filter Controls - Above Search */}
-      {showChat && !chatActive && (
+      {showChat && (
         <div 
           className="fixed z-50"
           style={{
             left: 'max(1rem, env(safe-area-inset-left))',
-            bottom: 'calc(8.75rem + env(safe-area-inset-bottom))',
+            bottom: chatActive 
+              ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
+              : 'calc(8.75rem + env(safe-area-inset-bottom))',
             transition: 'bottom 0.3s ease'
           }}
         >
@@ -530,7 +474,6 @@ export default function MapPage() {
           matchedCount={filteredRestaurants.length}
           userLocation={userLocation}
           onChatStateChange={handleChatStateChange}
-          onRestaurantClick={handleRestaurantClickFromChat}
         />
       )}
 
@@ -539,16 +482,14 @@ export default function MapPage() {
         restaurant={selectedRestaurant}
         onClose={() => {
           setSelectedRestaurant(null);
+          setShowChat(true);
         }}
         userLocation={userLocation}
-        onBackToChat={() => {
-          setSelectedRestaurant(null);
-          setChatActive(true);
-        }}
       />
 
-      {/* Bottom Navigation - Hide when chat is active */}
-      <BottomNav show={!chatActive} />
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }
+

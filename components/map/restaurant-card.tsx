@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, MessageCircle } from 'lucide-react';
+import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3 } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { CompactRating } from '@/components/ui/modern-rating';
@@ -10,10 +10,9 @@ interface RestaurantCardProps {
   restaurant: Restaurant | null;
   onClose: () => void;
   userLocation?: { lat: number; lng: number } | null;
-  onBackToChat?: () => void;
 }
 
-export function RestaurantCard({ restaurant, onClose, userLocation, onBackToChat }: RestaurantCardProps) {
+export function RestaurantCard({ restaurant, onClose, userLocation }: RestaurantCardProps) {
   const [similarPlaces, setSimilarPlaces] = useState<Restaurant[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);

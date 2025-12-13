@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// Force dynamic - never cache this API route
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 export async function POST(request: NextRequest) {
   try {
     const { message, conversationHistory, location } = await request.json();
@@ -29,26 +25,24 @@ export async function POST(request: NextRequest) {
 
     // Count how many questions we've asked
     const questionCount = conversationHistory.filter((m: any) => m.role === 'assistant').length;
-    const shouldSuggestRestaurants = questionCount >= 1; // After 1-2 exchanges, suggest restaurants (was >= 2)
+    const shouldSuggestRestaurants = questionCount >= 2; // After 2-3 exchanges, suggest restaurants
 
     // System prompt for conversational restaurant finding
     const systemPrompt = `You are Pachu, a friendly AI restaurant finder. Your goal is to understand the user's dining preferences through a natural conversation, then help them find perfect restaurants.
 
 ## Your Process:
-1️⃣ **First message**: Ask about cuisine type and preferences (budget, romantic, etc.) in ONE message
-2️⃣ **Second message**: Say you found places and they will appear below. DO NOT describe individual restaurants.
+1️⃣ **First message**: Ask about cuisine type
+2️⃣ **Second message**: Ask about budget and any special preferences (romantic, family-friendly, outdoor, etc.)
+3️⃣ **Third message**: Acknowledge their preferences and tell them you're showing matching restaurants on the map
 
-## CRITICAL RULES:
+## Rules:
 - Keep responses conversational and friendly (2-3 sentences max)
 - Use emojis naturally 🍽️ 💰 ❤️ 🏡
-- Ask MULTIPLE questions in your FIRST message (cuisine AND budget/preferences)
-- After user responds, say "I found some great places for you! 🍽️✨" (or similar)
-- NEVER mention specific restaurant names or details in your text
-- NEVER say things like "The Chinese restaurant" or describe restaurants
-- The restaurant cards will show automatically below your message
-- Just acknowledge and let the cards do the talking
+- Ask ONE clear question at a time
+- After 2-3 exchanges, say you'll show restaurants on the map
+- Be encouraging and positive
 
-## Current stage: ${questionCount === 0 ? 'Ask about cuisine, budget, and preferences in ONE message' : 'Say you found places (cards will show below automatically)'}
+## Current stage: ${questionCount === 0 ? 'Initial greeting' : questionCount === 1 ? 'Second question (budget/preferences)' : 'Ready to suggest restaurants'}
 
 ## Extract Information:
 After each response, include this JSON block (user won't see it):
@@ -117,44 +111,26 @@ Examples:
 
     // If ready to show restaurants, fetch some
     let restaurants: any[] = [];
-    const shouldFetchRestaurants = shouldSuggestRestaurants || extractedData.readyToShow;
-    
-    if (shouldFetchRestaurants && location) {
+    if (extractedData.readyToShow && location) {
+      // Call nearby restaurants API
       try {
         const nearbyResponse = await fetch(
           `${request.nextUrl.origin}/api/restaurants/nearby?latitude=${location.lat}&longitude=${location.lng}&radius=2000`,
           { headers: request.headers }
         );
-        
-        if (!nearbyResponse.ok) {
-          throw new Error(`API returned ${nearbyResponse.status}`);
-        }
-        
         const nearbyData = await nearbyResponse.json();
-        restaurants = (nearbyData.restaurants || []).slice(0, 3);
+        restaurants = (nearbyData.restaurants || []).slice(0, 5); // Top 5 restaurants
       } catch (error) {
         console.error('Error fetching restaurants:', error);
       }
     }
 
-    // ALWAYS include restaurants key (Chrome mobile caching fix)
-    const response = NextResponse.json({
+    return NextResponse.json({
       message: visibleMessage,
       filters,
-      restaurants: restaurants, // Always include, even if empty array
-      restaurantCount: restaurants.length,
+      restaurants: restaurants.length > 0 ? restaurants : undefined,
       success: true,
-      timestamp: Date.now(), // Unique timestamp to bust cache
     });
-
-    // Aggressive cache prevention for Chrome mobile
-    response.headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
-    response.headers.set('Pragma', 'no-cache');
-    response.headers.set('Expires', '0');
-    response.headers.set('Surrogate-Control', 'no-store');
-    response.headers.set('Vary', '*');
-
-    return response;
   } catch (error: any) {
     console.error('Map Chat API Error:', error);
     return NextResponse.json(
