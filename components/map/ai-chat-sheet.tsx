@@ -45,7 +45,7 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
-const STORAGE_KEY = 'pachu_chat_v6';
+const STORAGE_KEY = 'pachu_chat_v7';
 
 // Helper function to get restaurant icon
 function getRestaurantIcon(restaurant: Restaurant): string {
@@ -311,10 +311,16 @@ export function AIChatSheet({
         }
       }
 
+      // Debug: Include restaurant count in message text
+      let messageContent = String(data.message || '');
+      if (parsedRestaurants.length > 0) {
+        messageContent += `\n\n[Found ${parsedRestaurants.length}: ${parsedRestaurants.map(r => r.name).join(', ')}]`;
+      }
+
       const assistantMessage: Message = {
         id: String(Date.now() + 1),
         role: 'assistant',
-        content: String(data.message || ''),
+        content: messageContent,
         restaurants: parsedRestaurants.length > 0 ? parsedRestaurants : undefined
       };
 
