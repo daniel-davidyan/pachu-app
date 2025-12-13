@@ -306,7 +306,23 @@ export function AIChatSheet({
         throw new Error(data.error);
       }
 
-      const restaurantData = Array.isArray(data.restaurants) ? data.restaurants : [];
+      // Ensure restaurants is a valid array with proper data
+      const restaurantData = Array.isArray(data.restaurants) && data.restaurants.length > 0 
+        ? data.restaurants.map((r: any) => ({
+            id: r.id || String(Math.random()),
+            name: r.name || 'Unknown',
+            address: r.address || '',
+            latitude: r.latitude || 0,
+            longitude: r.longitude || 0,
+            rating: r.rating || 0,
+            totalReviews: r.totalReviews || 0,
+            photoUrl: r.photoUrl,
+            priceLevel: r.priceLevel,
+            cuisineTypes: r.cuisineTypes || [],
+            source: r.source || 'google',
+            googlePlaceId: r.googlePlaceId
+          }))
+        : [];
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -315,7 +331,23 @@ export function AIChatSheet({
         restaurants: restaurantData
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Force immediate state update
+      setMessages(prev => {
+        const newMessages = [...prev, assistantMessage];
+        // Also save to ensure Chrome gets it
+        try {
+          const messagesToSave = newMessages.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            restaurants: msg.restaurants || []
+          }));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(messagesToSave));
+        } catch (e) {
+          // Ignore save errors
+        }
+        return newMessages;
+      });
 
       if (restaurantData.length > 0) {
         onRestaurantsFound?.(restaurantData);
@@ -498,16 +530,24 @@ export function AIChatSheet({
                 </div>
               </div>
               
-              {/* Restaurant Suggestion Cards */}
-              {message.role === 'assistant' && message.restaurants && Array.isArray(message.restaurants) && message.restaurants.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2 px-2">
-                    <MapPin className="w-4 h-4 text-primary" />
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      Suggested For You ({message.restaurants.length})
-                    </p>
-                  </div>
-                  {message.restaurants.map((restaurant) => (
+              {/* Restaurant Suggestion Cards - Force render if restaurants exist */}
+              {(() => {
+                const hasRestaurants = message.role === 'assistant' && 
+                                      message.restaurants && 
+                                      Array.isArray(message.restaurants) && 
+                                      message.restaurants.length > 0;
+                
+                if (!hasRestaurants) return null;
+                
+                return (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-2 px-2">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Suggested For You ({message.restaurants.length})
+                      </p>
+                    </div>
+                    {message.restaurants.map((restaurant) => (
                     <div
                       key={restaurant.id}
                       onClick={() => handleRestaurantCardClick(restaurant)}
@@ -570,9 +610,10 @@ export function AIChatSheet({
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           ))}
 
