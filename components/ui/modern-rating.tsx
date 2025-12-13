@@ -46,13 +46,17 @@ export function ModernRating({
   const content = (
     <div className="flex items-center gap-2">
       <div 
-        className="relative inline-flex items-center justify-center transition-all duration-300 hover:scale-105"
-        style={{ width: config.size, height: config.size }}
+        className="relative inline-flex items-center justify-center transition-all duration-500 ease-out hover:scale-110 hover:shadow-xl hover:shadow-pink-500/30"
+        style={{ 
+          width: config.size, 
+          height: config.size,
+          filter: 'drop-shadow(0 4px 12px rgba(236, 72, 153, 0.15))'
+        }}
       >
         <svg
           width={config.size}
           height={config.size}
-          className="transform -rotate-90"
+          className="transform -rotate-90 transition-transform duration-700 ease-in-out"
         >
           {/* Gradient Definition */}
           <defs>
@@ -61,6 +65,14 @@ export function ModernRating({
               <stop offset="50%" stopColor="#D946EF" />
               <stop offset="100%" stopColor="#C026D3" />
             </linearGradient>
+            {/* Glow filter */}
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
           </defs>
           
           {/* Background Circle */}
@@ -71,6 +83,7 @@ export function ModernRating({
             fill="none"
             stroke="#E5E7EB"
             strokeWidth={config.strokeWidth}
+            className="transition-all duration-300"
           />
           
           {/* Progress Circle */}
@@ -84,20 +97,27 @@ export function ModernRating({
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
-            className="transition-all duration-500 ease-out"
+            filter="url(#glow)"
+            className="transition-all duration-1000 ease-out"
+            style={{
+              animation: 'drawProgress 1.5s ease-out forwards'
+            }}
           />
         </svg>
         
         {/* Rating number */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`font-bold text-gray-700 ${config.textSize} leading-none`}>
+          <span className={`font-bold text-gray-700 ${config.textSize} leading-none transition-all duration-300`}>
             {rating.toFixed(1)}
           </span>
         </div>
+
+        {/* Subtle pulse glow on hover */}
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500/10 to-purple-600/10 opacity-0 hover:opacity-100 transition-opacity duration-500 blur-xl" />
       </div>
 
       {showLabel && (
-        <div className="flex flex-col">
+        <div className="flex flex-col transition-all duration-300">
           <span className={`font-bold text-gray-900 ${config.labelSize}`}>
             {rating >= 4 ? 'Amazing' : rating >= 3 ? 'Good' : rating >= 2 ? 'Okay' : 'Meh'}
           </span>
@@ -111,7 +131,7 @@ export function ModernRating({
 
   if (animated) {
     return (
-      <div className="animate-in fade-in zoom-in duration-300">
+      <div className="animate-in fade-in zoom-in duration-700 slide-in-from-bottom-4">
         {content}
       </div>
     );
@@ -137,13 +157,17 @@ export function CompactRating({ rating }: CompactRatingProps) {
 
   return (
     <div 
-      className="relative inline-flex items-center justify-center transition-all duration-300 hover:scale-105"
-      style={{ width: size, height: size }}
+      className="relative inline-flex items-center justify-center transition-all duration-500 ease-out hover:scale-110 hover:shadow-lg hover:shadow-pink-500/20 group"
+      style={{ 
+        width: size, 
+        height: size,
+        filter: 'drop-shadow(0 2px 8px rgba(236, 72, 153, 0.12))'
+      }}
     >
       <svg
         width={size}
         height={size}
-        className="transform -rotate-90"
+        className="transform -rotate-90 transition-transform duration-700 ease-in-out"
       >
         {/* Gradient Definition */}
         <defs>
@@ -152,6 +176,14 @@ export function CompactRating({ rating }: CompactRatingProps) {
             <stop offset="50%" stopColor="#D946EF" />
             <stop offset="100%" stopColor="#C026D3" />
           </linearGradient>
+          {/* Glow filter */}
+          <filter id="compactGlow">
+            <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
         
         {/* Background Circle */}
@@ -162,6 +194,7 @@ export function CompactRating({ rating }: CompactRatingProps) {
           fill="none"
           stroke="#E5E7EB"
           strokeWidth={strokeWidth}
+          className="transition-all duration-300"
         />
         
         {/* Progress Circle */}
@@ -175,16 +208,20 @@ export function CompactRating({ rating }: CompactRatingProps) {
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-500 ease-out"
+          filter="url(#compactGlow)"
+          className="transition-all duration-1000 ease-out"
         />
       </svg>
       
       {/* Rating number */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-xs font-bold text-gray-700 leading-none">
+        <span className="text-xs font-bold text-gray-700 leading-none transition-all duration-300 group-hover:scale-110">
           {rating.toFixed(1)}
         </span>
       </div>
+
+      {/* Subtle glow on hover */}
+      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md" />
     </div>
   );
 }
