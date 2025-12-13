@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
+// Force dynamic - never cache this API route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: NextRequest) {
   try {
     const { message, conversationHistory, location } = await request.json();
@@ -133,17 +137,22 @@ Examples:
       }
     }
 
+    // ALWAYS include restaurants key (Chrome mobile caching fix)
     const response = NextResponse.json({
       message: visibleMessage,
       filters,
-      restaurants: restaurants.length > 0 ? restaurants : undefined,
+      restaurants: restaurants, // Always include, even if empty array
+      restaurantCount: restaurants.length,
       success: true,
+      timestamp: Date.now(), // Unique timestamp to bust cache
     });
 
-    // Prevent caching to avoid Chrome serving stale responses
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    // Aggressive cache prevention for Chrome mobile
+    response.headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+    response.headers.set('Vary', '*');
 
     return response;
   } catch (error: any) {

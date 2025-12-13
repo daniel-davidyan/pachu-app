@@ -45,7 +45,7 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
-const STORAGE_KEY = 'pachu_chat_v8';
+const STORAGE_KEY = 'pachu_chat_v9';
 
 // Helper function to get restaurant icon
 function getRestaurantIcon(restaurant: Restaurant): string {
@@ -265,17 +265,22 @@ export function AIChatSheet({
         content: m.content
       }));
 
-      const res = await fetch(`/api/map-chat?t=${Date.now()}`, {
+      // Generate unique request ID to bust ALL caches
+      const requestId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      
+      const res = await fetch(`/api/map-chat?nocache=${requestId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'X-Request-Id': requestId
         },
         body: JSON.stringify({
           message: currentInput,
           conversationHistory,
-          location: userLocation || { lat: 32.0853, lng: 34.7818 }
+          location: userLocation || { lat: 32.0853, lng: 34.7818 },
+          requestId // Also in body for extra uniqueness
         }),
         cache: 'no-store'
       });
