@@ -449,7 +449,7 @@ export default function RestaurantPage() {
                           <p className="text-xs text-gray-500">@{review.user.username}</p>
                         </div>
                         <div className="text-right flex flex-col items-end gap-1">
-                          <CompactRating rating={review.rating} showEmoji={true} />
+                          <CompactRating rating={review.rating} />
                           <p className="text-xs text-gray-400">
                             {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
                           </p>

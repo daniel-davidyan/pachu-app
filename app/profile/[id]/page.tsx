@@ -248,7 +248,7 @@ export default function ProfilePage() {
           {/* Average Rating */}
           {stats.reviewsCount > 0 && (
             <div className="flex items-center justify-center gap-2 mb-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl">
-              <CompactRating rating={stats.averageRating} showEmoji={false} />
+              <CompactRating rating={stats.averageRating} />
               <span className="font-bold text-sm text-gray-600">
                 avg rating
               </span>
@@ -388,7 +388,7 @@ export default function ProfilePage() {
                           )}
                         </div>
                         <div className="flex items-center gap-0.5">
-                          <CompactRating rating={review.rating} showEmoji={true} />
+                          <CompactRating rating={review.rating} />
                         </div>
                       </div>
                     )}

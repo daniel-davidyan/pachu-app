@@ -204,7 +204,7 @@ export function FullScreenReviewViewer({
           <div className="mb-4">
             <h2 className="text-white font-bold text-2xl mb-2">{currentReview.restaurant.name}</h2>
             <div className="flex items-center gap-3 text-white/80 text-sm">
-              <CompactRating rating={currentReview.rating} showEmoji={true} />
+              <CompactRating rating={currentReview.rating} />
               {currentReview.restaurant.address && (
                 <>
                   <span>•</span>

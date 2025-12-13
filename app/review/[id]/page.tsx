@@ -266,7 +266,7 @@ export default function ReviewPage() {
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 mt-1">
-                  <CompactRating rating={review.restaurant.averageRating} showEmoji={false} />
+                  <CompactRating rating={review.restaurant.averageRating} />
                   <span className="text-xs text-gray-400">
                     ({review.restaurant.totalReviews} reviews)
                   </span>
@@ -432,7 +432,7 @@ export default function ReviewPage() {
                         {recentReview.restaurant?.name}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <CompactRating rating={recentReview.rating} showEmoji={true} />
+                        <CompactRating rating={recentReview.rating} />
                         <span className="text-xs text-gray-400">
                           {formatDistanceToNow(new Date(recentReview.createdAt), { addSuffix: true })}
                         </span>

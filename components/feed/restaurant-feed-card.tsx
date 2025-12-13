@@ -334,7 +334,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                               </div>
                             </div>
                             <div className="flex-shrink-0">
-                              <CompactRating rating={review.rating} showEmoji={true} />
+                              <CompactRating rating={review.rating} />
                             </div>
                           </div>
                         </Link>
@@ -360,7 +360,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                             </div>
                           </div>
                           <div className="flex-shrink-0">
-                            <CompactRating rating={review.rating} showEmoji={true} />
+                            <CompactRating rating={review.rating} />
                           </div>
                         </div>
                       )}

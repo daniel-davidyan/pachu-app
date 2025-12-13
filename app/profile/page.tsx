@@ -615,7 +615,7 @@ export default function ProfilePage() {
                             {review.restaurants?.address || 'Address not available'}
                           </p>
                           <div className="flex items-center gap-1 mt-1.5">
-                            <CompactRating rating={review.rating} showEmoji={true} />
+                            <CompactRating rating={review.rating} />
                           </div>
                         </div>
                         <div className="relative flex-shrink-0">

@@ -168,7 +168,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                 
                 {/* Rating & Meta */}
                 <div className="flex items-center gap-1.5 mt-1">
-                  <CompactRating rating={restaurant.rating} showEmoji={false} />
+                  <CompactRating rating={restaurant.rating} />
                   <span className="text-xs text-gray-400">({restaurant.totalReviews})</span>
                   {priceSymbols && (
                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">{priceSymbols}</span>
@@ -236,7 +236,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                     </div>
                     <p className="text-xs font-medium text-gray-900 truncate">{place.name}</p>
                     <div className="flex items-center gap-0.5 mt-0.5">
-                      <CompactRating rating={place.rating} showEmoji={false} />
+                      <CompactRating rating={place.rating} />
                     </div>
                   </div>
                 ))}
