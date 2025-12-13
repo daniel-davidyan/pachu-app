@@ -44,7 +44,7 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
-const STORAGE_KEY = 'pachu_chat_messages';
+const STORAGE_KEY = 'pachu_chat_messages_v2'; // v2 to force refresh in Chrome
 
 export function AIChatSheet({ 
   onFilterChange, 
@@ -78,10 +78,17 @@ export function AIChatSheet({
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        setMessages(parsed);
+        // Ensure restaurants field is properly set for each message
+        const validatedMessages = parsed.map((msg: Message) => ({
+          ...msg,
+          restaurants: Array.isArray(msg.restaurants) ? msg.restaurants : []
+        }));
+        setMessages(validatedMessages);
       }
     } catch (error) {
       console.error('Error loading chat history:', error);
+      // Clear corrupted data
+      localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
 
@@ -89,9 +96,18 @@ export function AIChatSheet({
   useEffect(() => {
     if (messages.length > 0) {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+        // Ensure clean serialization
+        const messagesToSave = messages.map(msg => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          restaurants: Array.isArray(msg.restaurants) ? msg.restaurants : []
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messagesToSave));
       } catch (error) {
         console.error('Error saving chat history:', error);
+        // If save fails, clear storage
+        localStorage.removeItem(STORAGE_KEY);
       }
     }
   }, [messages]);
