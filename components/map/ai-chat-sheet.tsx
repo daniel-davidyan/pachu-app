@@ -272,7 +272,11 @@ export function AIChatSheet({
 
       const response = await fetch('/api/map-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        cache: 'no-store',
         body: JSON.stringify({
           message: inputValue,
           conversationHistory,

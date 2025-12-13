@@ -133,12 +133,19 @@ Examples:
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: visibleMessage,
       filters,
       restaurants: restaurants.length > 0 ? restaurants : undefined,
       success: true,
     });
+
+    // Prevent caching to avoid Chrome serving stale responses
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
+    return response;
   } catch (error: any) {
     console.error('Map Chat API Error:', error);
     return NextResponse.json(
