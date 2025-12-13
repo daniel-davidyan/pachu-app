@@ -17,42 +17,42 @@ export function ModernRating({
   const percentage = (rating / 5) * 100;
   
   // Dynamic gradient colors based on rating
-  // 5 = Full primary color #C5459C, 1 = Desaturated gray-ish
+  // Each rating goes from base color to lighter version
   const getGradientColors = () => {
     if (rating >= 4.5) {
-      // Very high rating - full vibrant primary color
+      // Rating 5: #C5459C -> lighter
       return {
         start: '#C5459C', // Primary color
-        middle: '#C5459C', // Primary color
-        end: '#C5459C' // Primary color
+        middle: '#D975B3', // Lighter primary
+        end: '#E8A3CA' // Light primary
       };
     } else if (rating >= 4) {
-      // High rating - slightly desaturated
+      // Rating 4
       return {
         start: '#B8548E', // Slightly desaturated
-        middle: '#C5459C', // Primary color
-        end: '#B8548E' // Slightly desaturated
+        middle: '#CA83AC', // Lighter
+        end: '#DCB1C9' // Light
       };
     } else if (rating >= 3) {
-      // Medium rating - moderately desaturated
+      // Rating 3
       return {
         start: '#A86B8A', // Moderately desaturated
-        middle: '#B8548E', // Slightly desaturated
-        end: '#A86B8A' // Moderately desaturated
+        middle: '#BC92A8', // Lighter
+        end: '#D0B9C6' // Light
       };
     } else if (rating >= 2) {
-      // Low-medium rating - quite desaturated
+      // Rating 2
       return {
         start: '#9A7F8E', // Quite desaturated
-        middle: '#A86B8A', // Moderately desaturated
-        end: '#9A7F8E' // Quite desaturated
+        middle: '#B29FAC', // Lighter
+        end: '#CABFCA' // Light
       };
     } else {
-      // Very low rating - very desaturated (grayish with hint of primary)
+      // Rating 1: #9A7F8E -> lighter
       return {
-        start: '#8B8B8B', // Gray
-        middle: '#9A8090', // Gray with hint of primary
-        end: '#9A7F8E' // Quite desaturated
+        start: '#9A7F8E', // Desaturated
+        middle: '#B29FAC', // Lighter
+        end: '#CABFCA' // Light
       };
     }
   };
@@ -172,42 +172,42 @@ export function CompactRating({ rating }: CompactRatingProps) {
   const percentage = (rating / 5) * 100;
   
   // Dynamic gradient colors based on rating
-  // 5 = Full primary color #C5459C, 1 = Desaturated gray-ish
+  // Each rating goes from base color to lighter version
   const getGradientColors = () => {
     if (rating >= 4.5) {
-      // Very high rating - full vibrant primary color
+      // Rating 5: #C5459C -> lighter
       return {
         start: '#C5459C', // Primary color
-        middle: '#C5459C', // Primary color
-        end: '#C5459C' // Primary color
+        middle: '#D975B3', // Lighter primary
+        end: '#E8A3CA' // Light primary
       };
     } else if (rating >= 4) {
-      // High rating - slightly desaturated
+      // Rating 4
       return {
         start: '#B8548E', // Slightly desaturated
-        middle: '#C5459C', // Primary color
-        end: '#B8548E' // Slightly desaturated
+        middle: '#CA83AC', // Lighter
+        end: '#DCB1C9' // Light
       };
     } else if (rating >= 3) {
-      // Medium rating - moderately desaturated
+      // Rating 3
       return {
         start: '#A86B8A', // Moderately desaturated
-        middle: '#B8548E', // Slightly desaturated
-        end: '#A86B8A' // Moderately desaturated
+        middle: '#BC92A8', // Lighter
+        end: '#D0B9C6' // Light
       };
     } else if (rating >= 2) {
-      // Low-medium rating - quite desaturated
+      // Rating 2
       return {
         start: '#9A7F8E', // Quite desaturated
-        middle: '#A86B8A', // Moderately desaturated
-        end: '#9A7F8E' // Quite desaturated
+        middle: '#B29FAC', // Lighter
+        end: '#CABFCA' // Light
       };
     } else {
-      // Very low rating - very desaturated (grayish with hint of primary)
+      // Rating 1: #9A7F8E -> lighter
       return {
-        start: '#8B8B8B', // Gray
-        middle: '#9A8090', // Gray with hint of primary
-        end: '#9A7F8E' // Quite desaturated
+        start: '#9A7F8E', // Desaturated
+        middle: '#B29FAC', // Lighter
+        end: '#CABFCA' // Light
       };
     }
   };
