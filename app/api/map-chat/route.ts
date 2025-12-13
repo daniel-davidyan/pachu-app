@@ -32,16 +32,19 @@ export async function POST(request: NextRequest) {
 
 ## Your Process:
 1️⃣ **First message**: Ask about cuisine type and preferences (budget, romantic, etc.) in ONE message
-2️⃣ **Second message**: Show 3 restaurant recommendations with brief descriptions
+2️⃣ **Second message**: Say you found places and they will appear below. DO NOT describe individual restaurants.
 
-## Rules:
+## CRITICAL RULES:
 - Keep responses conversational and friendly (2-3 sentences max)
 - Use emojis naturally 🍽️ 💰 ❤️ 🏡
 - Ask MULTIPLE questions in your FIRST message (cuisine AND budget/preferences)
-- After user responds once, ALWAYS show restaurants with descriptions
-- Be encouraging and positive
+- After user responds, say "I found some great places for you! 🍽️✨" (or similar)
+- NEVER mention specific restaurant names or details in your text
+- NEVER say things like "The Chinese restaurant" or describe restaurants
+- The restaurant cards will show automatically below your message
+- Just acknowledge and let the cards do the talking
 
-## Current stage: ${questionCount === 0 ? 'Ask about cuisine, budget, and preferences in ONE message' : 'Show 3 restaurant recommendations NOW'}
+## Current stage: ${questionCount === 0 ? 'Ask about cuisine, budget, and preferences in ONE message' : 'Say you found places (cards will show below automatically)'}
 
 ## Extract Information:
 After each response, include this JSON block (user won't see it):
@@ -109,33 +112,26 @@ Examples:
     }
 
     // If ready to show restaurants, fetch some
-    // ALWAYS fetch restaurants after first assistant message (more aggressive)
     let restaurants: any[] = [];
     const shouldFetchRestaurants = shouldSuggestRestaurants || extractedData.readyToShow;
     
     if (shouldFetchRestaurants && location) {
-      // Call nearby restaurants API
       try {
         const nearbyResponse = await fetch(
           `${request.nextUrl.origin}/api/restaurants/nearby?latitude=${location.lat}&longitude=${location.lng}&radius=2000`,
           { headers: request.headers }
         );
+        
+        if (!nearbyResponse.ok) {
+          throw new Error(`API returned ${nearbyResponse.status}`);
+        }
+        
         const nearbyData = await nearbyResponse.json();
-        restaurants = (nearbyData.restaurants || []).slice(0, 3); // Top 3 restaurants for AI suggestions
-        console.log(`Fetched ${restaurants.length} restaurants for suggestions`);
+        restaurants = (nearbyData.restaurants || []).slice(0, 3);
       } catch (error) {
         console.error('Error fetching restaurants:', error);
       }
-    } else {
-      console.log(`Not fetching restaurants: shouldFetchRestaurants=${shouldFetchRestaurants}, location=${!!location}`);
     }
-
-    console.log('Returning response:', {
-      messageLength: visibleMessage.length,
-      restaurantCount: restaurants.length,
-      shouldFetch: shouldFetchRestaurants,
-      questionCount
-    });
 
     return NextResponse.json({
       message: visibleMessage,

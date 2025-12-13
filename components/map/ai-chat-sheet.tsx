@@ -286,26 +286,19 @@ export function AIChatSheet({
         throw new Error(data.error);
       }
 
-      console.log('API Response:', {
-        hasRestaurants: !!data.restaurants,
-        restaurantCount: data.restaurants?.length || 0,
-        restaurants: data.restaurants
-      });
-
+      const restaurantData = Array.isArray(data.restaurants) ? data.restaurants : [];
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.message,
-        restaurants: data.restaurants || []
+        restaurants: restaurantData
       };
 
       setMessages(prev => [...prev, assistantMessage]);
 
-      if (data.restaurants && data.restaurants.length > 0) {
-        console.log(`Displaying ${data.restaurants.length} restaurant cards in chat`);
-        onRestaurantsFound?.(data.restaurants);
-      } else {
-        console.log('No restaurants returned from API');
+      if (restaurantData.length > 0) {
+        onRestaurantsFound?.(restaurantData);
       }
 
       if (data.filters) {
@@ -486,7 +479,7 @@ export function AIChatSheet({
               </div>
               
               {/* Restaurant Suggestion Cards */}
-              {message.role === 'assistant' && message.restaurants && message.restaurants.length > 0 && (
+              {message.role === 'assistant' && message.restaurants && Array.isArray(message.restaurants) && message.restaurants.length > 0 && (
                 <div className="mt-3 space-y-2">
                   <div className="flex items-center gap-2 px-2">
                     <MapPin className="w-4 h-4 text-primary" />
