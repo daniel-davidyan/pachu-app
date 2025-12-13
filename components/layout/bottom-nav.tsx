@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Search, Map, User } from 'lucide-react';
+import { Image, Search, Map, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -14,19 +14,19 @@ export function BottomNav({ show = true }: BottomNavProps) {
 
   const navItems = [
     {
+      name: 'Map',
+      href: '/map',
+      icon: Map,
+    },
+    {
       name: 'Feed',
       href: '/feed',
-      icon: Home,
+      icon: Image,
     },
     {
       name: 'Search',
       href: '/search',
       icon: Search,
-    },
-    {
-      name: 'Map',
-      href: '/map',
-      icon: Map,
     },
     {
       name: 'Profile',
