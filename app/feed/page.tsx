@@ -490,12 +490,24 @@ export default function FeedPage() {
 
         {/* Feed Content */}
         <div className="px-4 py-4 space-y-4">
-          {/* Loading State */}
+          {/* Loading Overlay - shows when switching tabs */}
+          {loading && restaurants.length > 0 && (
+            <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-30 flex items-center justify-center" style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }}>
+              <div className="flex flex-col items-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
+                <p className="text-sm text-gray-500 font-medium">
+                  {feedMode === 'following' ? "Loading your friends' favorites..." : 'Discovering restaurants for you...'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Loading State - shows on initial load */}
           {loading && restaurants.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
               <p className="text-sm text-gray-500">
-                {feedMode === 'following' ? 'Loading restaurants from people you follow...' : 'Finding restaurants...'}
+                {feedMode === 'following' ? "Loading your friends' favorites..." : 'Discovering restaurants for you...'}
               </p>
             </div>
           )}
