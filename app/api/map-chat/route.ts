@@ -130,6 +130,13 @@ Examples:
       console.log(`Not fetching restaurants: shouldFetchRestaurants=${shouldFetchRestaurants}, location=${!!location}`);
     }
 
+    console.log('Returning response:', {
+      messageLength: visibleMessage.length,
+      restaurantCount: restaurants.length,
+      shouldFetch: shouldFetchRestaurants,
+      questionCount
+    });
+
     return NextResponse.json({
       message: visibleMessage,
       filters,

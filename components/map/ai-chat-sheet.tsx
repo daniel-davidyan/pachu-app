@@ -286,6 +286,12 @@ export function AIChatSheet({
         throw new Error(data.error);
       }
 
+      console.log('API Response:', {
+        hasRestaurants: !!data.restaurants,
+        restaurantCount: data.restaurants?.length || 0,
+        restaurants: data.restaurants
+      });
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -296,7 +302,10 @@ export function AIChatSheet({
       setMessages(prev => [...prev, assistantMessage]);
 
       if (data.restaurants && data.restaurants.length > 0) {
+        console.log(`Displaying ${data.restaurants.length} restaurant cards in chat`);
         onRestaurantsFound?.(data.restaurants);
+      } else {
+        console.log('No restaurants returned from API');
       }
 
       if (data.filters) {
@@ -481,13 +490,16 @@ export function AIChatSheet({
                 <div className="mt-3 space-y-2">
                   <div className="flex items-center gap-2 px-2">
                     <MapPin className="w-4 h-4 text-primary" />
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Suggested For You</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Suggested For You ({message.restaurants.length})
+                    </p>
                   </div>
                   {message.restaurants.map((restaurant) => (
                     <div
                       key={restaurant.id}
                       onClick={() => handleRestaurantCardClick(restaurant)}
-                      className="bg-gradient-to-br from-white to-primary/5 rounded-2xl p-3 border-2 border-primary/20 shadow-md hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                      className="bg-gradient-to-br from-white to-primary/5 rounded-2xl p-3 border-2 border-primary/20 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                      style={{ minHeight: '80px' }}
                     >
                       <div className="flex gap-3">
                         {/* Icon/Image with Primary Border Ring */}
