@@ -1,9 +1,10 @@
 'use client';
 
-import { Newspaper, Plus, Map, User } from 'lucide-react';
+import { Newspaper, Plus, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { MapSearchIcon } from '@/components/icons';
 
 interface BottomNavProps {
   show?: boolean;
@@ -14,11 +15,6 @@ export function BottomNav({ show = true }: BottomNavProps) {
 
   const navItems = [
     {
-      name: 'Map',
-      href: '/map',
-      icon: Map,
-    },
-    {
       name: 'Feed',
       href: '/feed',
       icon: Newspaper,
@@ -27,6 +23,11 @@ export function BottomNav({ show = true }: BottomNavProps) {
       name: 'Search',
       href: '/search',
       icon: Plus,
+    },
+    {
+      name: 'Map',
+      href: '/map',
+      icon: MapSearchIcon,
     },
     {
       name: 'Profile',
