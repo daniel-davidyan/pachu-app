@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3 } from 'lucide-react';
+import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2 } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { CompactRating } from '@/components/ui/modern-rating';
@@ -16,6 +16,78 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
   const [similarPlaces, setSimilarPlaces] = useState<Restaurant[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
+  const [loadingWishlist, setLoadingWishlist] = useState(false);
+
+  const handleWishlist = async () => {
+    if (loadingWishlist) return;
+    
+    setLoadingWishlist(true);
+    const newWishlistState = !isLiked;
+    setIsLiked(newWishlistState);
+    
+    try {
+      if (newWishlistState) {
+        // Add to wishlist
+        const response = await fetch('/api/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            googlePlaceId: restaurant?.googlePlaceId || restaurant?.id,
+            name: restaurant?.name,
+            address: restaurant?.address,
+            imageUrl: restaurant?.photoUrl,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add to wishlist');
+        }
+      } else {
+        // Remove from wishlist - we need to get the restaurant ID first
+        const wishlistResponse = await fetch('/api/wishlist');
+        const wishlistData = await wishlistResponse.json();
+        const wishlistItem = wishlistData.wishlist?.find(
+          (item: any) => item.restaurants?.google_place_id === (restaurant?.googlePlaceId || restaurant?.id)
+        );
+
+        if (wishlistItem) {
+          const response = await fetch(`/api/wishlist?restaurantId=${wishlistItem.restaurants.id}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to remove from wishlist');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating wishlist:', error);
+      // Revert on error
+      setIsLiked(!newWishlistState);
+    } finally {
+      setLoadingWishlist(false);
+    }
+  };
+
+  // Check if restaurant is already in wishlist
+  useEffect(() => {
+    if (!restaurant) return;
+    
+    const checkWishlistStatus = async () => {
+      try {
+        const response = await fetch('/api/wishlist');
+        const data = await response.json();
+        const inWishlist = data.wishlist?.some(
+          (item: any) => item.restaurants?.google_place_id === (restaurant.googlePlaceId || restaurant.id)
+        );
+        setIsLiked(inWishlist || false);
+      } catch (error) {
+        console.error('Error checking wishlist status:', error);
+      }
+    };
+    
+    checkWishlistStatus();
+  }, [restaurant]);
 
   // Fetch similar places
   useEffect(() => {
@@ -199,12 +271,17 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                 <Edit3 className="w-5 h-5 text-gray-600" />
               </button>
               <button 
-                onClick={() => setIsLiked(!isLiked)}
-                className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all active:scale-95 ${
+                onClick={handleWishlist}
+                disabled={loadingWishlist}
+                className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all active:scale-95 disabled:opacity-50 ${
                   isLiked ? 'bg-red-50' : 'bg-gray-100 hover:bg-gray-200'
                 }`}
               >
-                <Heart className={`w-5 h-5 transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+                {loadingWishlist ? (
+                  <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+                ) : (
+                  <Heart className={`w-5 h-5 transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+                )}
               </button>
               <button className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors active:scale-95">
                 <Globe className="w-5 h-5 text-gray-600" />
