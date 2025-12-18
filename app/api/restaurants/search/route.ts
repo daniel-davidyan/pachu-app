@@ -73,12 +73,17 @@ export async function GET(request: NextRequest) {
       
       const followingIds = followingData?.map(f => f.following_id) || [];
 
+      console.log('🔍 Search - User following count:', followingIds.length);
+
       if (followingIds.length > 0 && placeIds.length > 0) {
         // Get restaurants from our database that match the place IDs
         const { data: dbRestaurants } = await supabase
           .from('restaurants')
           .select('id, google_place_id')
           .in('google_place_id', placeIds);
+
+        console.log('🔍 Search - DB restaurants found:', dbRestaurants?.length || 0);
+        console.log('🔍 Search - Place IDs searched:', placeIds.length);
 
         const restaurantIdMap = new Map<string, string>();
         dbRestaurants?.forEach((r: any) => {
@@ -88,6 +93,8 @@ export async function GET(request: NextRequest) {
         });
 
         const dbRestaurantIds = dbRestaurants?.map(r => r.id) || [];
+
+        console.log('🔍 Search - DB restaurant IDs:', dbRestaurantIds.length);
 
         if (dbRestaurantIds.length > 0) {
           // Get reviews from following users for these restaurants
@@ -106,20 +113,26 @@ export async function GET(request: NextRequest) {
             .in('restaurant_id', dbRestaurantIds)
             .in('user_id', followingIds);
 
-          // Group reviews by restaurant_id
-          const reviewsByRestaurant = new Map<string, any[]>();
+          console.log('🔍 Search - Reviews from following:', reviewsData?.length || 0);
+
+          // Group reviews by restaurant_id and deduplicate users
+          const reviewsByRestaurant = new Map<string, Map<string, any>>();
           reviewsData?.forEach((review: any) => {
             const restId = review.restaurant_id;
             if (!reviewsByRestaurant.has(restId)) {
-              reviewsByRestaurant.set(restId, []);
+              reviewsByRestaurant.set(restId, new Map());
             }
             if (review.profiles) {
-              reviewsByRestaurant.get(restId)?.push({
-                id: review.profiles.id,
-                username: review.profiles.username,
-                fullName: review.profiles.full_name || review.profiles.username,
-                avatarUrl: review.profiles.avatar_url,
-              });
+              const userId = review.profiles.id;
+              // Only add each user once per restaurant
+              if (!reviewsByRestaurant.get(restId)?.has(userId)) {
+                reviewsByRestaurant.get(restId)?.set(userId, {
+                  id: review.profiles.id,
+                  username: review.profiles.username,
+                  fullName: review.profiles.full_name || review.profiles.username,
+                  avatarUrl: review.profiles.avatar_url,
+                });
+              }
             }
           });
 
@@ -127,11 +140,13 @@ export async function GET(request: NextRequest) {
           restaurants.forEach((restaurant: any) => {
             const dbRestaurantId = restaurantIdMap.get(restaurant.googlePlaceId);
             if (dbRestaurantId && reviewsByRestaurant.has(dbRestaurantId)) {
-              restaurant.visitedByFollowing = reviewsByRestaurant.get(dbRestaurantId);
+              restaurant.visitedByFollowing = Array.from(reviewsByRestaurant.get(dbRestaurantId)!.values());
             } else {
               restaurant.visitedByFollowing = [];
             }
           });
+
+          console.log('🔍 Search API - Restaurants with friends:', restaurants.filter((r: any) => r.visitedByFollowing?.length > 0).length);
         } else {
           // No restaurants in DB, set empty arrays
           restaurants.forEach((restaurant: any) => {

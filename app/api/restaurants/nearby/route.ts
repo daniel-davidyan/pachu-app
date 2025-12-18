@@ -118,20 +118,24 @@ export async function GET(request: NextRequest) {
             .in('restaurant_id', dbRestaurantIds)
             .in('user_id', followingIds);
 
-          // Group reviews by restaurant_id
-          const reviewsByRestaurant = new Map<string, any[]>();
+          // Group reviews by restaurant_id and deduplicate users
+          const reviewsByRestaurant = new Map<string, Map<string, any>>();
           reviewsData?.forEach((review: any) => {
             const restId = review.restaurant_id;
             if (!reviewsByRestaurant.has(restId)) {
-              reviewsByRestaurant.set(restId, []);
+              reviewsByRestaurant.set(restId, new Map());
             }
             if (review.profiles) {
-              reviewsByRestaurant.get(restId)?.push({
-                id: review.profiles.id,
-                username: review.profiles.username,
-                fullName: review.profiles.full_name || review.profiles.username,
-                avatarUrl: review.profiles.avatar_url,
-              });
+              const userId = review.profiles.id;
+              // Only add each user once per restaurant
+              if (!reviewsByRestaurant.get(restId)?.has(userId)) {
+                reviewsByRestaurant.get(restId)?.set(userId, {
+                  id: review.profiles.id,
+                  username: review.profiles.username,
+                  fullName: review.profiles.full_name || review.profiles.username,
+                  avatarUrl: review.profiles.avatar_url,
+                });
+              }
             }
           });
 
@@ -139,11 +143,13 @@ export async function GET(request: NextRequest) {
           restaurants.forEach((restaurant: any) => {
             const dbRestaurantId = restaurantIdMap.get(restaurant.googlePlaceId);
             if (dbRestaurantId && reviewsByRestaurant.has(dbRestaurantId)) {
-              restaurant.visitedByFollowing = reviewsByRestaurant.get(dbRestaurantId);
+              restaurant.visitedByFollowing = Array.from(reviewsByRestaurant.get(dbRestaurantId)!.values());
             } else {
               restaurant.visitedByFollowing = [];
             }
           });
+
+          console.log('🗺️ Nearby API - Restaurants with friends:', restaurants.filter((r: any) => r.visitedByFollowing?.length > 0).length);
         } else {
           // No restaurants in DB, set empty arrays
           restaurants.forEach((restaurant: any) => {
