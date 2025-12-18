@@ -283,7 +283,7 @@ export default function RestaurantPage() {
               </div>
             </div>
             <span className="text-sm text-gray-500">
-              {restaurant.totalReviews} {restaurant.totalReviews === 1 ? 'review' : 'reviews'}
+              {restaurant.totalReviews} {restaurant.totalReviews === 1 ? 'experience' : 'experiences'}
             </span>
             {priceLevelText && (
               <>
@@ -343,8 +343,8 @@ export default function RestaurantPage() {
                   <span className="font-semibold">{friendsWhoReviewed[0].fullName}</span>
                   {friendsWhoReviewed.length > 1 && (
                     <> and {friendsWhoReviewed.length - 1} other friend{friendsWhoReviewed.length > 2 ? 's' : ''}</>
-                  )}
-                  {' '}reviewed this place
+                  )                  }
+                  {' '}experienced this place
                 </p>
               </div>
             </div>
@@ -394,7 +394,7 @@ export default function RestaurantPage() {
             }`}
           >
             <PenLine className="w-4 h-4 inline-block mr-2 -mt-0.5" />
-            {userHasReviewed ? 'Already Reviewed' : 'Write Review'}
+            {userHasReviewed ? 'Already Shared' : 'Share Experience'}
           </button>
           <button
             onClick={openInMaps}
@@ -405,10 +405,10 @@ export default function RestaurantPage() {
           </button>
         </div>
 
-        {/* Reviews Section */}
+        {/* Experiences Section */}
         <div className="px-4 py-4">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
-            Reviews ({reviews.length})
+            Experiences ({reviews.length})
           </h2>
 
           {reviews.length === 0 ? (
@@ -416,8 +416,8 @@ export default function RestaurantPage() {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Star className="w-8 h-8 text-gray-400" />
               </div>
-              <p className="text-gray-500 font-medium">No reviews yet</p>
-              <p className="text-sm text-gray-400 mt-1">Be the first to review!</p>
+              <p className="text-gray-500 font-medium">No experiences yet</p>
+              <p className="text-sm text-gray-400 mt-1">Be the first to share your experience!</p>
             </div>
           ) : (
             <div className="space-y-3">

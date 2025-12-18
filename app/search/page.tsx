@@ -337,10 +337,10 @@ export default function SearchPage() {
                                   </div>
                                   <span className="text-[10px] text-gray-600 ml-0.5">
                                     {place.visitedByFollowing.length === 1 
-                                      ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} reviewed`
+                                      ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} experienced`
                                       : place.visitedByFollowing.length === 2
-                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} reviewed`
-                                        : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others reviewed`
+                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} experienced`
+                                        : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others experienced`
                                     }
                                   </span>
                                 </div>
@@ -420,10 +420,10 @@ export default function SearchPage() {
                                     </div>
                                     <span className="text-[10px] text-gray-600 ml-0.5">
                                       {place.visitedByFollowing.length === 1 
-                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} reviewed`
+                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} experienced`
                                         : place.visitedByFollowing.length === 2
-                                          ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} reviewed`
-                                          : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others reviewed`
+                                          ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} experienced`
+                                          : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others experienced`
                                       }
                                     </span>
                                   </div>
