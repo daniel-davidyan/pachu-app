@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2 } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
@@ -13,6 +14,7 @@ interface RestaurantCardProps {
 }
 
 export function RestaurantCard({ restaurant, onClose, userLocation }: RestaurantCardProps) {
+  const router = useRouter();
   const [similarPlaces, setSimilarPlaces] = useState<Restaurant[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
@@ -183,6 +185,16 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
     window.open(url, '_blank');
   };
 
+  const handleViewDetails = () => {
+    const restaurantId = restaurant.googlePlaceId || restaurant.id;
+    router.push(`/restaurant/${restaurantId}`);
+  };
+
+  const handleSimilarPlaceClick = (place: Restaurant) => {
+    const placeId = place.googlePlaceId || place.id;
+    router.push(`/restaurant/${placeId}`);
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -202,8 +214,11 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
           {/* Main Content */}
           <div className="p-4">
-            {/* Header Row */}
-            <div className="flex gap-3">
+            {/* Header Row - Clickable to view details */}
+            <div 
+              className="flex gap-3 cursor-pointer hover:bg-gray-50 -m-4 p-4 rounded-t-3xl transition-colors"
+              onClick={handleViewDetails}
+            >
               {/* Image */}
               <div className="w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-100 relative">
                 {restaurant.photoUrl ? (
@@ -231,7 +246,10 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                     {restaurant.name}
                   </h3>
                   <button
-                    onClick={onClose}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose();
+                    }}
                     className="p-1.5 -m-1 hover:bg-gray-100 rounded-full flex-shrink-0 transition-colors"
                   >
                     <X className="w-5 h-5 text-gray-400" />
@@ -300,6 +318,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                 {similarPlaces.map((place) => (
                   <div 
                     key={place.id}
+                    onClick={() => handleSimilarPlaceClick(place)}
                     className="flex-shrink-0 w-28 bg-gray-50 rounded-xl p-2 hover:bg-gray-100 transition-colors cursor-pointer"
                   >
                     <div className="w-full h-16 rounded-lg overflow-hidden bg-gray-200 mb-1.5">
