@@ -13,12 +13,20 @@ interface RestaurantCardProps {
   userLocation?: { lat: number; lng: number } | null;
 }
 
+interface Friend {
+  id: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+}
+
 export function RestaurantCard({ restaurant, onClose, userLocation }: RestaurantCardProps) {
   const router = useRouter();
   const [similarPlaces, setSimilarPlaces] = useState<Restaurant[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [loadingWishlist, setLoadingWishlist] = useState(false);
+  const [friendsWhoVisited, setFriendsWhoVisited] = useState<Friend[]>([]);
 
   const handleWishlist = async () => {
     if (loadingWishlist) return;
@@ -112,6 +120,27 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
     
     fetchSimilar();
   }, [restaurant, userLocation]);
+
+  // Fetch friends who visited this restaurant
+  useEffect(() => {
+    if (!restaurant) return;
+    
+    const fetchFriendsWhoVisited = async () => {
+      try {
+        const restaurantId = restaurant.googlePlaceId || restaurant.id;
+        const response = await fetch(`/api/restaurants/${restaurantId}`);
+        const data = await response.json();
+        
+        if (data.friendsWhoReviewed) {
+          setFriendsWhoVisited(data.friendsWhoReviewed);
+        }
+      } catch (error) {
+        console.error('Error fetching friends who visited:', error);
+      }
+    };
+    
+    fetchFriendsWhoVisited();
+  }, [restaurant]);
 
   if (!restaurant) return null;
 
@@ -258,12 +287,56 @@ export function RestaurantCard({ restaurant, onClose, userLocation }: Restaurant
                 
                 {/* Rating & Meta */}
                 <div className="flex items-center gap-1.5 mt-1">
-                  <CompactRating rating={restaurant.rating} />
+                  {/* Match Percentage */}
+                  <div className="bg-white border border-gray-200 rounded-full px-2 py-0.5 shadow-sm">
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
+                      <span className="text-xs font-bold text-gray-900">{Math.round((restaurant.rating / 5) * 100)}%</span>
+                      <span className="text-[9px] text-gray-500 font-medium">match</span>
+                    </div>
+                  </div>
                   <span className="text-xs text-gray-400">({restaurant.totalReviews})</span>
                   {priceSymbols && (
                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">{priceSymbols}</span>
                   )}
                 </div>
+
+                {/* Friends Who Visited */}
+                {friendsWhoVisited.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-1.5 bg-primary/5 rounded-lg px-2 py-1">
+                    <div className="flex -space-x-1">
+                      {friendsWhoVisited.slice(0, 2).map((friend) => (
+                        friend.avatarUrl ? (
+                          <img
+                            key={friend.id}
+                            src={friend.avatarUrl}
+                            alt={friend.fullName}
+                            className="w-4 h-4 rounded-full border border-white object-cover"
+                          />
+                        ) : (
+                          <div
+                            key={friend.id}
+                            className="w-4 h-4 rounded-full border border-white bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center"
+                          >
+                            <span className="text-[8px] font-bold text-white">
+                              {friend.fullName.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-700 leading-tight">
+                      <span className="font-semibold">{friendsWhoVisited[0].fullName}</span>
+                      {friendsWhoVisited.length === 2 && (
+                        <> and <span className="font-semibold">{friendsWhoVisited[1].fullName}</span></>
+                      )}
+                      {friendsWhoVisited.length > 2 && (
+                        <> and {friendsWhoVisited.length - 1} other{friendsWhoVisited.length > 2 ? 's' : ''}</>
+                      )}
+                      {' '}visited
+                    </p>
+                  </div>
+                )}
 
                 {/* Address */}
                 <div className="flex items-center gap-1 mt-1.5">

@@ -104,6 +104,9 @@ export async function GET(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 });
     }
 
+    // Get the actual restaurant ID for querying reviews
+    const dbRestaurantId = restaurant.id;
+
     // Get all reviews for this restaurant
     const { data: reviewsData } = await supabase
       .from('reviews')
@@ -117,7 +120,7 @@ export async function GET(
         likes_count,
         user_id
       `)
-      .eq('restaurant_id', id)
+      .eq('restaurant_id', dbRestaurantId)
       .order('created_at', { ascending: false });
 
     // Get user profiles for reviews
@@ -189,7 +192,7 @@ export async function GET(
         .from('wishlist')
         .select('id')
         .eq('user_id', user.id)
-        .eq('restaurant_id', id)
+        .eq('restaurant_id', dbRestaurantId)
         .single();
       
       isWishlisted = !!wishlistData;
@@ -202,7 +205,7 @@ export async function GET(
         .from('reviews')
         .select('id')
         .eq('user_id', user.id)
-        .eq('restaurant_id', id)
+        .eq('restaurant_id', dbRestaurantId)
         .single();
       
       userHasReviewed = !!userReviewData;
@@ -222,7 +225,7 @@ export async function GET(
         const { data: friendReviewsData } = await supabase
           .from('reviews')
           .select('user_id')
-          .eq('restaurant_id', id)
+          .eq('restaurant_id', dbRestaurantId)
           .in('user_id', followingIds);
 
         const friendIds = [...new Set(friendReviewsData?.map(r => r.user_id) || [])];

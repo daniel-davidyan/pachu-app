@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -23,6 +24,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+
     // Use Google Places Nearby Search API - Restaurant only
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=restaurant&keyword=restaurant&key=${apiKey}`;
     
@@ -66,6 +72,96 @@ export async function GET(request: NextRequest) {
       source: 'google',
       googlePlaceId: place.place_id
     })) || [];
+
+    // If user is logged in, get following users who visited these restaurants
+    if (user) {
+      const placeIds = restaurants.map((r: any) => r.googlePlaceId);
+      
+      // Get list of users the current user is following
+      const { data: followingData } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id);
+      
+      const followingIds = followingData?.map(f => f.following_id) || [];
+
+      if (followingIds.length > 0 && placeIds.length > 0) {
+        // Get restaurants from our database that match the place IDs
+        const { data: dbRestaurants } = await supabase
+          .from('restaurants')
+          .select('id, google_place_id')
+          .in('google_place_id', placeIds);
+
+        const restaurantIdMap = new Map<string, string>();
+        dbRestaurants?.forEach((r: any) => {
+          if (r.google_place_id) {
+            restaurantIdMap.set(r.google_place_id, r.id);
+          }
+        });
+
+        const dbRestaurantIds = dbRestaurants?.map(r => r.id) || [];
+
+        if (dbRestaurantIds.length > 0) {
+          // Get reviews from following users for these restaurants
+          const { data: reviewsData } = await supabase
+            .from('reviews')
+            .select(`
+              restaurant_id,
+              user_id,
+              profiles!reviews_user_id_fkey (
+                id,
+                username,
+                full_name,
+                avatar_url
+              )
+            `)
+            .in('restaurant_id', dbRestaurantIds)
+            .in('user_id', followingIds);
+
+          // Group reviews by restaurant_id
+          const reviewsByRestaurant = new Map<string, any[]>();
+          reviewsData?.forEach((review: any) => {
+            const restId = review.restaurant_id;
+            if (!reviewsByRestaurant.has(restId)) {
+              reviewsByRestaurant.set(restId, []);
+            }
+            if (review.profiles) {
+              reviewsByRestaurant.get(restId)?.push({
+                id: review.profiles.id,
+                username: review.profiles.username,
+                fullName: review.profiles.full_name || review.profiles.username,
+                avatarUrl: review.profiles.avatar_url,
+              });
+            }
+          });
+
+          // Add visitedByFollowing to each restaurant
+          restaurants.forEach((restaurant: any) => {
+            const dbRestaurantId = restaurantIdMap.get(restaurant.googlePlaceId);
+            if (dbRestaurantId && reviewsByRestaurant.has(dbRestaurantId)) {
+              restaurant.visitedByFollowing = reviewsByRestaurant.get(dbRestaurantId);
+            } else {
+              restaurant.visitedByFollowing = [];
+            }
+          });
+        } else {
+          // No restaurants in DB, set empty arrays
+          restaurants.forEach((restaurant: any) => {
+            restaurant.visitedByFollowing = [];
+          });
+        }
+      } else {
+        // No following users or no places, set empty arrays
+        restaurants.forEach((restaurant: any) => {
+          restaurant.visitedByFollowing = [];
+        });
+      }
+    } else {
+      // User not logged in, set empty arrays
+      restaurants.forEach((restaurant: any) => {
+        restaurant.visitedByFollowing = [];
+      });
+    }
 
     return NextResponse.json({ restaurants });
   } catch (error) {

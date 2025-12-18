@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // First, check if restaurant exists in our database or create it
-    let restaurantId = restaurant.id;
+    // Always use Google Place ID to find or create restaurant
+    let restaurantId: string | null = null;
 
-    if (!restaurantId && restaurant.googlePlaceId) {
+    if (restaurant.googlePlaceId) {
       // Check if restaurant exists by Google Place ID
       const { data: existingRestaurant } = await supabase
         .from('restaurants')
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       if (existingRestaurant) {
         restaurantId = existingRestaurant.id;
       } else {
-        // Create new restaurant (location can be added later via SQL if needed)
+        // Create new restaurant with Google Place ID
         const { data: newRestaurant, error: createError } = await supabase
           .from('restaurants')
           .insert({
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         if (createError) {
           console.error('Error creating restaurant:', createError);
           return NextResponse.json(
-            { error: `Failed to create restaurant: ${createError.message}. Please check your database schema.` },
+            { error: `Failed to create restaurant: ${createError.message}` },
             { status: 500 }
           );
         }
@@ -74,17 +74,10 @@ export async function POST(request: NextRequest) {
             console.log('Location update skipped (PostGIS function may not exist)');
           }
         }
-
-        if (createError) {
-          console.error('Error creating restaurant:', createError);
-          return NextResponse.json(
-            { error: 'Failed to create restaurant' },
-            { status: 500 }
-          );
-        }
-
-        restaurantId = newRestaurant.id;
       }
+    } else if (restaurant.id) {
+      // Fallback: use provided restaurant ID (for legacy support)
+      restaurantId = restaurant.id;
     }
 
     if (!restaurantId) {
