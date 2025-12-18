@@ -119,7 +119,7 @@ export function FiltersDropdown({
       {isOpen && (
         <>
           {/* Full Screen Overlay */}
-          <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-gray-50 to-white animate-fade-in flex flex-col w-screen overflow-hidden" style={{ height: '100dvh', overscrollBehavior: 'contain' }}>
+          <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-gray-50 to-white animate-fade-in flex flex-col w-screen" style={{ height: '100dvh', overflow: 'hidden', overscrollBehavior: 'none' }}>
             {/* Header - Fixed with safe area */}
             <div className="flex-shrink-0 px-6 py-4 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}>
               <div className="flex items-center gap-3">
@@ -133,21 +133,21 @@ export function FiltersDropdown({
               </div>
             </div>
 
-            {/* Content (no scroll) */}
-            <div className="flex-1 px-6 py-6 space-y-8 overflow-hidden">
+            {/* Content (no scroll) - compact layout */}
+            <div className="flex-1 px-6 py-4 space-y-5" style={{ overflow: 'hidden', maxHeight: '100%' }}>
               {/* City Filter */}
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-4">City</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-3">City</h3>
                 <CitySelector selectedCity={tempCity} onSelectCity={setTempCity} />
               </div>
 
               {/* Distance Filter */}
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-4">Distance</h3>
-                <div className="space-y-2">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Distance</h3>
+                <div className="space-y-1.5">
                   <button
                     onClick={() => setTempLocationFilterEnabled(false)}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-all duration-200 ${
+                    className={`w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 ${
                       !tempLocationFilterEnabled
                         ? 'bg-primary/10 border-2 border-primary'
                         : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
@@ -174,7 +174,7 @@ export function FiltersDropdown({
                         setTempLocationFilterEnabled(true);
                         setTempDistanceKm(km);
                       }}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-all duration-200 ${
+                      className={`w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 ${
                         tempLocationFilterEnabled && tempDistanceKm === km
                           ? 'bg-primary/10 border-2 border-primary'
                           : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
@@ -205,7 +205,7 @@ export function FiltersDropdown({
                     setTempLocationFilterEnabled(true);
                     setTempDistanceKm(5);
                   }}
-                  className="w-full py-3.5 rounded-2xl border border-gray-200 text-base font-normal text-gray-600 hover:bg-gray-50/50 hover:border-gray-300 transition-all duration-200"
+                  className="w-full py-3 rounded-2xl border border-gray-200 text-base font-normal text-gray-600 hover:bg-gray-50/50 hover:border-gray-300 transition-all duration-200"
                 >
                   Clear all filters
                 </button>
