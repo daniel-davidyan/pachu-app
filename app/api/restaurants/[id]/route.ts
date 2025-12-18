@@ -46,6 +46,139 @@ export async function GET(
           const googleData = await googleResponse.json();
           
           if (googleData && googleData.name) {
+            // Check if this restaurant exists in our DB under the Google Place ID
+            // (it might have been created when someone reviewed it)
+            const { data: dbRestaurantCheck } = await supabase
+              .from('restaurants')
+              .select('id')
+              .eq('google_place_id', id)
+              .single();
+
+            let friendsWhoReviewed: any[] = [];
+            let userHasReviewed = false;
+            let isWishlisted = false;
+            let ourReviews: any[] = [];
+
+            // If restaurant exists in our DB, get friends who reviewed it
+            if (dbRestaurantCheck && user) {
+              const dbRestaurantId = dbRestaurantCheck.id;
+
+              // Get following users
+              const { data: followingData } = await supabase
+                .from('follows')
+                .select('following_id')
+                .eq('follower_id', user.id);
+
+              const followingIds = followingData?.map(f => f.following_id) || [];
+              
+              if (followingIds.length > 0) {
+                const { data: friendReviewsData } = await supabase
+                  .from('reviews')
+                  .select(`
+                    user_id,
+                    profiles!reviews_user_id_fkey (
+                      id,
+                      username,
+                      full_name,
+                      avatar_url
+                    )
+                  `)
+                  .eq('restaurant_id', dbRestaurantId)
+                  .in('user_id', followingIds);
+
+                const uniqueFriends = new Map();
+                friendReviewsData?.forEach((review: any) => {
+                  if (review.profiles && !uniqueFriends.has(review.user_id)) {
+                    uniqueFriends.set(review.user_id, {
+                      id: review.profiles.id,
+                      username: review.profiles.username,
+                      fullName: review.profiles.full_name || review.profiles.username,
+                      avatarUrl: review.profiles.avatar_url,
+                    });
+                  }
+                });
+
+                friendsWhoReviewed = Array.from(uniqueFriends.values());
+              }
+
+              // Check if user has reviewed
+              const { data: userReviewData } = await supabase
+                .from('reviews')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('restaurant_id', dbRestaurantId)
+                .single();
+              
+              userHasReviewed = !!userReviewData;
+
+              // Check wishlist status
+              const { data: wishlistData } = await supabase
+                .from('wishlist')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('restaurant_id', dbRestaurantId)
+                .single();
+              
+              isWishlisted = !!wishlistData;
+
+              // Get our reviews
+              const { data: reviewsData } = await supabase
+                .from('reviews')
+                .select(`
+                  id,
+                  rating,
+                  title,
+                  content,
+                  visit_date,
+                  created_at,
+                  likes_count,
+                  user_id,
+                  profiles!reviews_user_id_fkey (
+                    id,
+                    username,
+                    full_name,
+                    avatar_url
+                  )
+                `)
+                .eq('restaurant_id', dbRestaurantId)
+                .order('created_at', { ascending: false });
+
+              // Get photos for reviews
+              const reviewIds = reviewsData?.map((r: any) => r.id) || [];
+              const { data: photosData } = await supabase
+                .from('review_photos')
+                .select('review_id, photo_url')
+                .in('review_id', reviewIds)
+                .order('sort_order', { ascending: true });
+
+              // Group photos by review
+              const photosByReview = new Map<string, string[]>();
+              photosData?.forEach((photo: any) => {
+                if (!photosByReview.has(photo.review_id)) {
+                  photosByReview.set(photo.review_id, []);
+                }
+                photosByReview.get(photo.review_id)?.push(photo.photo_url);
+              });
+
+              ourReviews = reviewsData?.map((review: any) => ({
+                id: review.id,
+                rating: review.rating,
+                title: review.title,
+                content: review.content || '',
+                visitDate: review.visit_date,
+                createdAt: review.created_at,
+                likesCount: review.likes_count || 0,
+                isLiked: false,
+                user: {
+                  id: review.profiles.id,
+                  username: review.profiles.username,
+                  fullName: review.profiles.full_name || review.profiles.username,
+                  avatarUrl: review.profiles.avatar_url,
+                },
+                photos: photosByReview.get(review.id) || [],
+              })) || [];
+            }
+
             // Return Google data formatted as our restaurant structure
             return NextResponse.json({
               restaurant: {
@@ -70,7 +203,7 @@ export async function GET(
                 latitude: googleData.geometry?.location?.lat || 0,
                 longitude: googleData.geometry?.location?.lng || 0,
               },
-              reviews: (googleData.reviews || []).map((review: any) => ({
+              reviews: ourReviews.length > 0 ? ourReviews : (googleData.reviews || []).map((review: any) => ({
                 id: `google-${review.time}`,
                 rating: review.rating,
                 title: null,
@@ -87,9 +220,9 @@ export async function GET(
                 },
                 photos: [],
               })),
-              isWishlisted: false,
-              userHasReviewed: false,
-              friendsWhoReviewed: [],
+              isWishlisted,
+              userHasReviewed,
+              friendsWhoReviewed,
             });
           }
         } catch (googleError) {
