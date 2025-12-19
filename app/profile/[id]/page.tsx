@@ -10,6 +10,7 @@ import {
 import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/toast';
 
 interface Review {
   id: string;
@@ -54,6 +55,7 @@ interface MutualFriend {
 export default function ProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ followersCount: 0, followingCount: 0, reviewsCount: 0, averageRating: 0 });
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -115,14 +117,18 @@ export default function ProfilePage() {
           ...stats,
           followersCount: isFollowing ? stats.followersCount - 1 : stats.followersCount + 1,
         });
+        showToast(
+          isFollowing ? 'Unfollowed successfully' : 'Now following',
+          'success'
+        );
       } else {
         console.error('Failed to follow/unfollow:', data);
         const errorMsg = data.details ? `${data.error}: ${data.details}` : data.error;
-        alert(`Failed to ${action}: ${errorMsg}\n\nPlease check the console for more details.`);
+        showToast(`Failed to ${action}: ${errorMsg}`, 'error');
       }
     } catch (error) {
       console.error('Error in handleFollow:', error);
-      alert('Failed to update follow status');
+      showToast('Failed to update follow status', 'error');
     }
   };
 

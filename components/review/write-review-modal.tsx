@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Star, Camera, MapPin, Loader2, Search, MessageSquare, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/toast';
 
 interface Restaurant {
   id?: string;
@@ -45,6 +46,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+  const { showToast } = useToast();
 
   // Update form when existingReview changes
   useEffect(() => {
@@ -85,7 +87,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + photos.length > 5) {
-      alert('Maximum 5 photos allowed');
+      showToast('Maximum 5 photos allowed', 'error');
       return;
     }
     
@@ -115,7 +117,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   // Submit review
   const handleSubmit = async () => {
     if (!selectedRestaurant || rating === 0) {
-      alert('Please select a rating');
+      showToast('Please select a rating', 'error');
       return;
     }
 
@@ -173,17 +175,20 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       const data = await response.json();
 
       if (data.error) {
-        alert(`Error: ${data.error}`);
+        showToast(data.error, 'error');
         return;
       }
 
       if (!data.success) {
-        alert('Failed to submit experience. Please try again.');
+        showToast('Failed to submit experience. Please try again.', 'error');
         return;
       }
 
       // Success
-      alert(existingReview ? 'Experience updated successfully!' : 'Experience posted successfully!');
+      showToast(
+        existingReview ? 'Experience updated successfully!' : 'Experience posted successfully!',
+        'success'
+      );
       onSuccess?.();
       onClose();
       
@@ -196,7 +201,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       setStep('search');
     } catch (error) {
       console.error('Submit error:', error);
-      alert('Failed to submit experience');
+      showToast('Failed to submit experience', 'error');
     } finally {
       setSubmitting(false);
     }

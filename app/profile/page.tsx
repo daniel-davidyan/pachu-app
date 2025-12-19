@@ -9,6 +9,7 @@ import { CompactRating } from '@/components/ui/modern-rating';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
+import { useToast } from '@/components/ui/toast';
 
 interface Profile {
   id: string;
@@ -57,6 +58,7 @@ type ProfileTab = 'experiences' | 'wishlist';
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useUser();
+  const { showToast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ experiences: 0, followers: 0, following: 0 });
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -247,7 +249,7 @@ export default function ProfilePage() {
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to delete this review?')) {
+    if (!confirm('Are you sure you want to delete this experience?')) {
       return;
     }
 
@@ -260,12 +262,13 @@ export default function ProfilePage() {
         setReviews(prev => prev.filter(review => review.id !== reviewId));
         fetchStats(); // Refresh stats
         setShowReviewMenu(null);
+        showToast('Experience deleted successfully', 'success');
       } else {
-        alert('Failed to delete review');
+        showToast('Failed to delete experience', 'error');
       }
     } catch (error) {
       console.error('Error deleting review:', error);
-      alert('Failed to delete review');
+      showToast('Failed to delete experience', 'error');
     }
   };
 
@@ -285,12 +288,12 @@ export default function ProfilePage() {
     if (!file || !user?.id) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      showToast('Please select an image file', 'error');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB');
+      showToast('Image must be less than 5MB', 'error');
       return;
     }
 
@@ -321,9 +324,10 @@ export default function ProfilePage() {
       if (updateError) throw updateError;
 
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+      showToast('Profile photo updated successfully', 'success');
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      alert('Failed to upload photo. Please try again.');
+      showToast('Failed to upload photo. Please try again.', 'error');
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) {
@@ -344,15 +348,16 @@ export default function ProfilePage() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || 'Failed to update profile');
+        showToast(data.error || 'Failed to update profile', 'error');
         return;
       }
 
       setProfile(data.profile);
       setIsEditingProfile(false);
+      showToast('Profile updated successfully', 'success');
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Failed to update profile');
+      showToast('Failed to update profile', 'error');
     } finally {
       setSavingProfile(false);
     }

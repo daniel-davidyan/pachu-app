@@ -8,6 +8,7 @@ import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
 import { Loader2, UtensilsCrossed, Hotel, Home, Landmark, Car, MapPin } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 import type mapboxgl from 'mapbox-gl';
+import { useToast } from '@/components/ui/toast';
 
 // Dynamically import Mapbox with no SSR to avoid build issues
 const Mapbox = dynamic(() => import('@/components/map/mapbox').then(mod => mod.Mapbox), {
@@ -32,6 +33,7 @@ const categories = [
 
 export default function MapPage() {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+  const { showToast } = useToast();
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ export default function MapPage() {
         },
         (error) => {
           console.error('Error getting location:', error);
-          alert('Unable to get your location. Please enable location services.');
+          showToast('Unable to get your location. Please enable location services.', 'error');
           setIsRecentering(false);
         },
         {
