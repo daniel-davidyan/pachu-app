@@ -382,7 +382,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout showBottomNav={!showEditModal}>
       <div className="pb-24 bg-gray-50 min-h-screen">
         {/* Compact Profile Header */}
         <div className="bg-white px-4 py-5">
