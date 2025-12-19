@@ -213,7 +213,7 @@ export default function RestaurantPage() {
   const priceLevelText = restaurant.priceLevel ? '$'.repeat(restaurant.priceLevel) : null;
 
   return (
-    <MainLayout>
+    <MainLayout showBottomNav={!showWriteReview}>
       <div className="min-h-screen bg-gray-50 pb-20">
         {/* Header Image */}
         <div className="relative h-64 bg-gray-200">

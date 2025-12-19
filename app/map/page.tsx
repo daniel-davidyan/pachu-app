@@ -48,6 +48,7 @@ export default function MapPage() {
   const [viewMode, setViewMode] = useState<'following' | 'all'>('all');
   const [isTogglingView, setIsTogglingView] = useState(false);
   const [showViewDropup, setShowViewDropup] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   const handleViewModeChange = (mode: 'following' | 'all') => {
     if (mode !== viewMode) {
@@ -485,10 +486,11 @@ export default function MapPage() {
           setShowChat(true);
         }}
         userLocation={userLocation}
+        onReviewModalChange={setIsReviewModalOpen}
       />
 
       {/* Bottom Navigation */}
-      <BottomNav />
+      <BottomNav show={!isReviewModalOpen} />
     </div>
   );
 }

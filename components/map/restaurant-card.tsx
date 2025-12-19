@@ -11,6 +11,7 @@ interface RestaurantCardProps {
   restaurant: Restaurant | null;
   onClose: () => void;
   userLocation?: { lat: number; lng: number } | null;
+  onReviewModalChange?: (isOpen: boolean) => void;
 }
 
 interface Friend {
@@ -20,13 +21,18 @@ interface Friend {
   avatarUrl?: string;
 }
 
-export function RestaurantCard({ restaurant, onClose, userLocation }: RestaurantCardProps) {
+export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModalChange }: RestaurantCardProps) {
   const router = useRouter();
   const [similarPlaces, setSimilarPlaces] = useState<Restaurant[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [loadingWishlist, setLoadingWishlist] = useState(false);
   const [friendsWhoVisited, setFriendsWhoVisited] = useState<Friend[]>([]);
+
+  // Notify parent when review modal opens/closes
+  useEffect(() => {
+    onReviewModalChange?.(showWriteReview);
+  }, [showWriteReview, onReviewModalChange]);
 
   const handleWishlist = async () => {
     if (loadingWishlist) return;
