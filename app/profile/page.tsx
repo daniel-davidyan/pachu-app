@@ -855,7 +855,7 @@ export default function ProfilePage() {
             id: editingReview.id,
             rating: editingReview.rating,
             content: editingReview.content || '',
-            photos: editingReview.photos || [],
+            photos: editingReview.review_photos?.map(p => p.photo_url) || [],
           }}
           onSuccess={() => {
             setShowEditModal(false);
