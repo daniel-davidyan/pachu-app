@@ -73,17 +73,12 @@ export async function GET(request: NextRequest) {
       
       const followingIds = followingData?.map(f => f.following_id) || [];
 
-      console.log('🔍 Search - User following count:', followingIds.length);
-
       if (followingIds.length > 0 && placeIds.length > 0) {
         // Get restaurants from our database that match the place IDs
         const { data: dbRestaurants } = await supabase
           .from('restaurants')
           .select('id, google_place_id')
           .in('google_place_id', placeIds);
-
-        console.log('🔍 Search - DB restaurants found:', dbRestaurants?.length || 0);
-        console.log('🔍 Search - Place IDs searched:', placeIds.length);
 
         const restaurantIdMap = new Map<string, string>();
         dbRestaurants?.forEach((r: any) => {
@@ -94,26 +89,29 @@ export async function GET(request: NextRequest) {
 
         const dbRestaurantIds = dbRestaurants?.map(r => r.id) || [];
 
-        console.log('🔍 Search - DB restaurant IDs:', dbRestaurantIds.length);
-
         if (dbRestaurantIds.length > 0) {
           // Get reviews from following users for these restaurants
-          const { data: reviewsData } = await supabase
+          const { data: reviewsData, error: reviewsError } = await supabase
             .from('reviews')
-            .select(`
-              restaurant_id,
-              user_id,
-              profiles!reviews_user_id_fkey (
-                id,
-                username,
-                full_name,
-                avatar_url
-              )
-            `)
+            .select('restaurant_id, user_id')
             .in('restaurant_id', dbRestaurantIds)
             .in('user_id', followingIds);
 
-          console.log('🔍 Search - Reviews from following:', reviewsData?.length || 0);
+          if (reviewsError) {
+            console.error('Error fetching reviews:', reviewsError);
+          }
+
+          // Get unique user IDs from reviews
+          const userIds = [...new Set(reviewsData?.map(r => r.user_id) || [])];
+
+          // Get profiles for these users
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url')
+            .in('id', userIds);
+
+          // Create a map of user_id to profile
+          const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
           // Group reviews by restaurant_id and deduplicate users
           const reviewsByRestaurant = new Map<string, Map<string, any>>();
@@ -122,15 +120,16 @@ export async function GET(request: NextRequest) {
             if (!reviewsByRestaurant.has(restId)) {
               reviewsByRestaurant.set(restId, new Map());
             }
-            if (review.profiles) {
-              const userId = review.profiles.id;
+            const userId = review.user_id;
+            const profile = profilesMap.get(userId);
+            if (profile) {
               // Only add each user once per restaurant
               if (!reviewsByRestaurant.get(restId)?.has(userId)) {
                 reviewsByRestaurant.get(restId)?.set(userId, {
-                  id: review.profiles.id,
-                  username: review.profiles.username,
-                  fullName: review.profiles.full_name || review.profiles.username,
-                  avatarUrl: review.profiles.avatar_url,
+                  id: profile.id,
+                  username: profile.username,
+                  fullName: profile.full_name || profile.username,
+                  avatarUrl: profile.avatar_url,
                 });
               }
             }
@@ -145,8 +144,6 @@ export async function GET(request: NextRequest) {
               restaurant.visitedByFollowing = [];
             }
           });
-
-          console.log('🔍 Search API - Restaurants with friends:', restaurants.filter((r: any) => r.visitedByFollowing?.length > 0).length);
         } else {
           // No restaurants in DB, set empty arrays
           restaurants.forEach((restaurant: any) => {

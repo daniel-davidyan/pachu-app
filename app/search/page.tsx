@@ -120,7 +120,7 @@ export default function SearchPage() {
         `/api/restaurants/nearby?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&radius=5000`
       );
       const data = await response.json();
-      // Get top 5 trending places by rating
+      // Get top 5 trending places by rating - KEEP ALL FIELDS including visitedByFollowing
       const trending = (data.restaurants || [])
         .filter((r: any) => r.rating > 4.0)
         .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
@@ -130,7 +130,8 @@ export default function SearchPage() {
           name: r.name,
           address: r.address,
           rating: r.rating,
-          photoUrl: r.photoUrl
+          photoUrl: r.photoUrl,
+          visitedByFollowing: r.visitedByFollowing || [] // KEEP THIS FIELD!
         }));
       setTrendingPlaces(trending);
     } catch (error) {
@@ -337,10 +338,10 @@ export default function SearchPage() {
                                   </div>
                                   <span className="text-[10px] text-gray-600 ml-0.5">
                                     {place.visitedByFollowing.length === 1 
-                                      ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} experienced`
+                                      ? `${place.visitedByFollowing[0].fullName} experienced`
                                       : place.visitedByFollowing.length === 2
-                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} experienced`
-                                        : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others experienced`
+                                        ? `${place.visitedByFollowing[0].fullName} & ${place.visitedByFollowing[1].fullName} experienced`
+                                        : `${place.visitedByFollowing[0].fullName} & ${place.visitedByFollowing.length - 1} others experienced`
                                     }
                                   </span>
                                 </div>
@@ -420,10 +421,10 @@ export default function SearchPage() {
                                     </div>
                                     <span className="text-[10px] text-gray-600 ml-0.5">
                                       {place.visitedByFollowing.length === 1 
-                                        ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} experienced`
+                                        ? `${place.visitedByFollowing[0].fullName} experienced`
                                         : place.visitedByFollowing.length === 2
-                                          ? `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing[1].fullName.split(' ')[0]} experienced`
-                                          : `${place.visitedByFollowing[0].fullName.split(' ')[0]} & ${place.visitedByFollowing.length - 1} others experienced`
+                                          ? `${place.visitedByFollowing[0].fullName} & ${place.visitedByFollowing[1].fullName} experienced`
+                                          : `${place.visitedByFollowing[0].fullName} & ${place.visitedByFollowing.length - 1} others experienced`
                                       }
                                     </span>
                                   </div>

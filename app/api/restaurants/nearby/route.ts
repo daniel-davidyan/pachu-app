@@ -103,20 +103,27 @@ export async function GET(request: NextRequest) {
 
         if (dbRestaurantIds.length > 0) {
           // Get reviews from following users for these restaurants
-          const { data: reviewsData } = await supabase
+          const { data: reviewsData, error: reviewsError } = await supabase
             .from('reviews')
-            .select(`
-              restaurant_id,
-              user_id,
-              profiles!reviews_user_id_fkey (
-                id,
-                username,
-                full_name,
-                avatar_url
-              )
-            `)
+            .select('restaurant_id, user_id')
             .in('restaurant_id', dbRestaurantIds)
             .in('user_id', followingIds);
+
+          if (reviewsError) {
+            console.error('Error fetching reviews:', reviewsError);
+          }
+
+          // Get unique user IDs from reviews
+          const userIds = [...new Set(reviewsData?.map(r => r.user_id) || [])];
+
+          // Get profiles for these users
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url')
+            .in('id', userIds);
+
+          // Create a map of user_id to profile
+          const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
           // Group reviews by restaurant_id and deduplicate users
           const reviewsByRestaurant = new Map<string, Map<string, any>>();
@@ -125,15 +132,16 @@ export async function GET(request: NextRequest) {
             if (!reviewsByRestaurant.has(restId)) {
               reviewsByRestaurant.set(restId, new Map());
             }
-            if (review.profiles) {
-              const userId = review.profiles.id;
+            const userId = review.user_id;
+            const profile = profilesMap.get(userId);
+            if (profile) {
               // Only add each user once per restaurant
               if (!reviewsByRestaurant.get(restId)?.has(userId)) {
                 reviewsByRestaurant.get(restId)?.set(userId, {
-                  id: review.profiles.id,
-                  username: review.profiles.username,
-                  fullName: review.profiles.full_name || review.profiles.username,
-                  avatarUrl: review.profiles.avatar_url,
+                  id: profile.id,
+                  username: profile.username,
+                  fullName: profile.full_name || profile.username,
+                  avatarUrl: profile.avatar_url,
                 });
               }
             }
@@ -148,8 +156,6 @@ export async function GET(request: NextRequest) {
               restaurant.visitedByFollowing = [];
             }
           });
-
-          console.log('🗺️ Nearby API - Restaurants with friends:', restaurants.filter((r: any) => r.visitedByFollowing?.length > 0).length);
         } else {
           // No restaurants in DB, set empty arrays
           restaurants.forEach((restaurant: any) => {
