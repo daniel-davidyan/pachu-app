@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { restaurant, rating, content, photoUrls } = await request.json();
+    const { restaurant, rating, content, photoUrls, reviewId } = await request.json();
 
     if (!restaurant || !rating) {
       return NextResponse.json(
@@ -87,15 +87,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already reviewed this restaurant
-    const { data: existingReview } = await supabase
-      .from('reviews')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('restaurant_id', restaurantId)
-      .single();
+    // If reviewId is provided, update existing review (edit mode)
+    if (reviewId) {
+      // Verify the review belongs to the user
+      const { data: existingReview } = await supabase
+        .from('reviews')
+        .select('id, user_id')
+        .eq('id', reviewId)
+        .eq('user_id', user.id)
+        .single();
 
-    if (existingReview) {
+      if (!existingReview) {
+        return NextResponse.json(
+          { error: 'Review not found or unauthorized' },
+          { status: 404 }
+        );
+      }
+
       // Update existing review
       const { error: updateError } = await supabase
         .from('reviews')
@@ -104,7 +112,7 @@ export async function POST(request: NextRequest) {
           content,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', existingReview.id);
+        .eq('id', reviewId);
 
       if (updateError) {
         console.error('Error updating review:', updateError);
@@ -120,61 +128,67 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('review_photos')
           .delete()
-          .eq('review_id', existingReview.id);
+          .eq('review_id', reviewId);
 
         // Add new photos
         const photoInserts = photoUrls.map((url: string, index: number) => ({
-          review_id: existingReview.id,
+          review_id: reviewId,
           photo_url: url,
           sort_order: index,
         }));
 
         await supabase.from('review_photos').insert(photoInserts);
+      } else {
+        // If no photos provided, delete all existing photos
+        await supabase
+          .from('review_photos')
+          .delete()
+          .eq('review_id', reviewId);
       }
 
       return NextResponse.json({ 
         success: true, 
-        reviewId: existingReview.id,
+        reviewId: reviewId,
         message: 'Review updated'
       });
-    } else {
-      // Create new review
-      const { data: newReview, error: createError } = await supabase
-        .from('reviews')
-        .insert({
-          user_id: user.id,
-          restaurant_id: restaurantId,
-          rating,
-          content,
-        })
-        .select('id')
-        .single();
-
-      if (createError) {
-        console.error('Error creating review:', createError);
-        return NextResponse.json(
-          { error: 'Failed to create review' },
-          { status: 500 }
-        );
-      }
-
-      // Add photos
-      if (photoUrls?.length > 0) {
-        const photoInserts = photoUrls.map((url: string, index: number) => ({
-          review_id: newReview.id,
-          photo_url: url,
-          sort_order: index,
-        }));
-
-        await supabase.from('review_photos').insert(photoInserts);
-      }
-
-      return NextResponse.json({ 
-        success: true, 
-        reviewId: newReview.id,
-        message: 'Review created'
-      });
     }
+
+    // Otherwise, create a new review (allows multiple reviews per restaurant)
+    const { data: newReview, error: createError } = await supabase
+      .from('reviews')
+      .insert({
+        user_id: user.id,
+        restaurant_id: restaurantId,
+        rating,
+        content,
+      })
+      .select('id')
+      .single();
+
+    if (createError) {
+      console.error('Error creating review:', createError);
+      return NextResponse.json(
+        { error: 'Failed to create review' },
+        { status: 500 }
+      );
+    }
+
+    // Add photos
+    if (photoUrls?.length > 0) {
+      const photoInserts = photoUrls.map((url: string, index: number) => ({
+        review_id: newReview.id,
+        photo_url: url,
+        sort_order: index,
+      }));
+
+      await supabase.from('review_photos').insert(photoInserts);
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      reviewId: newReview.id,
+      message: 'Review created'
+    });
   } catch (error) {
     console.error('Error in reviews API:', error);
     return NextResponse.json(

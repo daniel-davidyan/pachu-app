@@ -819,6 +819,12 @@ export default function ProfilePage() {
             longitude: 0,
             photoUrl: editingReview.restaurants?.image_url,
           }}
+          existingReview={{
+            id: editingReview.id,
+            rating: editingReview.rating,
+            content: editingReview.content || '',
+            photos: editingReview.photos || [],
+          }}
           onSuccess={() => {
             setShowEditModal(false);
             setEditingReview(null);

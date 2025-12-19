@@ -63,7 +63,6 @@ export default function RestaurantPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [friendsWhoReviewed, setFriendsWhoReviewed] = useState<Friend[]>([]);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [userHasReviewed, setUserHasReviewed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
@@ -89,7 +88,6 @@ export default function RestaurantPage() {
         setReviews(data.reviews || []);
         setFriendsWhoReviewed(data.friendsWhoReviewed || []);
         setIsWishlisted(data.isWishlisted || false);
-        setUserHasReviewed(data.userHasReviewed || false);
         setRestaurantDbId(data.restaurant.id);
       }
     } catch (error) {
@@ -386,15 +384,10 @@ export default function RestaurantPage() {
         <div className="bg-white px-4 py-4 border-b border-gray-200 flex gap-3">
           <button
             onClick={() => setShowWriteReview(true)}
-            disabled={userHasReviewed}
-            className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all ${
-              userHasReviewed
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-primary text-white active:scale-95'
-            }`}
+            className="flex-1 py-3 rounded-xl font-semibold text-sm bg-primary text-white active:scale-95 transition-all"
           >
             <PenLine className="w-4 h-4 inline-block mr-2 -mt-0.5" />
-            {userHasReviewed ? 'Already Shared' : 'Share Experience'}
+            Share Experience
           </button>
           <button
             onClick={openInMaps}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, Star, Camera, MapPin, Loader2, Search, MessageSquare, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -14,29 +14,47 @@ interface Restaurant {
   photoUrl?: string;
 }
 
+interface Review {
+  id: string;
+  rating: number;
+  content: string;
+  photos: string[];
+}
+
 interface WriteReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   restaurant?: Restaurant | null;
+  existingReview?: Review | null;
   onSuccess?: () => void;
 }
 
-export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestaurant, onSuccess }: WriteReviewModalProps) {
+export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestaurant, existingReview, onSuccess }: WriteReviewModalProps) {
   const [step, setStep] = useState<'search' | 'experience'>(initialRestaurant ? 'experience' : 'search');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(initialRestaurant || null);
   
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState(existingReview?.rating || 0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [experienceText, setExperienceText] = useState('');
+  const [experienceText, setExperienceText] = useState(existingReview?.content || '');
   const [photos, setPhotos] = useState<File[]>([]);
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoUrls, setPhotoUrls] = useState<string[]>(existingReview?.photos || []);
   const [submitting, setSubmitting] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+
+  // Update form when existingReview changes
+  useEffect(() => {
+    if (existingReview) {
+      setRating(existingReview.rating);
+      setExperienceText(existingReview.content);
+      setPhotoUrls(existingReview.photos || []);
+      setPhotos([]);
+    }
+  }, [existingReview]);
 
   if (!isOpen) return null;
 
@@ -82,8 +100,16 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
   // Remove photo
   const removePhoto = (index: number) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index));
-    setPhotoUrls(prev => prev.filter((_, i) => i !== index));
+    // Check if this is an existing photo URL or a new file
+    if (index < photoUrls.length - photos.length) {
+      // It's an existing photo URL
+      setPhotoUrls(prev => prev.filter((_, i) => i !== index));
+    } else {
+      // It's a new file
+      const fileIndex = index - (photoUrls.length - photos.length);
+      setPhotos(prev => prev.filter((_, i) => i !== fileIndex));
+      setPhotoUrls(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   // Submit review
@@ -95,9 +121,21 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
     setSubmitting(true);
     try {
-      // Upload photos first
-      const uploadedPhotoUrls: string[] = [];
+      // Build the final photo URLs array
+      const finalPhotoUrls: string[] = [];
       
+      // First, add existing photos that haven't been removed
+      // Existing photos are regular URLs (not blob URLs)
+      const existingPhotoCount = existingReview?.photos?.length || 0;
+      for (let i = 0; i < photoUrls.length; i++) {
+        const url = photoUrls[i];
+        if (!url.startsWith('blob:')) {
+          // This is an existing photo URL
+          finalPhotoUrls.push(url);
+        }
+      }
+      
+      // Then upload new photos (these are blob URLs)
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         const fileExt = photo.name.split('.').pop() || 'jpg';
@@ -116,7 +154,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           .from('review-photos')
           .getPublicUrl(`reviews/${fileName}`);
         
-        uploadedPhotoUrls.push(publicUrl);
+        finalPhotoUrls.push(publicUrl);
       }
 
       // Submit experience
@@ -127,7 +165,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           restaurant: selectedRestaurant,
           rating,
           content: experienceText,
-          photoUrls: uploadedPhotoUrls,
+          photoUrls: finalPhotoUrls,
+          reviewId: existingReview?.id, // Include reviewId when editing
         }),
       });
 
@@ -144,7 +183,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       }
 
       // Success
-      alert('Experience posted successfully!');
+      alert(existingReview ? 'Experience updated successfully!' : 'Experience posted successfully!');
       onSuccess?.();
       onClose();
       
