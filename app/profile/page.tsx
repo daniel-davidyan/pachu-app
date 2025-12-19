@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
 import { Calendar, Camera, X, Check, Edit2, Heart, MapPin, Loader2, Trash2, MoreVertical } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
@@ -70,6 +71,8 @@ export default function ProfilePage() {
   const [showReviewMenu, setShowReviewMenu] = useState<string | null>(null);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -249,17 +252,20 @@ export default function ProfilePage() {
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to delete this experience?')) {
-      return;
-    }
+    setReviewToDelete(reviewId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteReview = async () => {
+    if (!reviewToDelete) return;
 
     try {
-      const response = await fetch(`/api/reviews?reviewId=${reviewId}`, {
+      const response = await fetch(`/api/reviews?reviewId=${reviewToDelete}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        setReviews(prev => prev.filter(review => review.id !== reviewId));
+        setReviews(prev => prev.filter(review => review.id !== reviewToDelete));
         fetchStats(); // Refresh stats
         setShowReviewMenu(null);
         showToast('Experience deleted successfully', 'success');
@@ -269,6 +275,8 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error deleting review:', error);
       showToast('Failed to delete experience', 'error');
+    } finally {
+      setReviewToDelete(null);
     }
   };
 
@@ -617,115 +625,126 @@ export default function ProfilePage() {
           ) : activeTab === 'experiences' ? (
             // My Experiences
             reviews.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {reviews.map((review) => (
                   <div
                     key={review.id}
-                    className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+                    className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
                   >
-                    {/* Restaurant Header */}
-                    <Link
-                      href={`/restaurant/${review.restaurants?.google_place_id || review.restaurants?.id}`}
-                      className="block p-4"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
-                          {review.restaurants?.image_url ? (
-                            <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-gray-900 truncate">
-                            {review.restaurants?.name || 'Restaurant'}
-                          </h3>
-                          <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {review.restaurants?.address || 'Address not available'}
-                          </p>
-                          <div className="flex items-center gap-1 mt-1.5">
+                    {/* Content at Top */}
+                    <div className="p-4">
+                      {/* Restaurant Info with Rating on Right */}
+                      <Link
+                        href={`/restaurant/${review.restaurants?.google_place_id || review.restaurants?.id}`}
+                        className="block mb-3"
+                      >
+                        <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                          <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
+                            {review.restaurants?.image_url ? (
+                              <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
+                            )}
+                          </div>
+                          
+                          {/* Left: Location name, address, date */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-base text-gray-900 truncate">
+                              {review.restaurants?.name || 'Restaurant'}
+                            </h3>
+                            <p className="text-xs text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3" />
+                              {review.restaurants?.address || 'Address not available'}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {new Date(review.created_at).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })}
+                            </p>
+                          </div>
+                          
+                          {/* Right: Rating */}
+                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
                             <CompactRating rating={review.rating} />
                           </div>
                         </div>
-                        <div className="relative flex-shrink-0">
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
-                            }}
-                            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-                          >
-                            <MoreVertical className="w-4 h-4 text-gray-600" />
-                          </button>
-                          
-                          {showReviewMenu === review.id && (
-                            <>
-                              <div 
-                                className="fixed inset-0 z-10"
-                                onClick={() => setShowReviewMenu(null)}
-                              />
-                              <div className="absolute right-0 top-10 z-20 bg-white rounded-lg shadow-lg border border-gray-200 py-1 w-32">
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleEditReview(review);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleDeleteReview(review.id);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
+                      </Link>
 
-                    {/* Review Photos */}
-                    {review.review_photos && review.review_photos.length > 0 && (
-                      <div className="px-4 pb-3">
-                        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-                          {review.review_photos.map((photo, index) => (
-                            <img
-                              key={index}
-                              src={photo.photo_url}
-                              alt=""
-                              className="w-28 h-28 rounded-xl object-cover flex-shrink-0 border border-gray-200"
-                            />
-                          ))}
-                        </div>
+                      {/* Modern Edit & Delete Buttons */}
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleEditReview(review);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl transition-all text-sm font-medium text-blue-700 shadow-sm hover:shadow"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteReview(review.id);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 border border-red-200 rounded-xl transition-all text-sm font-medium text-red-600 shadow-sm hover:shadow"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
                       </div>
-                    )}
 
-                    {/* Review Text */}
-                    {review.content && (
-                      <div className="px-4 pb-3">
-                        <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">{review.content}</p>
-                      </div>
-                    )}
-
-                    {/* Date */}
-                    <div className="px-4 pb-4 pt-2 border-t border-gray-50">
-                      <p className="text-xs text-gray-400">
-                        📅 {new Date(review.created_at).toLocaleDateString('en-US', { 
-                          month: 'long', 
-                          day: 'numeric', 
-                          year: 'numeric' 
-                        })}
-                      </p>
+                      {/* Review Text */}
+                      {review.content && (
+                        <p className="text-sm text-gray-700 leading-relaxed mb-3">
+                          {review.content}
+                        </p>
+                      )}
                     </div>
+
+                    {/* User's Experience Photos Below - Carousel with 20% peek */}
+                    {review.review_photos && review.review_photos.length > 0 && (
+                      <div className="relative">
+                        {review.review_photos.length === 1 ? (
+                          // Single photo - full width
+                          <img
+                            src={review.review_photos[0].photo_url}
+                            alt="Experience photo"
+                            className="w-full h-64 object-cover"
+                          />
+                        ) : (
+                          // Multiple photos - carousel showing 80% of current + 20% of next
+                          <div className="overflow-hidden">
+                            <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 -mx-4">
+                              {review.review_photos.map((photo, index) => (
+                                <img
+                                  key={index}
+                                  src={photo.photo_url}
+                                  alt={`Experience photo ${index + 1}`}
+                                  className="flex-shrink-0 w-[80%] h-64 object-cover rounded-2xl snap-start"
+                                />
+                              ))}
+                              {/* Spacer to allow last image to snap properly */}
+                              <div className="w-4 flex-shrink-0" />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Photo indicator dots for multiple photos */}
+                        {review.review_photos.length > 1 && (
+                          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                            {review.review_photos.map((_, index) => (
+                              <div
+                                key={index}
+                                className="w-1.5 h-1.5 rounded-full bg-white/80 backdrop-blur-sm shadow-sm"
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -838,6 +857,21 @@ export default function ProfilePage() {
           }}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setReviewToDelete(null);
+        }}
+        onConfirm={confirmDeleteReview}
+        title="Delete this experience?"
+        message="This will permanently remove your review and photos."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmButtonClass="bg-red-600 hover:bg-red-700"
+      />
     </MainLayout>
   );
 }

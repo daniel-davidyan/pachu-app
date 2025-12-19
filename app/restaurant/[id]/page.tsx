@@ -5,12 +5,15 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
   ArrowLeft, Heart, MapPin, Phone, Globe, DollarSign, 
-  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star
+  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star, Edit2, Trash2, MoreVertical
 } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
+import { useUser } from '@/hooks/use-user';
+import { useToast } from '@/components/ui/toast';
 
 interface Review {
   id: string;
@@ -59,6 +62,8 @@ interface Friend {
 export default function RestaurantPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useUser();
+  const { showToast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [friendsWhoReviewed, setFriendsWhoReviewed] = useState<Friend[]>([]);
@@ -68,6 +73,10 @@ export default function RestaurantPage() {
   const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
   const [loadingWishlist, setLoadingWishlist] = useState(false);
   const [restaurantDbId, setRestaurantDbId] = useState<string | null>(null);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [showReviewMenu, setShowReviewMenu] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   
   const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -149,6 +158,41 @@ export default function RestaurantPage() {
         ? { ...r, isLiked: !r.isLiked, likesCount: r.isLiked ? r.likesCount - 1 : r.likesCount + 1 }
         : r
     ));
+  };
+
+  const handleEditReview = (review: Review) => {
+    setEditingReview(review);
+    setShowWriteReview(true);
+    setShowReviewMenu(null);
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    setReviewToDelete(reviewId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteReview = async () => {
+    if (!reviewToDelete) return;
+
+    try {
+      const response = await fetch(`/api/reviews?reviewId=${reviewToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setReviews(prev => prev.filter(review => review.id !== reviewToDelete));
+        showToast('Experience deleted successfully', 'success');
+        setShowReviewMenu(null);
+        fetchRestaurant(); // Refresh the restaurant data
+      } else {
+        showToast('Failed to delete experience', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      showToast('Failed to delete experience', 'error');
+    } finally {
+      setReviewToDelete(null);
+    }
   };
 
   const openInMaps = () => {
@@ -440,12 +484,57 @@ export default function RestaurantPage() {
                         <div className="flex-1">
                           <p className="font-semibold text-gray-900">{review.user.fullName}</p>
                           <p className="text-xs text-gray-500">@{review.user.username}</p>
-                        </div>
-                        <div className="text-right flex flex-col items-end gap-1">
-                          <CompactRating rating={review.rating} />
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-gray-400 mt-0.5">
                             {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
                           </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <CompactRating rating={review.rating} />
+                          {/* Menu button for own reviews - below rating */}
+                          {user && review.user.id === user.id && (
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
+                                }}
+                                className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-gray-600" />
+                              </button>
+                              
+                              {showReviewMenu === review.id && (
+                                <>
+                                  <div 
+                                    className="fixed inset-0 z-10"
+                                    onClick={() => setShowReviewMenu(null)}
+                                  />
+                                  <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleEditReview(review);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-medium"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleDeleteReview(review.id);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600 font-medium"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </Link>
@@ -503,18 +592,20 @@ export default function RestaurantPage() {
                       </div>
                     )}
 
-                    {/* Like Button */}
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
-                      <button
-                        onClick={() => handleLikeReview(review.id)}
-                        className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                          review.isLiked ? 'text-primary' : 'text-gray-500 hover:text-primary'
-                        }`}
-                      >
-                        <ThumbsUp className={`w-4 h-4 ${review.isLiked ? 'fill-current' : ''}`} />
-                        <span>{review.likesCount}</span>
-                      </button>
-                    </div>
+                    {/* Like Button - Only show for other users' reviews */}
+                    {(!user || review.user.id !== user.id) && (
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={() => handleLikeReview(review.id)}
+                          className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                            review.isLiked ? 'text-primary' : 'text-gray-500 hover:text-primary'
+                          }`}
+                        >
+                          <ThumbsUp className={`w-4 h-4 ${review.isLiked ? 'fill-current' : ''}`} />
+                          <span>{review.likesCount}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -527,7 +618,10 @@ export default function RestaurantPage() {
       {restaurant && (
         <WriteReviewModal
           isOpen={showWriteReview}
-          onClose={() => setShowWriteReview(false)}
+          onClose={() => {
+            setShowWriteReview(false);
+            setEditingReview(null);
+          }}
           restaurant={{
             googlePlaceId: restaurant.googlePlaceId || restaurant.id,
             name: restaurant.name,
@@ -536,12 +630,34 @@ export default function RestaurantPage() {
             longitude: restaurant.longitude,
             photoUrl: restaurant.imageUrl,
           }}
+          existingReview={editingReview ? {
+            id: editingReview.id,
+            rating: editingReview.rating,
+            content: editingReview.content || '',
+            photos: editingReview.photos || [],
+          } : undefined}
           onSuccess={() => {
             setShowWriteReview(false);
+            setEditingReview(null);
             fetchRestaurant(); // Refresh data
           }}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setReviewToDelete(null);
+        }}
+        onConfirm={confirmDeleteReview}
+        title="Delete this experience?"
+        message="This will permanently remove your review and photos."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmButtonClass="bg-red-600 hover:bg-red-700"
+      />
     </MainLayout>
   );
 }
