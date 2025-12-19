@@ -666,35 +666,54 @@ export default function ProfilePage() {
                           </div>
                           
                           {/* Right: Rating */}
-                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                             <CompactRating rating={review.rating} />
+                            {/* Pencil icon menu below rating */}
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
+                                }}
+                                className="w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-gray-600" />
+                              </button>
+                              
+                              {showReviewMenu === review.id && (
+                                <>
+                                  <div 
+                                    className="fixed inset-0 z-10"
+                                    onClick={() => setShowReviewMenu(null)}
+                                  />
+                                  <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleEditReview(review);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-medium"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleDeleteReview(review.id);
+                                      }}
+                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600 font-medium"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </Link>
-
-                      {/* Modern Edit & Delete Buttons */}
-                      <div className="flex gap-2 mb-3">
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleEditReview(review);
-                          }}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl transition-all text-sm font-medium text-blue-700 shadow-sm hover:shadow"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleDeleteReview(review.id);
-                          }}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 border border-red-200 rounded-xl transition-all text-sm font-medium text-red-600 shadow-sm hover:shadow"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete
-                        </button>
-                      </div>
 
                       {/* Review Text */}
                       {review.content && (
@@ -706,7 +725,7 @@ export default function ProfilePage() {
 
                     {/* User's Experience Photos Below - Carousel with 20% peek */}
                     {review.review_photos && review.review_photos.length > 0 && (
-                      <div className="relative">
+                      <div className="relative -mx-4">
                         {review.review_photos.length === 1 ? (
                           // Single photo - full width
                           <img
@@ -717,30 +736,19 @@ export default function ProfilePage() {
                         ) : (
                           // Multiple photos - carousel showing 80% of current + 20% of next
                           <div className="overflow-hidden">
-                            <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 -mx-4">
+                            <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
                               {review.review_photos.map((photo, index) => (
                                 <img
                                   key={index}
                                   src={photo.photo_url}
                                   alt={`Experience photo ${index + 1}`}
-                                  className="flex-shrink-0 w-[80%] h-64 object-cover rounded-2xl snap-start"
+                                  className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
+                                  style={{ width: 'calc(80vw - 2rem)' }}
                                 />
                               ))}
                               {/* Spacer to allow last image to snap properly */}
                               <div className="w-4 flex-shrink-0" />
                             </div>
-                          </div>
-                        )}
-                        
-                        {/* Photo indicator dots for multiple photos */}
-                        {review.review_photos.length > 1 && (
-                          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
-                            {review.review_photos.map((_, index) => (
-                              <div
-                                key={index}
-                                className="w-1.5 h-1.5 rounded-full bg-white/80 backdrop-blur-sm shadow-sm"
-                              />
-                            ))}
                           </div>
                         )}
                       </div>

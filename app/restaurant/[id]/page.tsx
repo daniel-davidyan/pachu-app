@@ -548,20 +548,37 @@ export default function RestaurantPage() {
                       </Link>
                     )}
 
-                    {/* Review Photos */}
+                    {/* Review Photos - Carousel with 20% peek */}
                     {review.photos && review.photos.length > 0 && (
                       <div className="mb-3 -mx-4">
-                        <div className="flex gap-2 overflow-x-auto px-4 scrollbar-hide">
-                          {review.photos.map((photo, index) => (
-                            <Link key={index} href={`/review/${review.id}`}>
-                              <img
-                                src={photo}
-                                alt={`Review photo ${index + 1}`}
-                                className="h-48 w-auto rounded-xl object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                              />
-                            </Link>
-                          ))}
-                        </div>
+                        {review.photos.length === 1 ? (
+                          // Single photo - full width
+                          <Link href={`/review/${review.id}`}>
+                            <img
+                              src={review.photos[0]}
+                              alt="Review photo"
+                              className="w-full h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                            />
+                          </Link>
+                        ) : (
+                          // Multiple photos - carousel showing 80% of current + 20% of next
+                          <div className="overflow-hidden">
+                            <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
+                              {review.photos.map((photo, index) => (
+                                <Link key={index} href={`/review/${review.id}`}>
+                                  <img
+                                    src={photo}
+                                    alt={`Review photo ${index + 1}`}
+                                    className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start cursor-pointer hover:opacity-95 transition-opacity"
+                                    style={{ width: 'calc(80vw - 2rem)' }}
+                                  />
+                                </Link>
+                              ))}
+                              {/* Spacer to allow last image to snap properly */}
+                              <div className="w-4 flex-shrink-0" />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
