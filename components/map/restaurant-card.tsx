@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2 } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
-import { CompactRating } from '@/components/ui/modern-rating';
 
 interface RestaurantCardProps {
   restaurant: Restaurant | null;
@@ -410,8 +409,13 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                       )}
                     </div>
                     <p className="text-xs font-medium text-gray-900 truncate">{place.name}</p>
-                    <div className="flex items-center gap-0.5 mt-0.5">
-                      <CompactRating rating={place.rating} />
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="bg-white border border-gray-200 rounded-full px-1.5 py-0.5">
+                        <div className="flex items-center gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-gradient-to-r from-green-400 to-green-500" />
+                          <span className="text-[10px] font-bold text-gray-900">{Math.round((place.rating / 5) * 100)}%</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

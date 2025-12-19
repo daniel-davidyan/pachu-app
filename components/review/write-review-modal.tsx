@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, Star, Camera, MapPin, Loader2, Search } from 'lucide-react';
+import { X, Star, Camera, MapPin, Loader2, Search, MessageSquare, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface Restaurant {
@@ -22,7 +22,7 @@ interface WriteReviewModalProps {
 }
 
 export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestaurant, onSuccess }: WriteReviewModalProps) {
-  const [step, setStep] = useState<'search' | 'review'>(initialRestaurant ? 'review' : 'search');
+  const [step, setStep] = useState<'search' | 'experience'>(initialRestaurant ? 'experience' : 'search');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
   const [searching, setSearching] = useState(false);
@@ -30,7 +30,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [reviewText, setReviewText] = useState('');
+  const [experienceText, setExperienceText] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -119,14 +119,14 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
         uploadedPhotoUrls.push(publicUrl);
       }
 
-      // Submit review
+      // Submit experience
       const response = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           restaurant: selectedRestaurant,
           rating,
-          content: reviewText,
+          content: experienceText,
           photoUrls: uploadedPhotoUrls,
         }),
       });
@@ -139,25 +139,25 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       }
 
       if (!data.success) {
-        alert('Failed to submit review. Please try again.');
+        alert('Failed to submit experience. Please try again.');
         return;
       }
 
       // Success
-      alert('Review posted successfully! 🎉');
+      alert('Experience posted successfully!');
       onSuccess?.();
       onClose();
       
       // Reset form
       setRating(0);
-      setReviewText('');
+      setExperienceText('');
       setPhotos([]);
       setPhotoUrls([]);
       setSelectedRestaurant(null);
       setStep('search');
     } catch (error) {
       console.error('Submit error:', error);
-      alert('Failed to submit review');
+      alert('Failed to submit experience');
     } finally {
       setSubmitting(false);
     }
@@ -172,8 +172,17 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl max-h-[75vh] overflow-hidden animate-slide-up flex flex-col shadow-2xl">
         {/* Header - Compact */}
         <div className="sticky top-0 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-primary/10 px-4 py-3 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-base font-bold text-gray-900">
-            {step === 'search' ? '🔍 Find a Place' : '✍️ Write Review'}
+          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+            {step === 'search' ? (
+              <>
+                <Search className="w-4 h-4" />
+                Find a Place
+              </>
+            ) : (
+              <>
+                Share Experience
+              </>
+            )}
           </h2>
           <button
             onClick={onClose}
@@ -216,7 +225,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                     key={index}
                     onClick={() => {
                       setSelectedRestaurant(restaurant);
-                      setStep('review');
+                      setStep('experience');
                     }}
                     className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors text-left"
                   >
@@ -243,7 +252,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
               </div>
             </div>
           ) : (
-            /* Review Step - Compact */
+            /* Experience Step - Compact */
             <div className="p-4 space-y-4">
               {/* Selected Restaurant - Compact */}
               <div className="flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
@@ -270,7 +279,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
               {/* Star Rating - Compact */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Rating ⭐</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Rating</label>
                 <div className="flex gap-1.5 justify-center">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -301,12 +310,12 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 )}
               </div>
 
-              {/* Review Text - Compact */}
+              {/* Experience Text - Compact */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Review (Optional) 📝</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Experience (Optional)</label>
                 <textarea
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
+                  value={experienceText}
+                  onChange={(e) => setExperienceText(e.target.value)}
                   placeholder="Share your experience..."
                   rows={3}
                   className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none border border-gray-200"
@@ -315,7 +324,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
               {/* Photo Upload - Compact */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Add Photos (Optional) 📷</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Add Photos (Optional)</label>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -369,8 +378,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                     </>
                   ) : (
                     <>
-                      <span style={{ color: '#FFFFFF' }}>Post Review</span>
-                      <span className="text-base">🎉</span>
+                      <Send className="w-4 h-4" style={{ color: '#FFFFFF' }} />
+                      <span style={{ color: '#FFFFFF' }}>Post Experience</span>
                     </>
                   )}
                 </button>
