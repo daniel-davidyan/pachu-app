@@ -457,7 +457,7 @@ export default function RestaurantPage() {
               <p className="text-sm text-gray-400 mt-1">Be the first to share your experience!</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {reviews.map((review) => {
                 const isExpanded = expandedReviews.has(review.id);
                 const shouldShowExpand = review.content.length > 200;
@@ -465,114 +465,151 @@ export default function RestaurantPage() {
                 return (
                   <div 
                     key={review.id} 
-                    className="bg-white rounded-2xl p-4 border border-gray-100"
+                    className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
                   >
-                    {/* Reviewer Info */}
-                    <Link href={`/profile/${review.user.id}`}>
-                      <div className="flex items-center gap-3 mb-3">
-                        {review.user.avatarUrl ? (
-                          <img
-                            src={review.user.avatarUrl}
-                            alt={review.user.fullName}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold">
-                            {review.user.fullName.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900">{review.user.fullName}</p>
-                          <p className="text-xs text-gray-500">@{review.user.username}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5">
-                          <CompactRating rating={review.rating} />
-                          {/* Menu button for own reviews - below rating */}
-                          {user && review.user.id === user.id && (
-                            <div className="relative">
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
-                                }}
-                                className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-                              >
-                                <Edit2 className="w-3.5 h-3.5 text-gray-600" />
-                              </button>
-                              
-                              {showReviewMenu === review.id && (
-                                <>
-                                  <div 
-                                    className="fixed inset-0 z-10"
-                                    onClick={() => setShowReviewMenu(null)}
-                                  />
-                                  <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36">
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleEditReview(review);
-                                      }}
-                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-medium"
-                                    >
-                                      <Edit2 className="w-4 h-4" />
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleDeleteReview(review.id);
-                                      }}
-                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600 font-medium"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                      Delete
-                                    </button>
-                                  </div>
-                                </>
-                              )}
+                    {/* Content at Top */}
+                    <div className="p-4">
+                      {/* User Info with Rating on Right */}
+                      <Link href={`/profile/${review.user.id}`}>
+                        <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors mb-3">
+                          {review.user.avatarUrl ? (
+                            <img
+                              src={review.user.avatarUrl}
+                              alt={review.user.fullName}
+                              className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xl font-bold text-white">
+                                {review.user.fullName.charAt(0).toUpperCase()}
+                              </span>
                             </div>
                           )}
+                          
+                          {/* Left: User name, username, date */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-base text-gray-900 truncate">
+                              {review.user.fullName}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                              @{review.user.username}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
+                            </p>
+                          </div>
+                          
+                          {/* Right: Rating */}
+                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                            <CompactRating rating={review.rating} />
+                            {/* Pencil icon menu below rating - only for own reviews */}
+                            {user && review.user.id === user.id && (
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
+                                  }}
+                                  className="w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-gray-600" />
+                                </button>
+                                
+                                {showReviewMenu === review.id && (
+                                  <>
+                                    <div 
+                                      className="fixed inset-0 z-10"
+                                      onClick={() => setShowReviewMenu(null)}
+                                    />
+                                    <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36">
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleEditReview(review);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-medium"
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleDeleteReview(review.id);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600 font-medium"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-
-                    {/* Review Title */}
-                    {review.title && (
-                      <Link href={`/review/${review.id}`}>
-                        <h3 className="font-semibold text-gray-900 mb-2 hover:text-primary transition-colors cursor-pointer">
-                          {review.title}
-                        </h3>
                       </Link>
-                    )}
 
-                    {/* Review Photos - Carousel with 20% peek */}
+                      {/* Review Title */}
+                      {review.title && (
+                        <Link href={`/review/${review.id}`}>
+                          <h3 className="font-semibold text-gray-900 mb-2 hover:text-primary transition-colors cursor-pointer">
+                            {review.title}
+                          </h3>
+                        </Link>
+                      )}
+
+                      {/* Review Content */}
+                      {review.content && (
+                        <div className="mb-3">
+                          <Link href={`/review/${review.id}`}>
+                            <p className={`text-sm text-gray-700 leading-relaxed hover:text-gray-900 transition-colors cursor-pointer ${!isExpanded && shouldShowExpand ? 'line-clamp-3' : ''}`}>
+                              {review.content}
+                            </p>
+                          </Link>
+                          {shouldShowExpand && (
+                            <button
+                              onClick={() => toggleReviewExpansion(review.id)}
+                              className="text-primary text-sm font-semibold mt-1"
+                            >
+                              {isExpanded ? 'Show less' : 'Read more'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Visit Date */}
+                      {review.visitDate && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Visited {format(new Date(review.visitDate), 'MMM d, yyyy')}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* User's Experience Photos Below - Carousel with 20% peek */}
                     {review.photos && review.photos.length > 0 && (
-                      <div className="mb-3 -mx-4">
+                      <div className="relative">
                         {review.photos.length === 1 ? (
                           // Single photo - full width
-                          <Link href={`/review/${review.id}`}>
-                            <img
-                              src={review.photos[0]}
-                              alt="Review photo"
-                              className="w-full h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                            />
-                          </Link>
+                          <img
+                            src={review.photos[0]}
+                            alt="Experience photo"
+                            className="w-full h-64 object-cover"
+                          />
                         ) : (
                           // Multiple photos - carousel showing 80% of current + 20% of next
                           <div className="overflow-hidden">
                             <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
                               {review.photos.map((photo, index) => (
-                                <Link key={index} href={`/review/${review.id}`}>
-                                  <img
-                                    src={photo}
-                                    alt={`Review photo ${index + 1}`}
-                                    className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start cursor-pointer hover:opacity-95 transition-opacity"
-                                    style={{ width: 'calc(80vw - 2rem)' }}
-                                  />
-                                </Link>
+                                <img
+                                  key={index}
+                                  src={photo}
+                                  alt={`Experience photo ${index + 1}`}
+                                  className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
+                                  style={{ width: 'calc(80vw - 2rem)' }}
+                                />
                               ))}
                               {/* Spacer to allow last image to snap properly */}
                               <div className="w-4 flex-shrink-0" />
@@ -582,36 +619,9 @@ export default function RestaurantPage() {
                       </div>
                     )}
 
-                    {/* Review Content */}
-                    {review.content && (
-                      <div>
-                        <Link href={`/review/${review.id}`}>
-                          <p className={`text-sm text-gray-600 leading-relaxed hover:text-gray-900 transition-colors cursor-pointer ${!isExpanded && shouldShowExpand ? 'line-clamp-3' : ''}`}>
-                            {review.content}
-                          </p>
-                        </Link>
-                        {shouldShowExpand && (
-                          <button
-                            onClick={() => toggleReviewExpansion(review.id)}
-                            className="text-primary text-sm font-semibold mt-1"
-                          >
-                            {isExpanded ? 'Show less' : 'Read more'}
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Visit Date */}
-                    {review.visitDate && (
-                      <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-500">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>Visited {format(new Date(review.visitDate), 'MMM d, yyyy')}</span>
-                      </div>
-                    )}
-
                     {/* Like Button - Only show for other users' reviews */}
                     {(!user || review.user.id !== user.id) && (
-                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
+                      <div className="px-4 pb-4 pt-3">
                         <button
                           onClick={() => handleLikeReview(review.id)}
                           className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
