@@ -49,6 +49,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
   const { showToast } = useToast();
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const commentIdCounter = useRef(0);
   
   // State for each experience's comments
   const [experienceStates, setExperienceStates] = useState<{
@@ -288,9 +289,13 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
 
     console.log('[FEED] Posting comment:', commentText, 'for experience:', experienceId);
 
+    // Generate unique ID using counter
+    commentIdCounter.current += 1;
+    const tempId = `temp-${commentIdCounter.current}-${experienceId}`;
+
     // Create optimistic comment with unique ID
     const optimisticComment = {
-      id: 'temp-' + Date.now().toString(),
+      id: tempId,
       content: commentText,
       created_at: new Date().toISOString(),
       user: {
