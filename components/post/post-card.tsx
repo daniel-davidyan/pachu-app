@@ -71,6 +71,16 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [showLikes, setShowLikes] = useState(false);
+  const [loadingLikes, setLoadingLikes] = useState(false);
+  const [likesUsers, setLikesUsers] = useState<Array<{
+    id: string;
+    username: string;
+    fullName: string;
+    avatarUrl?: string;
+    isFollowing: boolean;
+    isCurrentUser: boolean;
+  }>>([]);
   const [newComment, setNewComment] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [expandedContent, setExpandedContent] = useState(false);
@@ -167,6 +177,72 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       showToast('Failed to load comments', 'error');
     } finally {
       setLoadingComments(false);
+    }
+  };
+
+  const loadLikes = async () => {
+    if (likesUsers.length > 0) {
+      setShowLikes(!showLikes);
+      return;
+    }
+
+    setLoadingLikes(true);
+    try {
+      const response = await fetch(`/api/reviews/${post.id}/likes`);
+      const data = await response.json();
+      
+      if (data.users) {
+        setLikesUsers(data.users);
+        setShowLikes(true);
+      }
+    } catch (error) {
+      console.error('Error loading likes:', error);
+      showToast('Failed to load likes', 'error');
+    } finally {
+      setLoadingLikes(false);
+    }
+  };
+
+  const handleFollowToggle = async (userId: string) => {
+    if (!user) {
+      showToast('Please log in to follow users', 'error');
+      return;
+    }
+
+    const userToUpdate = likesUsers.find(u => u.id === userId);
+    if (!userToUpdate) return;
+
+    const newFollowingState = !userToUpdate.isFollowing;
+
+    // Optimistic update
+    setLikesUsers(likesUsers.map(u => 
+      u.id === userId ? { ...u, isFollowing: newFollowingState } : u
+    ));
+
+    try {
+      const url = newFollowingState 
+        ? '/api/follows'
+        : `/api/follows?userId=${userId}`;
+      
+      const response = await fetch(url, {
+        method: newFollowingState ? 'POST' : 'DELETE',
+        headers: newFollowingState ? { 'Content-Type': 'application/json' } : {},
+        body: newFollowingState ? JSON.stringify({ userId }) : undefined,
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setLikesUsers(likesUsers.map(u => 
+          u.id === userId ? { ...u, isFollowing: !newFollowingState } : u
+        ));
+        showToast('Failed to update follow status', 'error');
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      setLikesUsers(likesUsers.map(u => 
+        u.id === userId ? { ...u, isFollowing: !newFollowingState } : u
+      ));
+      showToast('Failed to update follow status', 'error');
     }
   };
 
@@ -578,46 +654,108 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       )}
 
       {/* Interaction Bar - Instagram Style */}
-      <div className="px-4 py-3 border-t border-gray-100">
-        <div className="flex items-center gap-6 mb-2">
-          <button
-            onClick={handleLike}
-            className="flex items-center gap-2 transition-transform active:scale-90"
-          >
-            <Heart 
-              className={`w-7 h-7 ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
-              strokeWidth={isLiked ? 0 : 2}
-            />
-          </button>
+      <div className="px-4 py-2.5 border-t border-gray-50">
+        <div className="flex items-center gap-4">
+          {/* Like Button + Count */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleLike}
+              className="transition-transform active:scale-90"
+            >
+              <Heart 
+                className={`w-[26px] h-[26px] ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
+                strokeWidth={isLiked ? 0 : 1.5}
+              />
+            </button>
+            {likesCount > 0 && (
+              <button
+                onClick={loadLikes}
+                className="text-sm font-semibold text-gray-900"
+              >
+                {likesCount}
+              </button>
+            )}
+          </div>
           
-          <button
-            onClick={loadComments}
-            className="flex items-center gap-2 transition-transform active:scale-90"
-          >
-            <MessageCircle className="w-7 h-7 text-gray-900" strokeWidth={2} />
-          </button>
+          {/* Comment Button + Count */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadComments}
+              className="transition-transform active:scale-90"
+            >
+              <MessageCircle 
+                className="w-[26px] h-[26px] text-gray-900" 
+                strokeWidth={1.5}
+              />
+            </button>
+            {post.commentsCount > 0 && (
+              <button
+                onClick={loadComments}
+                className="text-sm font-semibold text-gray-900"
+              >
+                {post.commentsCount}
+              </button>
+            )}
+          </div>
         </div>
-        
-        {/* Like Count */}
-        {likesCount > 0 && (
-          <button
-            onClick={handleLike}
-            className="text-sm font-semibold text-gray-900 mb-1"
-          >
-            {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-          </button>
-        )}
-        
-        {/* Comment Count */}
-        {post.commentsCount > 0 && (
-          <button
-            onClick={loadComments}
-            className="text-sm text-gray-500 block"
-          >
-            View all {post.commentsCount} {post.commentsCount === 1 ? 'comment' : 'comments'}
-          </button>
-        )}
       </div>
+
+      {/* Likes Bottom Sheet */}
+      <BottomSheet
+        isOpen={showLikes}
+        onClose={() => setShowLikes(false)}
+        title="Likes"
+      >
+        {loadingLikes ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        ) : likesUsers.length > 0 ? (
+          <div className="space-y-0 -mx-4">
+            {likesUsers.map((likeUser) => (
+              <div key={likeUser.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                <Link href={`/profile/${likeUser.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                  {likeUser.avatarUrl ? (
+                    <img
+                      src={likeUser.avatarUrl}
+                      alt={likeUser.fullName}
+                      className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                      <span className="text-base font-bold text-white">
+                        {likeUser.fullName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-gray-900 truncate">{likeUser.username}</p>
+                    <p className="text-xs text-gray-500 truncate">{likeUser.fullName}</p>
+                  </div>
+                </Link>
+                {!likeUser.isCurrentUser && (
+                  <button
+                    onClick={() => handleFollowToggle(likeUser.id)}
+                    className={`px-6 py-1.5 rounded-lg text-sm font-semibold transition-colors flex-shrink-0 ${
+                      likeUser.isFollowing
+                        ? 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    {likeUser.isFollowing ? 'Following' : 'Follow'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Heart className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">No likes yet</p>
+            <p className="text-sm text-gray-400 mt-1">Be the first to like!</p>
+          </div>
+        )}
+      </BottomSheet>
 
       {/* Comments Bottom Sheet - Instagram Style */}
       <BottomSheet
