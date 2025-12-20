@@ -66,25 +66,31 @@ export async function GET(
     }
 
     // Transform the data to a cleaner format
-    const formattedComments = comments?.map(comment => ({
-      id: comment.id,
-      content: comment.content,
-      createdAt: comment.created_at,
-      updatedAt: comment.updated_at,
-      likesCount: likesCounts[comment.id] || 0,
-      isLiked: userLikes.includes(comment.id),
-      user: {
-        id: comment.user.id,
-        username: comment.user.username,
-        fullName: comment.user.full_name,
-        avatarUrl: comment.user.avatar_url,
-      },
-      mentions: comment.mentions?.map((m: any) => ({
-        id: m.mentioned_user.id,
-        username: m.mentioned_user.username,
-        fullName: m.mentioned_user.full_name,
-      })) || [],
-    }));
+    const formattedComments = comments?.map(comment => {
+      // Type assertion to handle Supabase's type inference issue
+      const commentUser = Array.isArray(comment.user) ? comment.user[0] : comment.user;
+      const commentMentions = comment.mentions || [];
+      
+      return {
+        id: comment.id,
+        content: comment.content,
+        createdAt: comment.created_at,
+        updatedAt: comment.updated_at,
+        likesCount: likesCounts[comment.id] || 0,
+        isLiked: userLikes.includes(comment.id),
+        user: {
+          id: commentUser.id,
+          username: commentUser.username,
+          fullName: commentUser.full_name,
+          avatarUrl: commentUser.avatar_url,
+        },
+        mentions: commentMentions.map((m: any) => ({
+          id: m.mentioned_user.id,
+          username: m.mentioned_user.username,
+          fullName: m.mentioned_user.full_name,
+        })),
+      };
+    });
 
     return NextResponse.json({ comments: formattedComments || [] });
   } catch (error) {
@@ -205,22 +211,28 @@ export async function POST(
 
     console.log('[API] Complete comment fetched:', completeComment);
 
+    // Type assertion to handle Supabase's type inference issue
+    const completeCommentUser = Array.isArray(completeComment.user) ? completeComment.user[0] : completeComment.user;
+    const completeCommentMentions = completeComment.mentions || [];
+
     const formattedComment = {
       id: completeComment.id,
       content: completeComment.content,
       createdAt: completeComment.created_at,
       updatedAt: completeComment.updated_at,
+      likesCount: 0,
+      isLiked: false,
       user: {
-        id: completeComment.user.id,
-        username: completeComment.user.username,
-        fullName: completeComment.user.full_name,
-        avatarUrl: completeComment.user.avatar_url,
+        id: completeCommentUser.id,
+        username: completeCommentUser.username,
+        fullName: completeCommentUser.full_name,
+        avatarUrl: completeCommentUser.avatar_url,
       },
-      mentions: completeComment.mentions?.map((m: any) => ({
+      mentions: completeCommentMentions.map((m: any) => ({
         id: m.mentioned_user.id,
         username: m.mentioned_user.username,
         fullName: m.mentioned_user.full_name,
-      })) || [],
+      })),
     };
 
     console.log('[API] Returning formatted comment');
