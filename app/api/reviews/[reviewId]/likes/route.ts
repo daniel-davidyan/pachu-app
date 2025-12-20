@@ -37,7 +37,7 @@ export async function GET(
     if (profilesError) throw profilesError;
 
     // Get follow status for each user if logged in
-    let followStatuses: { [key: string]: boolean } = {};
+    const followStatuses: { [key: string]: boolean } = {};
     if (user) {
       const { data: followData } = await supabase
         .from('follows')

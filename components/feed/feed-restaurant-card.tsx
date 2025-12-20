@@ -288,9 +288,12 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
 
     console.log('[FEED] Posting comment:', commentText, 'for experience:', experienceId);
 
+    // Generate unique ID for optimistic comment (outside of render)
+    const tempId = `temp-${Date.now()}`;
+    
     // Create optimistic comment
     const optimisticComment = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       content: commentText,
       created_at: new Date().toISOString(),
       user: {
