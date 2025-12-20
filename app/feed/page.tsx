@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Star, Heart, MapPin, Loader2, Users, Plus, Bookmark } from 'lucide-react';
-import { RestaurantFeedCard } from '@/components/feed/restaurant-feed-card';
+import { FeedRestaurantCard } from '@/components/feed/feed-restaurant-card';
 import { FiltersDropdown } from '@/components/feed/filters-dropdown';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -514,10 +514,10 @@ export default function FeedPage() {
 
           {/* Restaurant Cards */}
           {restaurants.map((restaurant) => (
-            <RestaurantFeedCard
+            <FeedRestaurantCard
               key={restaurant.id}
               restaurant={restaurant}
-              userLocation={userLocation}
+              onUpdate={() => fetchRestaurants(0)}
             />
           ))}
 

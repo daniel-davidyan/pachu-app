@@ -102,20 +102,28 @@ export async function POST(
     const supabase = await createClient();
     const { reviewId } = await params;
 
+    console.log('[API] Adding comment to review:', reviewId);
+
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      console.error('[API] Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    console.log('[API] User authenticated:', user.id);
+
     const body = await request.json();
     const { content, mentionedUserIds = [] } = body;
+
+    console.log('[API] Comment content:', content, 'Mentions:', mentionedUserIds);
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json({ error: 'Comment content is required' }, { status: 400 });
     }
 
     // Add comment
+    console.log('[API] Inserting comment...');
     const { data: comment, error: commentError } = await supabase
       .from('review_comments')
       .insert({
@@ -137,10 +145,16 @@ export async function POST(
       `)
       .single();
 
-    if (commentError) throw commentError;
+    if (commentError) {
+      console.error('[API] Comment insert error:', commentError);
+      throw commentError;
+    }
+
+    console.log('[API] Comment inserted:', comment.id);
 
     // Add mentions if any
     if (mentionedUserIds.length > 0) {
+      console.log('[API] Adding mentions...');
       const mentions = mentionedUserIds.map((userId: string) => ({
         comment_id: comment.id,
         mentioned_user_id: userId,
@@ -151,13 +165,16 @@ export async function POST(
         .insert(mentions);
 
       if (mentionsError) {
-        console.error('Error adding mentions:', mentionsError);
+        console.error('[API] Error adding mentions:', mentionsError);
         // Don't fail the whole request if mentions fail
+      } else {
+        console.log('[API] Mentions added successfully');
       }
     }
 
     // Fetch the complete comment with mentions
-    const { data: completeComment } = await supabase
+    console.log('[API] Fetching complete comment...');
+    const { data: completeComment, error: fetchError } = await supabase
       .from('review_comments')
       .select(`
         id,
@@ -181,28 +198,39 @@ export async function POST(
       .eq('id', comment.id)
       .single();
 
+    if (fetchError || !completeComment) {
+      console.error('[API] Error fetching complete comment:', fetchError);
+      throw fetchError;
+    }
+
+    console.log('[API] Complete comment fetched:', completeComment);
+
     const formattedComment = {
-      id: completeComment!.id,
-      content: completeComment!.content,
-      createdAt: completeComment!.created_at,
-      updatedAt: completeComment!.updated_at,
+      id: completeComment.id,
+      content: completeComment.content,
+      createdAt: completeComment.created_at,
+      updatedAt: completeComment.updated_at,
       user: {
-        id: completeComment!.user.id,
-        username: completeComment!.user.username,
-        fullName: completeComment!.user.full_name,
-        avatarUrl: completeComment!.user.avatar_url,
+        id: completeComment.user.id,
+        username: completeComment.user.username,
+        fullName: completeComment.user.full_name,
+        avatarUrl: completeComment.user.avatar_url,
       },
-      mentions: completeComment!.mentions?.map((m: any) => ({
+      mentions: completeComment.mentions?.map((m: any) => ({
         id: m.mentioned_user.id,
         username: m.mentioned_user.username,
         fullName: m.mentioned_user.full_name,
       })) || [],
     };
 
+    console.log('[API] Returning formatted comment');
     return NextResponse.json({ comment: formattedComment });
   } catch (error) {
-    console.error('Error adding comment:', error);
-    return NextResponse.json({ error: 'Failed to add comment' }, { status: 500 });
+    console.error('[API] Error adding comment:', error);
+    return NextResponse.json({ 
+      error: 'Failed to add comment',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
