@@ -83,22 +83,26 @@ export async function PATCH(
 
     if (error) throw error;
 
+    // Type assertion to handle Supabase's type inference issue
+    const commentUser = Array.isArray(comment.user) ? comment.user[0] : comment.user;
+    const commentMentions = comment.mentions || [];
+
     const formattedComment = {
       id: comment.id,
       content: comment.content,
       createdAt: comment.created_at,
       updatedAt: comment.updated_at,
       user: {
-        id: comment.user.id,
-        username: comment.user.username,
-        fullName: comment.user.full_name,
-        avatarUrl: comment.user.avatar_url,
+        id: commentUser.id,
+        username: commentUser.username,
+        fullName: commentUser.full_name,
+        avatarUrl: commentUser.avatar_url,
       },
-      mentions: comment.mentions?.map((m: any) => ({
+      mentions: commentMentions.map((m: any) => ({
         id: m.mentioned_user.id,
         username: m.mentioned_user.username,
         fullName: m.mentioned_user.full_name,
-      })) || [],
+      })),
     };
 
     return NextResponse.json({ comment: formattedComment });
