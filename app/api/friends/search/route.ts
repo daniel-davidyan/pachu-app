@@ -14,26 +14,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Search for friends (people the user follows)
-    const { data: friends, error } = await supabase
+    // Get all users that the current user follows
+    const { data: followsData, error: followsError } = await supabase
       .from('follows')
-      .select(`
-        following:profiles!follows_following_id_fkey (
-          id,
-          username,
-          full_name
-        )
-      `)
-      .eq('follower_id', user.id)
-      .ilike('profiles.username', `%${query}%`)
-      .limit(10);
+      .select('following_id')
+      .eq('follower_id', user.id);
 
-    if (error) throw error;
+    if (followsError) throw followsError;
 
-    const formattedFriends = friends?.map(f => ({
-      id: f.following.id,
-      username: f.following.username,
-      fullName: f.following.full_name,
+    const followingIds = followsData?.map(f => f.following_id) || [];
+
+    if (followingIds.length === 0) {
+      return NextResponse.json({ friends: [] });
+    }
+
+    // Search for friends (people the user follows)
+    let profileQuery = supabase
+      .from('profiles')
+      .select('id, username, full_name')
+      .in('id', followingIds)
+      .order('username', { ascending: true })
+      .limit(20);
+
+    // If there's a search query, filter by username
+    if (query) {
+      profileQuery = profileQuery.ilike('username', `%${query}%`);
+    }
+
+    const { data: profiles, error: profilesError } = await profileQuery;
+
+    if (profilesError) throw profilesError;
+
+    const formattedFriends = profiles?.map(profile => ({
+      id: profile.id,
+      username: profile.username,
+      fullName: profile.full_name || profile.username,
     })) || [];
 
     return NextResponse.json({ friends: formattedFriends });

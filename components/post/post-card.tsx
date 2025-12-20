@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
@@ -13,6 +14,8 @@ interface Comment {
   content: string;
   createdAt: string;
   updatedAt: string;
+  likesCount: number;
+  isLiked: boolean;
   user: {
     id: string;
     username: string;
@@ -69,7 +72,6 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState('');
-  const [submittingComment, setSubmittingComment] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [expandedContent, setExpandedContent] = useState(false);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
@@ -79,6 +81,36 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
 
   const shouldShowExpand = post.content.length > 200;
   const isOwnPost = user && post.user.id === user.id;
+
+  // Get user profile for optimistic updates
+  const [profile, setProfile] = useState<any>(null);
+  
+  // Load profile when user is available
+  if (user && !profile) {
+    fetch(`/api/profile/${user.id}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.profile) {
+          setProfile(data.profile);
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching profile:', error);
+      });
+  }
+
+  // Fetch friends list when component mounts or comments are shown
+  const fetchFriends = async (search = '') => {
+    try {
+      const response = await fetch('/api/friends/search?q=' + search);
+      const data = await response.json();
+      if (data.friends) {
+        setAvailableFriends(data.friends);
+      }
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+    }
+  };
 
   const handleLike = async () => {
     if (!user) {
@@ -127,6 +159,8 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       if (data.comments) {
         setComments(data.comments);
         setShowComments(true);
+        // Load friends list for mentions
+        fetchFriends();
       }
     } catch (error) {
       console.error('Error loading comments:', error);
@@ -146,33 +180,73 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       return;
     }
 
-    setSubmittingComment(true);
-    try {
-      const response = await fetch(`/api/reviews/${post.id}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: newComment.trim(),
-          mentionedUserIds: mentionedUsers.map(u => u.id),
-        }),
-      });
+    const commentText = newComment.trim();
+    const mentionedIds = mentionedUsers.map(u => u.id);
+    
+    // Create optimistic comment
+    const optimisticComment: Comment = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      content: commentText,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      likesCount: 0,
+      isLiked: false,
+      user: {
+        id: user.id,
+        username: profile?.username || user.email?.split('@')[0] || 'You',
+        fullName: profile?.full_name || profile?.username || 'You',
+        avatarUrl: profile?.avatar_url,
+      },
+      mentions: mentionedUsers.map(u => ({
+        id: u.id,
+        username: u.username,
+        fullName: u.username,
+      })),
+    };
 
-      const data = await response.json();
-      
-      if (data.comment) {
-        setComments([...comments, data.comment]);
-        setNewComment('');
-        setMentionedUsers([]);
-        if (onUpdate) onUpdate();
-      } else {
-        showToast('Failed to post comment', 'error');
-      }
-    } catch (error) {
-      console.error('Error posting comment:', error);
-      showToast('Failed to post comment', 'error');
-    } finally {
-      setSubmittingComment(false);
-    }
+    // Clear input immediately
+    setNewComment('');
+    setMentionedUsers([]);
+
+    // Add comment to UI after 1 second (feels more natural)
+    setTimeout(() => {
+      setComments([...comments, optimisticComment]);
+    }, 1000);
+
+    // Post to server in background (don't wait for it)
+    fetch(`/api/reviews/${post.id}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: commentText,
+        mentionedUserIds: mentionedIds,
+      }),
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.comment) {
+          // Replace optimistic comment with real one from server
+          setTimeout(() => {
+            setComments(prev => 
+              prev.map(c => c.id === optimisticComment.id ? data.comment : c)
+            );
+          }, 1000);
+        } else {
+          // If failed, remove optimistic comment
+          setTimeout(() => {
+            setComments(prev => prev.filter(c => c.id !== optimisticComment.id));
+            showToast('Failed to post comment', 'error');
+          }, 1000);
+        }
+      })
+      .catch(error => {
+        console.error('Error posting comment:', error);
+        // Remove optimistic comment on error
+        setTimeout(() => {
+          setComments(prev => prev.filter(c => c.id !== optimisticComment.id));
+          showToast('Failed to post comment', 'error');
+        }, 1000);
+      });
   };
 
   const handleDeleteComment = async (commentId: string) => {
@@ -204,16 +278,8 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
         setMentionSearch(textAfterAt);
         setShowMentionDropdown(true);
         
-        // Fetch friends for mention (you'll need to create this API)
-        try {
-          const response = await fetch('/api/friends/search?q=' + textAfterAt);
-          const data = await response.json();
-          if (data.friends) {
-            setAvailableFriends(data.friends);
-          }
-        } catch (error) {
-          console.error('Error fetching friends:', error);
-        }
+        // Fetch friends for mention
+        fetchFriends(textAfterAt);
       } else {
         setShowMentionDropdown(false);
       }
@@ -223,12 +289,64 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   };
 
   const handleSelectMention = (friend: { id: string; username: string; fullName: string }) => {
+    // Check if user is already mentioned
+    if (mentionedUsers.some(u => u.id === friend.id)) {
+      showToast(`@${friend.username} is already mentioned`, 'error');
+      setShowMentionDropdown(false);
+      return;
+    }
+
     const lastAtIndex = newComment.lastIndexOf('@');
     const beforeAt = newComment.slice(0, lastAtIndex);
     const afterMention = beforeAt + '@' + friend.username + ' ';
     setNewComment(afterMention);
     setMentionedUsers([...mentionedUsers, { id: friend.id, username: friend.username }]);
     setShowMentionDropdown(false);
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    if (!user) {
+      showToast('Please log in to like comments', 'error');
+      return;
+    }
+
+    const comment = comments.find(c => c.id === commentId);
+    if (!comment) return;
+
+    const newLikedState = !comment.isLiked;
+    const newCount = newLikedState ? comment.likesCount + 1 : comment.likesCount - 1;
+
+    // Optimistic update
+    setComments(comments.map(c => 
+      c.id === commentId 
+        ? { ...c, isLiked: newLikedState, likesCount: newCount }
+        : c
+    ));
+
+    try {
+      const url = `/api/reviews/${post.id}/comments/${commentId}/like`;
+      const response = await fetch(url, {
+        method: newLikedState ? 'POST' : 'DELETE',
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setComments(comments.map(c => 
+          c.id === commentId 
+            ? { ...c, isLiked: !newLikedState, likesCount: comment.likesCount }
+            : c
+        ));
+        showToast('Failed to update like', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating comment like:', error);
+      setComments(comments.map(c => 
+        c.id === commentId 
+          ? { ...c, isLiked: !newLikedState, likesCount: comment.likesCount }
+          : c
+      ));
+      showToast('Failed to update like', 'error');
+    }
   };
 
   return (
@@ -459,110 +577,164 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
         </div>
       )}
 
-      {/* Interaction Bar */}
+      {/* Interaction Bar - Instagram Style */}
       <div className="px-4 py-3 border-t border-gray-100">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6 mb-2">
           <button
             onClick={handleLike}
-            className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-              isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-            }`}
+            className="flex items-center gap-2 transition-transform active:scale-90"
           >
-            <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-            <span>{likesCount}</span>
+            <Heart 
+              className={`w-7 h-7 ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
+              strokeWidth={isLiked ? 0 : 2}
+            />
           </button>
           
           <button
             onClick={loadComments}
-            className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-primary transition-colors"
+            className="flex items-center gap-2 transition-transform active:scale-90"
           >
-            <MessageCircle className="w-5 h-5" />
-            <span>{post.commentsCount || comments.length}</span>
+            <MessageCircle className="w-7 h-7 text-gray-900" strokeWidth={2} />
           </button>
         </div>
+        
+        {/* Like Count */}
+        {likesCount > 0 && (
+          <button
+            onClick={handleLike}
+            className="text-sm font-semibold text-gray-900 mb-1"
+          >
+            {likesCount} {likesCount === 1 ? 'like' : 'likes'}
+          </button>
+        )}
+        
+        {/* Comment Count */}
+        {post.commentsCount > 0 && (
+          <button
+            onClick={loadComments}
+            className="text-sm text-gray-500 block"
+          >
+            View all {post.commentsCount} {post.commentsCount === 1 ? 'comment' : 'comments'}
+          </button>
+        )}
       </div>
 
-      {/* Comments Section */}
-      {showComments && (
-        <div className="px-4 pb-4 border-t border-gray-100">
-          {loadingComments ? (
-            <p className="text-sm text-gray-500 text-center py-4">Loading comments...</p>
-          ) : (
-            <>
-              {/* Comments List */}
-              {comments.length > 0 && (
-                <div className="space-y-3 mt-3 max-h-80 overflow-y-auto">
-                  {comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-2">
+      {/* Comments Bottom Sheet - Instagram Style */}
+      <BottomSheet
+        isOpen={showComments}
+        onClose={() => setShowComments(false)}
+        title="Comments"
+      >
+        {loadingComments ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        ) : (
+          <>
+            {/* Comments List */}
+            {comments.length > 0 ? (
+              <div className="space-y-4 mb-4">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="flex gap-3">
+                    <Link href={`/profile/${comment.user.id}`} className="flex-shrink-0">
                       {comment.user.avatarUrl ? (
                         <img
                           src={comment.user.avatarUrl}
                           alt={comment.user.fullName}
-                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          className="w-9 h-9 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-white">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                          <span className="text-sm font-bold text-white">
                             {comment.user.fullName.charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="bg-gray-50 rounded-xl px-3 py-2">
+                    </Link>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
                           <Link href={`/profile/${comment.user.id}`}>
-                            <p className="font-semibold text-sm text-gray-900 hover:text-primary">
-                              {comment.user.fullName}
-                            </p>
+                            <span className="font-semibold text-sm text-gray-900 hover:text-gray-600">
+                              {comment.user.username}
+                            </span>
                           </Link>
-                          <p className="text-sm text-gray-700 mt-0.5">
+                          <span className="text-sm text-gray-900 ml-2">
                             {comment.content}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 px-3">
-                          <span className="text-xs text-gray-400">
-                            {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                           </span>
-                          {user && comment.user.id === user.id && (
-                            <button
-                              onClick={() => handleDeleteComment(comment.id)}
-                              className="text-xs text-red-500 hover:text-red-600"
-                            >
-                              Delete
-                            </button>
-                          )}
                         </div>
+                        <button
+                          onClick={() => handleLikeComment(comment.id)}
+                          className="flex-shrink-0 transition-transform active:scale-90"
+                        >
+                          <Heart 
+                            className={`w-4 h-4 ${comment.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
+                            strokeWidth={comment.isLiked ? 0 : 2}
+                          />
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 mt-1.5">
+                        <span className="text-xs text-gray-500">
+                          {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                        </span>
+                        {comment.likesCount > 0 && (
+                          <button
+                            onClick={() => handleLikeComment(comment.id)}
+                            className="text-xs font-semibold text-gray-500"
+                          >
+                            {comment.likesCount} {comment.likesCount === 1 ? 'like' : 'likes'}
+                          </button>
+                        )}
+                        {user && comment.user.id === user.id && (
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="text-xs font-semibold text-red-500 hover:text-red-600"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <MessageCircle className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">No comments yet</p>
+                <p className="text-sm text-gray-400 mt-1">Be the first to comment!</p>
+              </div>
+            )}
 
-              {/* Comment Input */}
-              {user && (
-                <div className="mt-3 relative">
-                  {mentionedUsers.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {mentionedUsers.map((mentioned) => (
-                        <span
-                          key={mentioned.id}
-                          className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full"
+            {/* Comment Input - Fixed at Bottom */}
+            {user && (
+              <div className="sticky bottom-0 bg-white pt-3 pb-safe border-t border-gray-200 -mx-4 px-4">
+                {mentionedUsers.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {mentionedUsers.map((mentioned) => (
+                      <span
+                        key={mentioned.id}
+                        className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-full font-medium"
+                      >
+                        @{mentioned.username}
+                        <button
+                          onClick={() => setMentionedUsers(mentionedUsers.filter(u => u.id !== mentioned.id))}
+                          className="hover:text-blue-800"
                         >
-                          @{mentioned.username}
-                          <button
-                            onClick={() => setMentionedUsers(mentionedUsers.filter(u => u.id !== mentioned.id))}
-                            className="hover:text-primary/70"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="relative">
+                  <div className="flex items-center gap-3">
                     <input
                       type="text"
-                      placeholder="Write a comment... (use @ to mention)"
+                      placeholder="Add a comment..."
                       value={newComment}
                       onChange={(e) => handleMentionInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -571,40 +743,45 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                           handleCommentSubmit();
                         }
                       }}
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                      disabled={submittingComment}
+                      className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
                     />
                     <button
                       onClick={handleCommentSubmit}
-                      disabled={submittingComment || !newComment.trim()}
-                      className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      disabled={!newComment.trim()}
+                      className="text-blue-500 font-semibold text-sm disabled:opacity-40 transition-opacity"
                     >
-                      <Send className="w-4 h-4" />
+                      Post
                     </button>
                   </div>
                   
                   {/* Mention Dropdown */}
                   {showMentionDropdown && availableFriends.length > 0 && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto z-10">
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto">
                       {availableFriends.map((friend) => (
                         <button
                           key={friend.id}
                           onClick={() => handleSelectMention(friend)}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
                         >
-                          <UserPlus className="w-4 h-4 text-gray-400" />
-                          <span className="font-medium">{friend.fullName}</span>
-                          <span className="text-gray-500">@{friend.username}</span>
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-bold text-white">
+                              {friend.fullName.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
+                            <p className="text-xs text-gray-500">@{friend.username}</p>
+                          </div>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+              </div>
+            )}
+          </>
+        )}
+      </BottomSheet>
     </div>
   );
 }

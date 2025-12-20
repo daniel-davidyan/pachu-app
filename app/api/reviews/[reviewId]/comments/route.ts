@@ -10,6 +10,9 @@ export async function GET(
     const supabase = await createClient();
     const { reviewId } = await params;
 
+    // Get current user to check for likes
+    const { data: { user } } = await supabase.auth.getUser();
+
     // Get comments with user info and mentions
     const { data: comments, error } = await supabase
       .from('review_comments')
@@ -37,12 +40,39 @@ export async function GET(
 
     if (error) throw error;
 
+    // Get likes counts and user's likes for all comments
+    const commentIds = comments?.map(c => c.id) || [];
+    
+    // Get likes counts
+    const { data: likesData } = await supabase
+      .from('comment_likes')
+      .select('comment_id')
+      .in('comment_id', commentIds);
+
+    const likesCounts: { [key: string]: number } = {};
+    likesData?.forEach(like => {
+      likesCounts[like.comment_id] = (likesCounts[like.comment_id] || 0) + 1;
+    });
+
+    // Get user's likes if logged in
+    let userLikes: string[] = [];
+    if (user) {
+      const { data: userLikesData } = await supabase
+        .from('comment_likes')
+        .select('comment_id')
+        .eq('user_id', user.id)
+        .in('comment_id', commentIds);
+      userLikes = userLikesData?.map(l => l.comment_id) || [];
+    }
+
     // Transform the data to a cleaner format
     const formattedComments = comments?.map(comment => ({
       id: comment.id,
       content: comment.content,
       createdAt: comment.created_at,
       updatedAt: comment.updated_at,
+      likesCount: likesCounts[comment.id] || 0,
+      isLiked: userLikes.includes(comment.id),
       user: {
         id: comment.user.id,
         username: comment.user.username,
