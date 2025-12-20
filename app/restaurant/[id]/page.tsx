@@ -10,6 +10,7 @@ import {
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { CompactRating } from '@/components/ui/modern-rating';
+import { PostCard, PostCardData } from '@/components/post/post-card';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
 import { useUser } from '@/hooks/use-user';
@@ -23,6 +24,7 @@ interface Review {
   visitDate?: string;
   createdAt: string;
   likesCount: number;
+  commentsCount: number;
   isLiked: boolean;
   user: {
     id: string;
@@ -70,11 +72,9 @@ export default function RestaurantPage() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showWriteReview, setShowWriteReview] = useState(false);
-  const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
   const [loadingWishlist, setLoadingWishlist] = useState(false);
   const [restaurantDbId, setRestaurantDbId] = useState<string | null>(null);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
-  const [showReviewMenu, setShowReviewMenu] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   
@@ -151,19 +151,12 @@ export default function RestaurantPage() {
     }
   };
 
-  const handleLikeReview = async (reviewId: string) => {
-    // TODO: Implement like review API call
-    setReviews(reviews.map(r => 
-      r.id === reviewId 
-        ? { ...r, isLiked: !r.isLiked, likesCount: r.isLiked ? r.likesCount - 1 : r.likesCount + 1 }
-        : r
-    ));
-  };
-
-  const handleEditReview = (review: Review) => {
-    setEditingReview(review);
-    setShowWriteReview(true);
-    setShowReviewMenu(null);
+  const handleEditReview = (post: PostCardData) => {
+    const review = reviews.find(r => r.id === post.id);
+    if (review) {
+      setEditingReview(review);
+      setShowWriteReview(true);
+    }
   };
 
   const handleDeleteReview = async (reviewId: string) => {
@@ -182,7 +175,6 @@ export default function RestaurantPage() {
       if (response.ok) {
         setReviews(prev => prev.filter(review => review.id !== reviewToDelete));
         showToast('Experience deleted successfully', 'success');
-        setShowReviewMenu(null);
         fetchRestaurant(); // Refresh the restaurant data
       } else {
         showToast('Failed to delete experience', 'error');
@@ -214,16 +206,6 @@ export default function RestaurantPage() {
         console.log('Error sharing:', error);
       }
     }
-  };
-
-  const toggleReviewExpansion = (reviewId: string) => {
-    const newExpanded = new Set(expandedReviews);
-    if (newExpanded.has(reviewId)) {
-      newExpanded.delete(reviewId);
-    } else {
-      newExpanded.add(reviewId);
-    }
-    setExpandedReviews(newExpanded);
   };
 
   if (loading) {
@@ -458,184 +440,16 @@ export default function RestaurantPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => {
-                const isExpanded = expandedReviews.has(review.id);
-                const shouldShowExpand = review.content.length > 200;
-                
-                return (
-                  <div 
-                    key={review.id} 
-                    className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    {/* Content at Top */}
-                    <div className="p-4">
-                      {/* User Info with Rating on Right */}
-                      <Link href={`/profile/${review.user.id}`}>
-                        <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors mb-3">
-                          {review.user.avatarUrl ? (
-                            <img
-                              src={review.user.avatarUrl}
-                              alt={review.user.fullName}
-                              className="w-14 h-14 rounded-full object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xl font-bold text-white">
-                                {review.user.fullName.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                          
-                          {/* Left: User name, username, date */}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-base text-gray-900 truncate">
-                              {review.user.fullName}
-                            </p>
-                            <p className="text-xs text-gray-500 truncate mt-0.5">
-                              @{review.user.username}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
-                            </p>
-                          </div>
-                          
-                          {/* Right: Rating */}
-                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                            <CompactRating rating={review.rating} />
-                            {/* Pencil icon menu below rating - only for own reviews */}
-                            {user && review.user.id === user.id && (
-                              <div className="relative">
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
-                                  }}
-                                  className="w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5 text-gray-600" />
-                                </button>
-                                
-                                {showReviewMenu === review.id && (
-                                  <>
-                                    <div 
-                                      className="fixed inset-0 z-10"
-                                      onClick={() => setShowReviewMenu(null)}
-                                    />
-                                    <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36">
-                                      <button
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          handleEditReview(review);
-                                        }}
-                                        className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-medium"
-                                      >
-                                        <Edit2 className="w-4 h-4" />
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          handleDeleteReview(review.id);
-                                        }}
-                                        className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600 font-medium"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-
-                      {/* Review Title */}
-                      {review.title && (
-                        <Link href={`/review/${review.id}`}>
-                          <h3 className="font-semibold text-gray-900 mb-2 hover:text-primary transition-colors cursor-pointer">
-                            {review.title}
-                          </h3>
-                        </Link>
-                      )}
-
-                      {/* Review Content */}
-                      {review.content && (
-                        <div className="mb-3">
-                          <Link href={`/review/${review.id}`}>
-                            <p className={`text-sm text-gray-700 leading-relaxed hover:text-gray-900 transition-colors cursor-pointer ${!isExpanded && shouldShowExpand ? 'line-clamp-3' : ''}`}>
-                              {review.content}
-                            </p>
-                          </Link>
-                          {shouldShowExpand && (
-                            <button
-                              onClick={() => toggleReviewExpansion(review.id)}
-                              className="text-primary text-sm font-semibold mt-1"
-                            >
-                              {isExpanded ? 'Show less' : 'Read more'}
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Visit Date */}
-                      {review.visitDate && (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>Visited {format(new Date(review.visitDate), 'MMM d, yyyy')}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* User's Experience Photos Below - Carousel with 20% peek */}
-                    {review.photos && review.photos.length > 0 && (
-                      <div className="relative">
-                        {review.photos.length === 1 ? (
-                          // Single photo - full width
-                          <img
-                            src={review.photos[0]}
-                            alt="Experience photo"
-                            className="w-full h-64 object-cover"
-                          />
-                        ) : (
-                          // Multiple photos - carousel showing 80% of current + 20% of next
-                          <div className="overflow-hidden">
-                            <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
-                              {review.photos.map((photo, index) => (
-                                <img
-                                  key={index}
-                                  src={photo}
-                                  alt={`Experience photo ${index + 1}`}
-                                  className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
-                                  style={{ width: 'calc(80vw - 2rem)' }}
-                                />
-                              ))}
-                              {/* Spacer to allow last image to snap properly */}
-                              <div className="w-4 flex-shrink-0" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Like Button - Only show for other users' reviews */}
-                    {(!user || review.user.id !== user.id) && (
-                      <div className="px-4 pb-4 pt-3">
-                        <button
-                          onClick={() => handleLikeReview(review.id)}
-                          className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                            review.isLiked ? 'text-primary' : 'text-gray-500 hover:text-primary'
-                          }`}
-                        >
-                          <ThumbsUp className={`w-4 h-4 ${review.isLiked ? 'fill-current' : ''}`} />
-                          <span>{review.likesCount}</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {reviews.map((review) => (
+                <PostCard
+                  key={review.id}
+                  post={review}
+                  showRestaurantInfo={false}
+                  onEdit={handleEditReview}
+                  onDelete={handleDeleteReview}
+                  onUpdate={fetchRestaurant}
+                />
+              ))}
             </div>
           )}
         </div>

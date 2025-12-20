@@ -216,8 +216,10 @@ export async function GET(request: NextRequest) {
     const restaurantId = searchParams.get('restaurantId');
     const userId = searchParams.get('userId');
 
+    // Get current user to check for likes
+    const { data: { user } } = await supabase.auth.getUser();
+
     // Query reviews with restaurant and photo data
-    // Using left join to handle cases where restaurant might be deleted
     let query = supabase
       .from('reviews')
       .select(`
@@ -231,7 +233,8 @@ export async function GET(request: NextRequest) {
           id,
           name,
           address,
-          image_url
+          image_url,
+          google_place_id
         ),
         review_photos (
           photo_url,
@@ -263,8 +266,74 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get user profiles for all reviews
+    const userIds = [...new Set(reviews?.map(r => r.user_id) || [])];
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, avatar_url')
+      .in('id', userIds);
+
+    const profilesMap = new Map();
+    profilesData?.forEach((profile: any) => {
+      profilesMap.set(profile.id, profile);
+    });
+
+    // Get likes and comments counts for all reviews
+    const reviewIds = reviews?.map(r => r.id) || [];
+    
+    // Get likes counts
+    const { data: likesData } = await supabase
+      .from('review_likes')
+      .select('review_id')
+      .in('review_id', reviewIds);
+
+    // Get user's likes if logged in
+    let userLikes: string[] = [];
+    if (user) {
+      const { data: userLikesData } = await supabase
+        .from('review_likes')
+        .select('review_id')
+        .eq('user_id', user.id)
+        .in('review_id', reviewIds);
+      userLikes = userLikesData?.map(l => l.review_id) || [];
+    }
+
+    // Get comments counts
+    const { data: commentsData } = await supabase
+      .from('review_comments')
+      .select('review_id')
+      .in('review_id', reviewIds);
+
+    // Count likes and comments per review
+    const likesCounts: { [key: string]: number } = {};
+    likesData?.forEach(like => {
+      likesCounts[like.review_id] = (likesCounts[like.review_id] || 0) + 1;
+    });
+
+    const commentsCounts: { [key: string]: number } = {};
+    commentsData?.forEach(comment => {
+      commentsCounts[comment.review_id] = (commentsCounts[comment.review_id] || 0) + 1;
+    });
+
+    // Format reviews with counts and user profiles
+    const formattedReviews = reviews?.map(review => {
+      const profile = profilesMap.get(review.user_id);
+      return {
+        ...review,
+        likesCount: likesCounts[review.id] || 0,
+        commentsCount: commentsCounts[review.id] || 0,
+        isLiked: userLikes.includes(review.id),
+        user: profile ? {
+          id: profile.id,
+          username: profile.username,
+          fullName: profile.full_name || profile.username,
+          avatarUrl: profile.avatar_url,
+        } : undefined,
+      };
+    });
+
     // Return empty array if no reviews
-    return NextResponse.json({ reviews: reviews || [] });
+    return NextResponse.json({ reviews: formattedReviews || [] });
   } catch (error) {
     console.error('Error in reviews API:', error);
     return NextResponse.json(

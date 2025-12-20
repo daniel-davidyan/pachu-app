@@ -160,6 +160,39 @@ export async function GET(
                 photosByReview.get(photo.review_id)?.push(photo.photo_url);
               });
 
+              // Get likes counts
+              const { data: likesData } = await supabase
+                .from('review_likes')
+                .select('review_id')
+                .in('review_id', reviewIds);
+
+              const likesCounts: { [key: string]: number } = {};
+              likesData?.forEach(like => {
+                likesCounts[like.review_id] = (likesCounts[like.review_id] || 0) + 1;
+              });
+
+              // Get comments counts
+              const { data: commentsData } = await supabase
+                .from('review_comments')
+                .select('review_id')
+                .in('review_id', reviewIds);
+
+              const commentsCounts: { [key: string]: number } = {};
+              commentsData?.forEach(comment => {
+                commentsCounts[comment.review_id] = (commentsCounts[comment.review_id] || 0) + 1;
+              });
+
+              // Get user's likes if logged in
+              let userLikes: string[] = [];
+              if (user) {
+                const { data: userLikesData } = await supabase
+                  .from('review_likes')
+                  .select('review_id')
+                  .eq('user_id', user.id)
+                  .in('review_id', reviewIds);
+                userLikes = userLikesData?.map(l => l.review_id) || [];
+              }
+
               ourReviews = reviewsData?.map((review: any) => ({
                 id: review.id,
                 rating: review.rating,
@@ -167,8 +200,9 @@ export async function GET(
                 content: review.content || '',
                 visitDate: review.visit_date,
                 createdAt: review.created_at,
-                likesCount: review.likes_count || 0,
-                isLiked: false,
+                likesCount: likesCounts[review.id] || 0,
+                commentsCount: commentsCounts[review.id] || 0,
+                isLiked: userLikes.includes(review.id),
                 user: {
                   id: review.profiles.id,
                   username: review.profiles.username,
@@ -211,6 +245,7 @@ export async function GET(
                 visitDate: null,
                 createdAt: new Date(review.time * 1000).toISOString(),
                 likesCount: 0,
+                commentsCount: 0,
                 isLiked: false,
                 user: {
                   id: review.author_name,
@@ -250,7 +285,6 @@ export async function GET(
         content,
         visit_date,
         created_at,
-        likes_count,
         user_id
       `)
       .eq('restaurant_id', dbRestaurantId)
@@ -285,16 +319,38 @@ export async function GET(
       photosByReview.get(photo.review_id)?.push(photo.photo_url);
     });
 
+    // Get likes counts
+    const { data: likesData } = await supabase
+      .from('review_likes')
+      .select('review_id')
+      .in('review_id', reviewIds);
+
+    const likesCounts: { [key: string]: number } = {};
+    likesData?.forEach(like => {
+      likesCounts[like.review_id] = (likesCounts[like.review_id] || 0) + 1;
+    });
+
+    // Get comments counts
+    const { data: commentsData } = await supabase
+      .from('review_comments')
+      .select('review_id')
+      .in('review_id', reviewIds);
+
+    const commentsCounts: { [key: string]: number } = {};
+    commentsData?.forEach(comment => {
+      commentsCounts[comment.review_id] = (commentsCounts[comment.review_id] || 0) + 1;
+    });
+
     // Get review likes if user is logged in
     let likedReviewIds = new Set<string>();
     if (user) {
-      const { data: likesData } = await supabase
+      const { data: userLikesData } = await supabase
         .from('review_likes')
         .select('review_id')
         .eq('user_id', user.id)
         .in('review_id', reviewIds);
       
-      likedReviewIds = new Set(likesData?.map(l => l.review_id) || []);
+      likedReviewIds = new Set(userLikesData?.map(l => l.review_id) || []);
     }
 
     const reviews = reviewsData?.map((review: any) => {
@@ -306,7 +362,8 @@ export async function GET(
         content: review.content || '',
         visitDate: review.visit_date,
         createdAt: review.created_at,
-        likesCount: review.likes_count || 0,
+        likesCount: likesCounts[review.id] || 0,
+        commentsCount: commentsCounts[review.id] || 0,
         isLiked: likedReviewIds.has(review.id),
         user: {
           id: review.user_id,

@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Calendar, Camera, X, Check, Edit2, Heart, MapPin, Loader2, Trash2, MoreVertical } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { PostCard, PostCardData } from '@/components/post/post-card';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
@@ -32,6 +33,15 @@ interface Review {
   rating: number;
   content: string;
   created_at: string;
+  likesCount: number;
+  commentsCount: number;
+  isLiked: boolean;
+  user: {
+    id: string;
+    username: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
   restaurants: {
     id: string;
     name: string;
@@ -68,7 +78,6 @@ export default function ProfilePage() {
   const [loadingTab, setLoadingTab] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('experiences');
-  const [showReviewMenu, setShowReviewMenu] = useState<string | null>(null);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -267,7 +276,6 @@ export default function ProfilePage() {
       if (response.ok) {
         setReviews(prev => prev.filter(review => review.id !== reviewToDelete));
         fetchStats(); // Refresh stats
-        setShowReviewMenu(null);
         showToast('Experience deleted successfully', 'success');
       } else {
         showToast('Failed to delete experience', 'error');
@@ -280,10 +288,12 @@ export default function ProfilePage() {
     }
   };
 
-  const handleEditReview = (review: Review) => {
-    setEditingReview(review);
-    setShowEditModal(true);
-    setShowReviewMenu(null);
+  const handleEditReview = (post: PostCardData) => {
+    const review = reviews.find(r => r.id === post.id);
+    if (review) {
+      setEditingReview(review);
+      setShowEditModal(true);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -626,135 +636,45 @@ export default function ProfilePage() {
             // My Experiences
             reviews.length > 0 ? (
               <div className="space-y-4">
-                {reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    {/* Content at Top */}
-                    <div className="p-4">
-                      {/* Restaurant Info with Rating on Right */}
-                      <Link
-                        href={`/restaurant/${review.restaurants?.google_place_id || review.restaurants?.id}`}
-                        className="block mb-3"
-                      >
-                        <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                          <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl overflow-hidden flex-shrink-0">
-                            {review.restaurants?.image_url ? (
-                              <img src={review.restaurants.image_url} alt={review.restaurants.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
-                            )}
-                          </div>
-                          
-                          {/* Left: Location name, address, date */}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-base text-gray-900 truncate">
-                              {review.restaurants?.name || 'Restaurant'}
-                            </h3>
-                            <p className="text-xs text-gray-500 truncate flex items-center gap-1 mt-0.5">
-                              <MapPin className="w-3 h-3" />
-                              {review.restaurants?.address || 'Address not available'}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {new Date(review.created_at).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric', 
-                                year: 'numeric' 
-                              })}
-                            </p>
-                          </div>
-                          
-                          {/* Right: Rating */}
-                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                            <CompactRating rating={review.rating} />
-                            {/* Pencil icon menu below rating */}
-                            <div className="relative">
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setShowReviewMenu(showReviewMenu === review.id ? null : review.id);
-                                }}
-                                className="w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors"
-                              >
-                                <Edit2 className="w-3.5 h-3.5 text-gray-600" />
-                              </button>
-                              
-                              {showReviewMenu === review.id && (
-                                <>
-                                  <div 
-                                    className="fixed inset-0 z-10"
-                                    onClick={() => setShowReviewMenu(null)}
-                                  />
-                                  <div className="absolute right-0 top-9 z-20 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36">
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleEditReview(review);
-                                      }}
-                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-medium"
-                                    >
-                                      <Edit2 className="w-4 h-4" />
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleDeleteReview(review.id);
-                                      }}
-                                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600 font-medium"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                      Delete
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
+                {reviews.map((review) => {
+                  const postData: PostCardData = {
+                    id: review.id,
+                    rating: review.rating,
+                    content: review.content,
+                    createdAt: review.created_at,
+                    likesCount: review.likesCount || 0,
+                    commentsCount: review.commentsCount || 0,
+                    isLiked: review.isLiked || false,
+                    user: review.user || {
+                      id: user?.id || '',
+                      username: profile?.username || '',
+                      fullName: profile?.full_name || '',
+                      avatarUrl: profile?.avatar_url || undefined,
+                    },
+                    photos: review.review_photos?.map(p => p.photo_url) || [],
+                    restaurant: {
+                      id: review.restaurants?.id || '',
+                      name: review.restaurants?.name || 'Restaurant',
+                      address: review.restaurants?.address || '',
+                      imageUrl: review.restaurants?.image_url,
+                      googlePlaceId: review.restaurants?.google_place_id,
+                    },
+                  };
 
-                      {/* Review Text */}
-                      {review.content && (
-                        <p className="text-sm text-gray-700 leading-relaxed mb-3">
-                          {review.content}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* User's Experience Photos Below - Carousel with 20% peek */}
-                    {review.review_photos && review.review_photos.length > 0 && (
-                      <div className="relative -mx-4">
-                        {review.review_photos.length === 1 ? (
-                          // Single photo - full width
-                          <img
-                            src={review.review_photos[0].photo_url}
-                            alt="Experience photo"
-                            className="w-full h-64 object-cover"
-                          />
-                        ) : (
-                          // Multiple photos - carousel showing 80% of current + 20% of next
-                          <div className="overflow-hidden">
-                            <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
-                              {review.review_photos.map((photo, index) => (
-                                <img
-                                  key={index}
-                                  src={photo.photo_url}
-                                  alt={`Experience photo ${index + 1}`}
-                                  className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
-                                  style={{ width: 'calc(80vw - 2rem)' }}
-                                />
-                              ))}
-                              {/* Spacer to allow last image to snap properly */}
-                              <div className="w-4 flex-shrink-0" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  return (
+                    <PostCard
+                      key={review.id}
+                      post={postData}
+                      showRestaurantInfo={true}
+                      onEdit={handleEditReview}
+                      onDelete={handleDeleteReview}
+                      onUpdate={() => {
+                        fetchReviews();
+                        fetchStats();
+                      }}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
