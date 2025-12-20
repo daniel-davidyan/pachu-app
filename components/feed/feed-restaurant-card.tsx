@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, Send, X, Loader2, UserPlus, UserCheck } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
@@ -273,7 +273,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
     });
   };
 
-  const handlePostComment = async (experienceId: string) => {
+  const handlePostComment = useCallback(async (experienceId: string) => {
     if (!user) {
       showToast('Please log in to comment', 'error');
       return;
@@ -288,12 +288,9 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
 
     console.log('[FEED] Posting comment:', commentText, 'for experience:', experienceId);
 
-    // Generate unique ID for optimistic comment (outside of render)
-    const tempId = `temp-${Date.now()}`;
-    
-    // Create optimistic comment
+    // Create optimistic comment with unique ID
     const optimisticComment = {
-      id: tempId,
+      id: 'temp-' + Date.now().toString(),
       content: commentText,
       created_at: new Date().toISOString(),
       user: {
@@ -392,7 +389,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
       });
       showToast('Failed to post comment', 'error');
     }
-  };
+  }, [user, showToast, experienceStates, getExperienceState]);
 
   const handleLikeComment = async (experienceId: string, commentId: string) => {
     if (!user) {
