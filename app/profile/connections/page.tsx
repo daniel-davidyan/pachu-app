@@ -69,28 +69,49 @@ function ConnectionsContent() {
         body: JSON.stringify({ userId, action }),
       });
 
+      const result = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to update follow status');
+        console.error('Follow API error:', result);
+        throw new Error(result.error || 'Failed to update follow status');
       }
+
+      console.log('Follow operation successful:', result);
 
       // Update local state
       const newFollowingUsers = new Set(followingUsers);
       if (currentlyFollowing) {
         newFollowingUsers.delete(userId);
+        
+        // If we're in the Following tab and unfollowing, remove the user from the list
+        if (activeTab === 'following') {
+          setFollowing(prev => prev.filter(user => user.id !== userId));
+        }
       } else {
         newFollowingUsers.add(userId);
       }
       setFollowingUsers(newFollowingUsers);
 
-      // Update the users in both lists
+      // Update the users in the followers list (keep for followers tab)
       setFollowers(prev => prev.map(user => 
         user.id === userId ? { ...user, isFollowing: !currentlyFollowing } : user
       ));
-      setFollowing(prev => prev.map(user => 
-        user.id === userId ? { ...user, isFollowing: !currentlyFollowing } : user
-      ));
+      
+      // If we're in followers tab and following someone, also update the following list
+      if (activeTab === 'followers' && !currentlyFollowing) {
+        setFollowing(prev => prev.map(user => 
+          user.id === userId ? { ...user, isFollowing: true } : user
+        ));
+      }
+      
+      // If we got an "already following" response, refresh the data to sync the UI
+      if (result.alreadyFollowing) {
+        console.log('Already following - refreshing connections data');
+        await fetchConnections();
+      }
     } catch (error) {
       console.error('Error updating follow status:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update follow status');
     }
   };
 
@@ -202,14 +223,14 @@ function ConnectionsContent() {
                       </div>
                     </button>
                     <button
-                      onClick={(e) => handleFollow(user.id, user.isFollowing, e)}
+                      onClick={(e) => handleFollow(user.id, activeTab === 'following' ? true : user.isFollowing, e)}
                       className={`px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 flex-shrink-0 ${
-                        user.isFollowing
+                        (activeTab === 'following' || user.isFollowing)
                           ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           : 'bg-primary text-white hover:bg-primary/90'
                       }`}
                     >
-                      {user.isFollowing ? (
+                      {(activeTab === 'following' || user.isFollowing) ? (
                         <>
                           <UserCheck className="w-3.5 h-3.5" />
                           <span>Following</span>

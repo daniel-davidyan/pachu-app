@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
 
     const { userId, action } = await request.json();
 
+    console.log('[FOLLOW API] Request:', { userId, action, currentUserId: user.id });
+
     if (!userId || !action || !['follow', 'unfollow'].includes(action)) {
+      console.error('[FOLLOW API] Invalid request:', { userId, action });
       return NextResponse.json(
         { error: 'Invalid request. Required: userId and action (follow/unfollow)' },
         { status: 400 }
@@ -30,6 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Prevent self-following
     if (userId === user.id) {
+      console.error('[FOLLOW API] Self-follow attempt');
       return NextResponse.json(
         { error: 'You cannot follow yourself' },
         { status: 400 }
@@ -44,6 +48,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (targetError || !targetUser) {
+      console.error('[FOLLOW API] Target user not found:', userId, targetError);
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -53,6 +58,8 @@ export async function POST(request: NextRequest) {
     if (action === 'follow') {
       // Follow user - try both column names for compatibility
       let followError;
+      
+      console.log(`[FOLLOW] User ${user.id} attempting to follow ${userId}`);
       
       // Try with following_id first (standard)
       const { error: error1 } = await supabase
@@ -64,8 +71,13 @@ export async function POST(request: NextRequest) {
       
       followError = error1;
       
+      if (error1) {
+        console.error('[FOLLOW] Error with following_id:', error1);
+      }
+      
       // If column doesn't exist, try with followed_id (legacy)
       if (error1 && error1.code === '42703') {
+        console.log('[FOLLOW] Trying legacy followed_id column');
         const { error: error2 } = await supabase
           .from('follows')
           .insert({
@@ -73,19 +85,45 @@ export async function POST(request: NextRequest) {
             followed_id: userId,
           });
         followError = error2;
+        
+        if (error2) {
+          console.error('[FOLLOW] Error with followed_id:', error2);
+        }
       }
 
       if (followError) {
         // Check if already following
         if (followError.code === '23505') { // Unique constraint violation
+          console.log('[FOLLOW] Already following - unique constraint violation');
+          // Return success since the desired state is achieved
           return NextResponse.json(
-            { error: 'Already following this user' },
-            { status: 400 }
+            { 
+              success: true,
+              message: 'Already following this user',
+              isFollowing: true,
+              alreadyFollowing: true
+            },
+            { status: 200 }
           );
         }
-        console.error('Follow error:', followError);
-        throw followError;
+        console.error('[FOLLOW] Follow error details:', {
+          code: followError.code,
+          message: followError.message,
+          details: followError.details,
+          hint: followError.hint,
+        });
+        return NextResponse.json(
+          { 
+            error: followError.message || 'Failed to follow user',
+            code: followError.code,
+            details: followError.details,
+            hint: followError.hint
+          },
+          { status: 400 }
+        );
       }
+      
+      console.log('[FOLLOW] Successfully followed user');
 
       // Optional: Create notification for the followed user
       const { error: notifError } = await supabase.from('notifications').insert({

@@ -52,14 +52,33 @@ export async function GET(request: NextRequest) {
       .in('id', followerIds.length > 0 ? followerIds : ['00000000-0000-0000-0000-000000000000']); // Use dummy ID if empty
 
     // Check which users the current user is following
-    const { data: currentUserFollowing } = await supabase
+    let currentUserFollowing: any[] = [];
+    
+    // Try with following_id first (standard)
+    const { data: followData1, error: followError1 } = await supabase
       .from('follows')
-      .select('following_id, followed_id')
+      .select('following_id')
       .eq('follower_id', user.id);
 
+    if (followError1 && followError1.code === '42703') {
+      // Try legacy column name
+      const { data: followData2 } = await supabase
+        .from('follows')
+        .select('followed_id')
+        .eq('follower_id', user.id);
+      currentUserFollowing = followData2 || [];
+    } else if (followError1) {
+      console.error('Error fetching current user following:', followError1);
+    } else {
+      currentUserFollowing = followData1 || [];
+    }
+
     const followingIds = new Set(
-      currentUserFollowing?.map(f => f.following_id || f.followed_id) || []
+      currentUserFollowing.map(f => f.following_id || f.followed_id).filter(Boolean)
     );
+    
+    console.log('[FOLLOWERS API] Current user following count:', followingIds.size);
+    console.log('[FOLLOWERS API] Following IDs:', Array.from(followingIds));
 
     // Format the response
     const followers = (profilesData || []).map((profile: any) => ({
@@ -70,6 +89,9 @@ export async function GET(request: NextRequest) {
       bio: profile.bio,
       isFollowing: followingIds.has(profile.id),
     }));
+    
+    console.log('[FOLLOWERS API] Returning', followers.length, 'followers');
+    console.log('[FOLLOWERS API] Sample follower:', followers[0]);
 
     return NextResponse.json({ 
       followers,
