@@ -33,13 +33,10 @@ export async function GET(request: NextRequest) {
     const fetchPlacesByType = async (type: string) => {
       const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=${type}&key=${apiKey}`;
       
-      console.log(`🔍 Calling Google Places API (type: ${type}):`, { latitude, longitude, radius });
-      
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-        console.error(`❌ Google Places API error for type ${type}:`, data);
         return [];
       }
 
@@ -65,13 +62,11 @@ export async function GET(request: NextRequest) {
         pageCount++;
       }
 
-      console.log(`📊 Type ${type}: ${allResults.length} results (${pageCount} page(s))`);
       return allResults;
     };
 
     // Fetch multiple types of food establishments in parallel
     const types = ['restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery'];
-    console.log('🔍 Fetching all food establishment types...');
     
     const resultsArrays = await Promise.all(
       types.map(type => fetchPlacesByType(type))
@@ -88,7 +83,6 @@ export async function GET(request: NextRequest) {
     });
 
     const allResults = Array.from(allResultsMap.values());
-    console.log(`📊 Total unique places fetched: ${allResults.length} (across ${types.length} types)`);
 
     // Transform Google Places data to our Restaurant format
     const restaurants = allResults.map((place: any) => ({
@@ -145,10 +139,6 @@ export async function GET(request: NextRequest) {
             .select('restaurant_id, user_id')
             .in('restaurant_id', dbRestaurantIds)
             .in('user_id', followingIds);
-
-          if (reviewsError) {
-            console.error('Error fetching reviews:', reviewsError);
-          }
 
           // Get unique user IDs from reviews
           const userIds = [...new Set(reviewsData?.map(r => r.user_id) || [])];
@@ -214,7 +204,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ restaurants });
   } catch (error) {
-    console.error('Error fetching nearby restaurants:', error);
     return NextResponse.json(
       { error: 'Failed to fetch nearby restaurants' },
       { status: 500 }
