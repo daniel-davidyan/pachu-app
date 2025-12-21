@@ -540,6 +540,9 @@ export function Mapbox({
           cursor: pointer;
           position: relative;
           z-index: 1000;
+          visibility: hidden;
+          opacity: 0;
+          transition: opacity 0.2s ease-in;
         ">
           <!-- White circle with icon (no extra ring) -->
           <div class="marker-circle" style="
@@ -608,6 +611,7 @@ export function Mapbox({
 
       const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
       const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
+      
       el.addEventListener('mouseenter', () => {
         if (markerCircle) {
           markerCircle.style.transform = 'scale(1.1)';
@@ -639,6 +643,14 @@ export function Mapbox({
         // Ensure marker stays on top
         if (el.parentElement) {
           el.parentElement.style.zIndex = '1000';
+          // Add class to make marker visible after positioning
+          setTimeout(() => {
+            if (el.parentElement && markerWrapper) {
+              el.parentElement.classList.add('marker-visible');
+              markerWrapper.style.visibility = 'visible';
+              markerWrapper.style.opacity = '1';
+            }
+          }, 150);
         }
         
         markers.current.push(marker);
@@ -666,11 +678,14 @@ export function Mapbox({
           box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px white;
           border: 2px solid white;
           cursor: pointer;
+          visibility: hidden;
+          opacity: 0;
           transition: all 0.2s ease;
         "></div>
       `;
 
       const dotContent = el.querySelector('.dot-marker') as HTMLElement;
+      
       el.addEventListener('mouseenter', () => {
         if (dotContent) {
           dotContent.style.transform = 'scale(1.5)';
@@ -701,6 +716,14 @@ export function Mapbox({
         // Ensure dot marker stays on top too
         if (el.parentElement) {
           el.parentElement.style.zIndex = '999';
+          // Add class to make marker visible after positioning
+          setTimeout(() => {
+            if (el.parentElement && dotContent) {
+              el.parentElement.classList.add('marker-visible');
+              dotContent.style.visibility = 'visible';
+              dotContent.style.opacity = '1';
+            }
+          }, 150);
         }
         
         markers.current.push(marker);
@@ -738,6 +761,15 @@ export function Mapbox({
             transform: translate(-50%, -50%) scale(1.5);
             opacity: 0;
           }
+        }
+        
+        /* Force markers to stay hidden until explicitly shown */
+        .mapboxgl-marker {
+          visibility: hidden !important;
+        }
+        
+        .mapboxgl-marker.marker-visible {
+          visibility: visible !important;
         }
       `}</style>
     </div>

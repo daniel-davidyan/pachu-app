@@ -491,8 +491,8 @@ export default function MapPage() {
         onReviewModalChange={setIsReviewModalOpen}
       />
 
-      {/* Bottom Navigation */}
-      <BottomNav show={!isReviewModalOpen} />
+      {/* Bottom Navigation - Hide when chat is active */}
+      <BottomNav show={!isReviewModalOpen && !chatActive} />
     </div>
   );
 }
