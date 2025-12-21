@@ -264,9 +264,9 @@ export function Mapbox({
     
     // Calculate radius in meters
     const radius = Math.min(
-      5000, // Max 5km
+      10000, // Max 10km (increased from 5km to show more restaurants)
       Math.max(
-        500, // Min 500m
+        1000, // Min 1km (increased from 500m)
         Math.sqrt(
           Math.pow((ne.lat - sw.lat) * 111000, 2) + 
           Math.pow((ne.lng - sw.lng) * 111000, 2)
@@ -275,7 +275,7 @@ export function Mapbox({
     );
     
     // Create a unique key for this area
-    const gridSize = 0.01; // ~1km
+    const gridSize = 0.02; // ~2km (reduced from 1km to load more frequently)
     const gridX = Math.floor(center.lng / gridSize);
     const gridY = Math.floor(center.lat / gridSize);
     const areaKey = `${gridX},${gridY}`;

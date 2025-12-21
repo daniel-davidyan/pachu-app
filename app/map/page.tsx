@@ -160,7 +160,7 @@ export default function MapPage() {
         }
 
         const googleResponse = await fetch(
-          `/api/restaurants/nearby?latitude=${userLocation.lat}&longitude=${userLocation.lng}&radius=2000`
+          `/api/restaurants/nearby?latitude=${userLocation.lat}&longitude=${userLocation.lng}&radius=5000`
         );
         const googleData = await googleResponse.json();
         const googleRestaurants = googleData.restaurants || [];

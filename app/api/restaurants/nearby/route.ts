@@ -29,32 +29,69 @@ export async function GET(request: NextRequest) {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Use Google Places Nearby Search API - Restaurant only
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=restaurant&keyword=restaurant&key=${apiKey}`;
+    // Function to fetch places by type with pagination
+    const fetchPlacesByType = async (type: string) => {
+      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=${type}&key=${apiKey}`;
+      
+      console.log(`🔍 Calling Google Places API (type: ${type}):`, { latitude, longitude, radius });
+      
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+        console.error(`❌ Google Places API error for type ${type}:`, data);
+        return [];
+      }
+
+      let allResults = data.results || [];
+      let nextPageToken = data.next_page_token;
+
+      // Fetch additional pages if available (max 2 more pages = 60 results total per type)
+      let pageCount = 1;
+      while (nextPageToken && pageCount < 3) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const nextUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${nextPageToken}&key=${apiKey}`;
+        
+        const nextResponse = await fetch(nextUrl);
+        const nextData = await nextResponse.json();
+        
+        if (nextData.status === 'OK' && nextData.results) {
+          allResults = [...allResults, ...nextData.results];
+          nextPageToken = nextData.next_page_token;
+        } else {
+          break;
+        }
+        pageCount++;
+      }
+
+      console.log(`📊 Type ${type}: ${allResults.length} results (${pageCount} page(s))`);
+      return allResults;
+    };
+
+    // Fetch multiple types of food establishments in parallel
+    const types = ['restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery'];
+    console.log('🔍 Fetching all food establishment types...');
     
-    console.log('🔍 Calling Google Places API (restaurants only):', { latitude, longitude, radius });
-    
-    const response = await fetch(url);
-    const data = await response.json();
+    const resultsArrays = await Promise.all(
+      types.map(type => fetchPlacesByType(type))
+    );
 
-    console.log('📊 Google Places API status:', data.status);
-    console.log('📊 Google Places API results count:', data.results?.length || 0);
+    // Merge all results and deduplicate by place_id
+    const allResultsMap = new Map();
+    resultsArrays.forEach(results => {
+      results.forEach((place: any) => {
+        if (!allResultsMap.has(place.place_id)) {
+          allResultsMap.set(place.place_id, place);
+        }
+      });
+    });
 
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      console.error('❌ Google Places API error:', data);
-      console.error('Error message:', data.error_message);
-      return NextResponse.json(
-        { error: `Google Places API error: ${data.status} - ${data.error_message || 'Unknown error'}` },
-        { status: 500 }
-      );
-    }
+    const allResults = Array.from(allResultsMap.values());
+    console.log(`📊 Total unique places fetched: ${allResults.length} (across ${types.length} types)`);
 
-    // Transform Google Places data to our Restaurant format (filter out non-restaurants)
-    const restaurants = data.results?.filter((place: any) => {
-      // Only include places that are clearly restaurants
-      const types = place.types || [];
-      return types.includes('restaurant') || types.includes('food');
-    }).map((place: any) => ({
+    // Transform Google Places data to our Restaurant format
+    const restaurants = allResults.map((place: any) => ({
       id: place.place_id,
       name: place.name,
       address: place.vicinity,
@@ -71,7 +108,7 @@ export async function GET(request: NextRequest) {
       ),
       source: 'google',
       googlePlaceId: place.place_id
-    })) || [];
+    }));
 
     // If user is logged in, get following users who visited these restaurants
     if (user) {
