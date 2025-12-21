@@ -306,43 +306,6 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                   )}
                 </div>
 
-                {/* Friends Who Visited */}
-                {friendsWhoVisited.length > 0 && (
-                  <div className="flex items-center gap-1.5 mt-1.5 bg-primary/5 rounded-lg px-2 py-1">
-                    <div className="flex -space-x-1">
-                      {friendsWhoVisited.slice(0, 2).map((friend) => (
-                        friend.avatarUrl ? (
-                          <img
-                            key={friend.id}
-                            src={friend.avatarUrl}
-                            alt={friend.fullName}
-                            className="w-4 h-4 rounded-full border border-white object-cover"
-                          />
-                        ) : (
-                          <div
-                            key={friend.id}
-                            className="w-4 h-4 rounded-full border border-white bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center"
-                          >
-                            <span className="text-[8px] font-bold text-white">
-                              {friend.fullName.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-gray-700 leading-tight">
-                      <span className="font-semibold">{friendsWhoVisited[0].fullName}</span>
-                      {friendsWhoVisited.length === 2 && (
-                        <> and <span className="font-semibold">{friendsWhoVisited[1].fullName}</span></>
-                      )}
-                      {friendsWhoVisited.length > 2 && (
-                        <> and {friendsWhoVisited.length - 1} other{friendsWhoVisited.length > 2 ? 's' : ''}</>
-                      )}
-                      {' '}visited
-                    </p>
-                  </div>
-                )}
-
                 {/* Address */}
                 <div className="flex items-center gap-1 mt-1.5">
                   <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
@@ -350,6 +313,81 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                 </div>
               </div>
             </div>
+
+            {/* Friends Who Visited - Enhanced Modern Design */}
+            {friendsWhoVisited.length > 0 && (
+              <div className="mt-3 -mx-4 px-4 py-2.5 bg-gradient-to-r from-primary/5 via-purple-50/50 to-pink-50/50 border-t border-b border-primary/10">
+                <div className="flex items-center gap-2.5">
+                  {/* Avatar Stack */}
+                  <div className="flex -space-x-2.5 relative">
+                    {friendsWhoVisited.slice(0, 3).map((friend, index) => (
+                      friend.avatarUrl ? (
+                        <div
+                          key={friend.id}
+                          className="relative"
+                          style={{ zIndex: 10 - index }}
+                        >
+                          <img
+                            src={friend.avatarUrl}
+                            alt={friend.fullName}
+                            className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          key={friend.id}
+                          className="relative w-8 h-8 rounded-full border-2 border-white bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center shadow-sm"
+                          style={{ zIndex: 10 - index }}
+                        >
+                          <span className="text-xs font-bold text-white">
+                            {friend.fullName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )
+                    ))}
+                    {friendsWhoVisited.length > 3 && (
+                      <div className="relative w-8 h-8 rounded-full border-2 border-white bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center shadow-sm" style={{ zIndex: 7 }}>
+                        <span className="text-[10px] font-bold text-white">
+                          +{friendsWhoVisited.length - 3}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text Content */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs leading-tight text-gray-800">
+                      {friendsWhoVisited.length === 1 ? (
+                        <>
+                          <span className="font-bold text-primary">{friendsWhoVisited[0].fullName}</span>
+                          <span className="text-gray-600"> visited here</span>
+                        </>
+                      ) : friendsWhoVisited.length === 2 ? (
+                        <>
+                          <span className="font-bold text-primary">{friendsWhoVisited[0].fullName}</span>
+                          <span className="text-gray-600"> and </span>
+                          <span className="font-bold text-primary">{friendsWhoVisited[1].fullName}</span>
+                          <span className="text-gray-600"> visited here</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-bold text-primary">{friendsWhoVisited[0].fullName}</span>
+                          <span className="text-gray-600"> and </span>
+                          <span className="font-bold text-primary">{friendsWhoVisited.length - 1} others</span>
+                          <span className="text-gray-600"> visited here</span>
+                        </>
+                      )}
+                    </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] text-gray-500 font-medium">
+                        From your following
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Quick Action Buttons */}
             <div className="flex gap-2 mt-4">
