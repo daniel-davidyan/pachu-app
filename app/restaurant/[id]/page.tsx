@@ -449,7 +449,6 @@ export default function RestaurantPage() {
                   onEdit={handleEditReview}
                   onDelete={handleDeleteReview}
                   onSheetStateChange={setSheetOpen}
-                />
                   onUpdate={fetchRestaurant}
                 />
               ))}
