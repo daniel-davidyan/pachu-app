@@ -64,6 +64,7 @@ export default function FeedPage() {
   const [locationFilterEnabled, setLocationFilterEnabled] = useState(true);
   const [distanceKm, setDistanceKm] = useState(5);
   const [showHeader, setShowHeader] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
@@ -416,7 +417,7 @@ export default function FeedPage() {
   }, [loading, loadingMore, hasMore, page, fetchRestaurants]);
 
   return (
-    <MainLayout showBottomNav={showHeader}>
+    <MainLayout showBottomNav={showHeader && !sheetOpen}>
       <div className="pb-24 min-h-screen bg-gray-50">
         {/* Header with Tabs */}
         <div 
@@ -518,6 +519,8 @@ export default function FeedPage() {
               key={restaurant.id}
               restaurant={restaurant}
               onUpdate={() => fetchRestaurants(0)}
+              showInteractions={feedMode === 'following'}
+              onSheetStateChange={setSheetOpen}
             />
           ))}
 

@@ -42,9 +42,11 @@ interface RestaurantFeed {
 interface FeedRestaurantCardProps {
   restaurant: RestaurantFeed;
   onUpdate?: () => void;
+  showInteractions?: boolean;
+  onSheetStateChange?: (isOpen: boolean) => void;
 }
 
-export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardProps) {
+export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = true, onSheetStateChange }: FeedRestaurantCardProps) {
   const { user } = useUser();
   const { showToast } = useToast();
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -92,13 +94,25 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
   };
 
   const updateExperienceState = (experienceId: string, updates: any) => {
-    setExperienceStates(prev => ({
-      ...prev,
-      [experienceId]: {
-        ...getExperienceState(experienceId),
-        ...updates,
-      },
-    }));
+    setExperienceStates(prev => {
+      const newState = {
+        ...prev,
+        [experienceId]: {
+          ...getExperienceState(experienceId),
+          ...updates,
+        },
+      };
+      
+      // Check if any sheet is open and notify parent
+      if (onSheetStateChange) {
+        const anySheetOpen = Object.values(newState).some((state: any) => 
+          state.showComments || state.showLikes
+        );
+        onSheetStateChange(anySheetOpen);
+      }
+      
+      return newState;
+    });
   };
 
   const handleLike = async (experience: Review) => {
@@ -627,45 +641,47 @@ export function FeedRestaurantCard({ restaurant, onUpdate }: FeedRestaurantCardP
                 )}
 
                 {/* Instagram-style Like/Comment Bar */}
-                <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
-                  {/* Like */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleLike(experience)}
-                      className="transition-transform active:scale-90"
-                    >
-                      <Heart
-                        className={`w-6 h-6 ${state.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
-                        strokeWidth={state.isLiked ? 0 : 1.5}
-                      />
-                    </button>
-                    <button
-                      onClick={() => loadLikes(experience.id)}
-                      className="text-sm font-semibold text-gray-900 hover:text-gray-600"
-                    >
-                      {state.likesCount}
-                    </button>
-                  </div>
+                {showInteractions && (
+                  <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
+                    {/* Like */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleLike(experience)}
+                        className="transition-transform active:scale-90"
+                      >
+                        <Heart
+                          className={`w-6 h-6 ${state.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
+                          strokeWidth={state.isLiked ? 0 : 1.5}
+                        />
+                      </button>
+                      <button
+                        onClick={() => loadLikes(experience.id)}
+                        className="text-sm font-semibold text-gray-900 hover:text-gray-600"
+                      >
+                        {state.likesCount}
+                      </button>
+                    </div>
 
-                  {/* Comment */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => loadComments(experience.id)}
-                      className="transition-transform active:scale-90"
-                    >
-                      <MessageCircle
-                        className="w-6 h-6 text-gray-900"
-                        strokeWidth={1.5}
-                      />
-                    </button>
-                    <button
-                      onClick={() => loadComments(experience.id)}
-                      className="text-sm font-semibold text-gray-900 hover:text-gray-600"
-                    >
-                      {state.commentsCount > 0 ? state.commentsCount : (experience.commentsCount || 0)}
-                    </button>
+                    {/* Comment */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => loadComments(experience.id)}
+                        className="transition-transform active:scale-90"
+                      >
+                        <MessageCircle
+                          className="w-6 h-6 text-gray-900"
+                          strokeWidth={1.5}
+                        />
+                      </button>
+                      <button
+                        onClick={() => loadComments(experience.id)}
+                        className="text-sm font-semibold text-gray-900 hover:text-gray-600"
+                      >
+                        {state.commentsCount > 0 ? state.commentsCount : (experience.commentsCount || 0)}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}

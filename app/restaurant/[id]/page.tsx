@@ -77,6 +77,7 @@ export default function RestaurantPage() {
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   
   const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -237,7 +238,7 @@ export default function RestaurantPage() {
   const priceLevelText = restaurant.priceLevel ? '$'.repeat(restaurant.priceLevel) : null;
 
   return (
-    <MainLayout showBottomNav={!showWriteReview}>
+    <MainLayout showBottomNav={!showWriteReview && !sheetOpen}>
       <div className="min-h-screen bg-gray-50 pb-20">
         {/* Header Image */}
         <div className="relative h-64 bg-gray-200">
@@ -447,6 +448,8 @@ export default function RestaurantPage() {
                   showRestaurantInfo={false}
                   onEdit={handleEditReview}
                   onDelete={handleDeleteReview}
+                  onSheetStateChange={setSheetOpen}
+                />
                   onUpdate={fetchRestaurant}
                 />
               ))}

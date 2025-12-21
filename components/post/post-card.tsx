@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
@@ -61,9 +61,10 @@ interface PostCardProps {
   onEdit?: (post: PostCardData) => void;
   onDelete?: (postId: string) => void;
   onUpdate?: () => void;
+  onSheetStateChange?: (isOpen: boolean) => void;
 }
 
-export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, onUpdate }: PostCardProps) {
+export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, onUpdate, onSheetStateChange }: PostCardProps) {
   const { user } = useUser();
   const { showToast } = useToast();
   const [isLiked, setIsLiked] = useState(post.isLiked);
@@ -91,6 +92,13 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
 
   const shouldShowExpand = post.content.length > 200;
   const isOwnPost = user && post.user.id === user.id;
+
+  // Notify parent when sheet state changes
+  useEffect(() => {
+    if (onSheetStateChange) {
+      onSheetStateChange(showComments || showLikes);
+    }
+  }, [showComments, showLikes, onSheetStateChange]);
 
   // Get user profile for optimistic updates
   const [profile, setProfile] = useState<any>(null);

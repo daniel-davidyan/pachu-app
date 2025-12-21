@@ -82,6 +82,7 @@ export default function ProfilePage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -405,7 +406,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <MainLayout showBottomNav={!showEditModal}>
+    <MainLayout showBottomNav={!showEditModal && !sheetOpen}>
       <div className="pb-24 bg-gray-50 min-h-screen">
         {/* Compact Profile Header */}
         <div className="bg-white px-4 py-5">
@@ -668,6 +669,8 @@ export default function ProfilePage() {
                       showRestaurantInfo={true}
                       onEdit={handleEditReview}
                       onDelete={handleDeleteReview}
+                      onSheetStateChange={setSheetOpen}
+                    />
                       onUpdate={() => {
                         fetchReviews();
                         fetchStats();
