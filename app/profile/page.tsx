@@ -670,7 +670,6 @@ export default function ProfilePage() {
                       onEdit={handleEditReview}
                       onDelete={handleDeleteReview}
                       onSheetStateChange={setSheetOpen}
-                    />
                       onUpdate={() => {
                         fetchReviews();
                         fetchStats();
