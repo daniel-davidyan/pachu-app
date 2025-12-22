@@ -254,7 +254,7 @@ export function Mapbox({
     };
   }, []);
 
-  // Lazy load restaurants based on map bounds
+  // Lazy load restaurants based on map bounds (optimized with debouncing)
   const loadRestaurantsInBounds = useCallback(async (bounds: mapboxgl.LngLatBounds) => {
     if (isLoadingMore) return;
     
@@ -264,9 +264,9 @@ export function Mapbox({
     
     // Calculate radius in meters
     const radius = Math.min(
-      10000, // Max 10km (increased from 5km to show more restaurants)
+      5000, // Reduced max from 10km to 5km for faster queries
       Math.max(
-        1000, // Min 1km (increased from 500m)
+        500, // Reduced min from 1km to 500m 
         Math.sqrt(
           Math.pow((ne.lat - sw.lat) * 111000, 2) + 
           Math.pow((ne.lng - sw.lng) * 111000, 2)
@@ -274,8 +274,8 @@ export function Mapbox({
       )
     );
     
-    // Create a unique key for this area
-    const gridSize = 0.02; // ~2km (reduced from 1km to load more frequently)
+    // Create a unique key for this area (larger grid to reduce API calls)
+    const gridSize = 0.05; // Increased from 0.02 (~5km instead of ~2km)
     const gridX = Math.floor(center.lng / gridSize);
     const gridY = Math.floor(center.lat / gridSize);
     const areaKey = `${gridX},${gridY}`;
@@ -640,17 +640,12 @@ export function Mapbox({
           .setLngLat([restaurant.longitude, restaurant.latitude])
           .addTo(currentMap);
         
-        // Ensure marker stays on top
+        // Ensure marker stays on top and show immediately
         if (el.parentElement) {
           el.parentElement.style.zIndex = '1000';
-          // Add class to make marker visible after positioning
-          setTimeout(() => {
-            if (el.parentElement && markerWrapper) {
-              el.parentElement.classList.add('marker-visible');
-              markerWrapper.style.visibility = 'visible';
-              markerWrapper.style.opacity = '1';
-            }
-          }, 150);
+          el.parentElement.classList.add('marker-visible');
+          markerWrapper.style.visibility = 'visible';
+          markerWrapper.style.opacity = '1';
         }
         
         markers.current.push(marker);
@@ -713,17 +708,12 @@ export function Mapbox({
           .setLngLat([restaurant.longitude, restaurant.latitude])
           .addTo(currentMap);
         
-        // Ensure dot marker stays on top too
+        // Ensure dot marker stays on top and show immediately
         if (el.parentElement) {
           el.parentElement.style.zIndex = '999';
-          // Add class to make marker visible after positioning
-          setTimeout(() => {
-            if (el.parentElement && dotContent) {
-              el.parentElement.classList.add('marker-visible');
-              dotContent.style.visibility = 'visible';
-              dotContent.style.opacity = '1';
-            }
-          }, 150);
+          el.parentElement.classList.add('marker-visible');
+          dotContent.style.visibility = 'visible';
+          dotContent.style.opacity = '1';
         }
         
         markers.current.push(marker);

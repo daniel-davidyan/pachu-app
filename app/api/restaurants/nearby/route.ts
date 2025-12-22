@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Cache for Google Places results (5 minute TTL)
+const placesCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const latitude = searchParams.get('latitude');
@@ -29,8 +33,17 @@ export async function GET(request: NextRequest) {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Function to fetch places by type with pagination
+    // Function to fetch places by type with caching and optimized pagination
     const fetchPlacesByType = async (type: string) => {
+      // Create cache key based on location, radius, and type
+      const cacheKey = `${latitude},${longitude},${radius},${type}`;
+      
+      // Check cache
+      const cached = placesCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+      }
+      
       const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&type=${type}&key=${apiKey}`;
       
       const response = await fetch(url);
@@ -43,10 +56,10 @@ export async function GET(request: NextRequest) {
       let allResults = data.results || [];
       let nextPageToken = data.next_page_token;
 
-      // Fetch additional pages if available (max 2 more pages = 60 results total per type)
+      // Only fetch 1 additional page (reduced from 2) and reduce delay to 1s
       let pageCount = 1;
-      while (nextPageToken && pageCount < 3) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      if (nextPageToken && pageCount < 2) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced from 2000ms
         
         const nextUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${nextPageToken}&key=${apiKey}`;
         
@@ -55,18 +68,24 @@ export async function GET(request: NextRequest) {
         
         if (nextData.status === 'OK' && nextData.results) {
           allResults = [...allResults, ...nextData.results];
-          nextPageToken = nextData.next_page_token;
-        } else {
-          break;
         }
         pageCount++;
+      }
+
+      // Cache the results
+      placesCache.set(cacheKey, { data: allResults, timestamp: Date.now() });
+      
+      // Clean up old cache entries (keep cache size manageable)
+      if (placesCache.size > 100) {
+        const oldestKey = Array.from(placesCache.keys())[0];
+        placesCache.delete(oldestKey);
       }
 
       return allResults;
     };
 
-    // Fetch multiple types of food establishments in parallel
-    const types = ['restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery'];
+    // Fetch only essential types for faster response (reduced from 6 to 3)
+    const types = ['restaurant', 'cafe', 'bar'];
     
     const resultsArrays = await Promise.all(
       types.map(type => fetchPlacesByType(type))
