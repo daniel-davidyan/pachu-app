@@ -1,5 +1,7 @@
--- Quick Apply: Copy and paste this entire file into your Supabase SQL Editor
--- This will add all performance indexes to speed up map queries
+-- FIXED Migration: Add Performance Indexes for Map and Restaurant Queries
+-- Created: 2025-12-22
+-- Description: Add database indexes to speed up restaurant and review queries
+-- NOTE: Removed latitude/longitude index as restaurants uses PostGIS geometry
 
 -- Index for google_place_id lookups (used in nearby API)
 CREATE INDEX IF NOT EXISTS idx_restaurants_google_place_id 
@@ -26,10 +28,6 @@ ON follows(following_id, follower_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_user_restaurant 
 ON reviews(user_id, restaurant_id);
 
--- Index for restaurant location-based queries (if we add PostGIS later)
-CREATE INDEX IF NOT EXISTS idx_restaurants_location 
-ON restaurants(latitude, longitude);
-
 -- Index for created_at timestamp queries (for recent reviews)
 CREATE INDEX IF NOT EXISTS idx_reviews_created_at 
 ON reviews(created_at DESC);
@@ -39,8 +37,24 @@ CREATE INDEX IF NOT EXISTS idx_profiles_username
 ON profiles(username);
 
 -- Composite index for reviews with user_id in a list (used in nearby API)
+-- This helps with the IN clause queries
 CREATE INDEX IF NOT EXISTS idx_reviews_restaurant_user 
 ON reviews(restaurant_id, user_id);
+
+-- Index for restaurant location (PostGIS geometry column)
+-- Only create if the location column exists (it's optional)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'restaurants' 
+    AND column_name = 'location'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_restaurants_location 
+    ON restaurants USING GIST(location);
+  END IF;
+END $$;
 
 -- Analyze tables to update statistics for query planner
 ANALYZE restaurants;
@@ -58,4 +72,3 @@ FROM pg_indexes
 WHERE schemaname = 'public'
   AND indexname LIKE 'idx_%'
 ORDER BY tablename, indexname;
-
