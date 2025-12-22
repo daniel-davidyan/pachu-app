@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
@@ -90,6 +90,12 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [mentionSearch, setMentionSearch] = useState('');
   const [availableFriends, setAvailableFriends] = useState<Array<{ id: string; username: string; fullName: string }>>([]);
   const [mentionedUsers, setMentionedUsers] = useState<Array<{ id: string; username: string }>>([]);
+
+  // Generate random food emoji once and keep it stable
+  const randomFoodEmoji = useMemo(() => {
+    const foodEmojis = ['🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛'];
+    return foodEmojis[Math.floor(Math.random() * foodEmojis.length)];
+  }, []);
 
   const shouldShowExpand = post.content.length > 200;
   const isOwnPost = user && post.user.id === user.id;
@@ -665,7 +671,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
         <div className="relative">
           <div className="w-full h-32 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 flex items-center justify-center animate-pulse">
             <span className="text-8xl opacity-20">
-              {['🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛'][Math.floor(Math.random() * 10)]}
+              {randomFoodEmoji}
             </span>
           </div>
         </div>

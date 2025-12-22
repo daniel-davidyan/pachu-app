@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, Send, X, Loader2, UserPlus, UserCheck } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
@@ -52,6 +52,18 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const commentIdCounter = useRef(0);
+  
+  // Helper function to get consistent random emoji based on ID
+  const getFoodEmoji = (id: string) => {
+    const foodEmojis = ['🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛'];
+    // Use simple hash of ID to get consistent index
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = ((hash << 5) - hash) + id.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return foodEmojis[Math.abs(hash) % foodEmojis.length];
+  };
   
   // State for each experience's comments
   const [experienceStates, setExperienceStates] = useState<{
@@ -643,7 +655,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                   <div className="mb-3">
                     <div className="w-full h-28 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 rounded-xl flex items-center justify-center animate-pulse">
                       <span className="text-7xl opacity-20">
-                        {['🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛'][Math.floor(Math.random() * 10)]}
+                        {getFoodEmoji(experience.id)}
                       </span>
                     </div>
                   </div>
