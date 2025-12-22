@@ -54,11 +54,10 @@ export async function GET(request: NextRequest) {
       }
 
       let allResults = data.results || [];
-      let nextPageToken = data.next_page_token;
+      const nextPageToken = data.next_page_token;
 
       // Only fetch 1 additional page (reduced from 2) and reduce delay to 1s
-      let pageCount = 1;
-      if (nextPageToken && pageCount < 2) {
+      if (nextPageToken) {
         await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced from 2000ms
         
         const nextUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${nextPageToken}&key=${apiKey}`;
@@ -69,7 +68,6 @@ export async function GET(request: NextRequest) {
         if (nextData.status === 'OK' && nextData.results) {
           allResults = [...allResults, ...nextData.results];
         }
-        pageCount++;
       }
 
       // Cache the results
