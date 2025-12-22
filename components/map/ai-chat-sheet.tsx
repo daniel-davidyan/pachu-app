@@ -1,13 +1,20 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Sparkles, Loader2, ChevronDown, Plus, Clock, X, Trash2 } from 'lucide-react';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   restaurants?: Array<{ id: string; name: string; }>;
+}
+
+interface ChatConversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  timestamp: number;
 }
 
 interface AIChatSheetProps {
@@ -28,6 +35,8 @@ export interface RestaurantFilters {
   outdoor?: boolean;
 }
 
+const STORAGE_KEY = 'pachu-chat-history';
+
 export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount = 0, userLocation, onChatStateChange }: AIChatSheetProps) {
   const [isActive, setIsActive] = useState(false); // Whether pane is visible
   const [sheetHeight, setSheetHeight] = useState(200); // Height when active
@@ -36,6 +45,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [maxHeight, setMaxHeight] = useState(700);
+  const [showHistory, setShowHistory] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -44,6 +56,45 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   const inputRef = useRef<HTMLInputElement>(null);
 
   const minHeight = 200; // Minimum when pane is visible
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const history = JSON.parse(stored);
+        setChatHistory(history);
+        // Load the most recent chat if exists
+        if (history.length > 0) {
+          const mostRecent = history[0];
+          setCurrentChatId(mostRecent.id);
+          setMessages(mostRecent.messages);
+        }
+      } catch (e) {
+        console.error('Failed to load chat history', e);
+      }
+    }
+  }, []);
+
+  // Save current conversation to history when messages change
+  useEffect(() => {
+    if (messages.length === 0 || !currentChatId) return;
+    
+    const title = generateChatTitle(messages);
+    const conversation: ChatConversation = {
+      id: currentChatId,
+      title,
+      messages,
+      timestamp: Date.now()
+    };
+
+    setChatHistory(prev => {
+      const filtered = prev.filter(c => c.id !== currentChatId);
+      const updated = [conversation, ...filtered].slice(0, 20); // Keep max 20 conversations
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, [messages, currentChatId]);
 
   // Calculate max height on client side only
   useEffect(() => {
@@ -119,6 +170,11 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   const handleActivate = () => {
     setIsActive(true);
     setSheetHeight(200);
+    setShowHistory(false);
+    // Create new chat if none exists
+    if (!currentChatId) {
+      setCurrentChatId(Date.now().toString());
+    }
     // Auto-focus input when pane opens
     setTimeout(() => {
       inputRef.current?.focus();
@@ -141,6 +197,47 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   const handleClose = () => {
     setIsActive(false);
     setInputValue('');
+    setShowHistory(false);
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setCurrentChatId(Date.now().toString());
+    setShowHistory(false);
+    setInputValue('');
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleLoadChat = (conversation: ChatConversation) => {
+    setMessages(conversation.messages);
+    setCurrentChatId(conversation.id);
+    setShowHistory(false);
+    setSheetHeight(500);
+  };
+
+  const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = chatHistory.filter(c => c.id !== chatId);
+    setChatHistory(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    
+    // If deleting current chat, start new one
+    if (chatId === currentChatId) {
+      handleNewChat();
+    }
+  };
+
+  const generateChatTitle = (messages: Message[]): string => {
+    // Find first user message
+    const firstUserMsg = messages.find(m => m.role === 'user');
+    if (firstUserMsg) {
+      // Truncate to first 40 characters
+      const content = firstUserMsg.content.trim();
+      return content.length > 40 ? content.substring(0, 40) + '...' : content;
+    }
+    return 'New conversation';
   };
 
   const handleSend = async () => {
@@ -216,7 +313,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
     }
   };
 
-  // If not active, show only floating search bar
+  // If not active, show only floating search bar (positioned above nav-bar)
   if (!isActive) {
     return (
       <div 
@@ -265,13 +362,13 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
     );
   }
 
-  // Active pane with conversation
+  // Active pane with conversation - extends to bottom with padding
   return (
     <div
       ref={sheetRef}
       className="fixed z-40 bg-gradient-to-b from-gray-50 to-white rounded-2xl shadow-2xl border border-gray-200 transition-all duration-200 ease-out overflow-hidden"
       style={{ 
-        bottom: 'calc(4.5rem + env(safe-area-inset-bottom))',
+        bottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
         left: 'max(0.75rem, env(safe-area-inset-left))',
         right: 'max(0.75rem, env(safe-area-inset-right))',
         height: sheetHeight,
@@ -290,10 +387,78 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
       {/* Content */}
       <div className="flex flex-col h-[calc(100%-24px)] px-4 pb-3">
         
-        {/* Expanded State */}
-        {(
+        {/* History View */}
+        {showHistory ? (
           <>
-            {/* Header */}
+            {/* History Header */}
+            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
+                  <Clock className="w-4.5 h-4.5 text-white" strokeWidth={2} />
+                </div>
+                <h2 className="font-bold text-gray-900 text-sm">Chat History</h2>
+              </div>
+              <button
+                onClick={() => setShowHistory(false)}
+                className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="w-4.5 h-4.5 text-gray-600" strokeWidth={2.5} />
+              </button>
+            </div>
+
+            {/* History List */}
+            <div className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-gray-300">
+              {chatHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <Clock className="w-12 h-12 text-gray-300 mx-auto mb-2" strokeWidth={1.5} />
+                  <p className="text-sm text-gray-500">No chat history yet</p>
+                </div>
+              ) : (
+                chatHistory.map((chat) => (
+                  <div
+                    key={chat.id}
+                    onClick={() => handleLoadChat(chat)}
+                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer group ${
+                      chat.id === currentChatId
+                        ? 'bg-primary/5 border-primary shadow-sm'
+                        : 'bg-white border-gray-200 hover:border-primary/50 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm text-gray-900 truncate mb-1">
+                          {chat.title}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {new Date(chat.timestamp).toLocaleDateString()} • {chat.messages.length} messages
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteChat(chat.id, e)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 rounded-full"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* New Chat Button */}
+            <div className="mt-3 flex-shrink-0">
+              <button
+                onClick={handleNewChat}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-primary/80 text-white rounded-full font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" strokeWidth={2.5} />
+                Start New Chat
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Chat Header */}
             <div className="flex items-center justify-between mb-3 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
@@ -306,12 +471,34 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
                   )}
                 </div>
               </div>
-              <button
-                onClick={handleClose}
-                className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <ChevronDown className="w-4 h-4 text-gray-600" />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* New Chat Button */}
+                <button
+                  onClick={handleNewChat}
+                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                  title="New Chat"
+                >
+                  <Plus className="w-4.5 h-4.5 text-gray-600" strokeWidth={2.5} />
+                </button>
+                {/* History Button */}
+                <button
+                  onClick={() => {
+                    setShowHistory(true);
+                    setSheetHeight(500);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                  title="Chat History"
+                >
+                  <Clock className="w-4.5 h-4.5 text-gray-600" strokeWidth={2} />
+                </button>
+                {/* Close Button */}
+                <button
+                  onClick={handleClose}
+                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <ChevronDown className="w-4.5 h-4.5 text-gray-600" strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
 
             {/* Messages */}

@@ -354,7 +354,7 @@ export default function MapPage() {
         style={{
           right: 'max(1rem, env(safe-area-inset-right))',
           bottom: chatActive 
-            ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
+            ? `calc(${chatHeight + 28}px + env(safe-area-inset-bottom))` 
             : 'calc(8.25rem + env(safe-area-inset-bottom))',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
         }}
@@ -374,7 +374,7 @@ export default function MapPage() {
           style={{
             left: 'max(1rem, env(safe-area-inset-left))',
             bottom: chatActive 
-              ? `calc(${chatHeight + 88}px + env(safe-area-inset-bottom))` 
+              ? `calc(${chatHeight + 28}px + env(safe-area-inset-bottom))` 
               : 'calc(8.75rem + env(safe-area-inset-bottom))',
             transition: 'bottom 0.3s ease'
           }}
@@ -491,7 +491,7 @@ export default function MapPage() {
         onReviewModalChange={setIsReviewModalOpen}
       />
 
-      {/* Bottom Navigation - Hide when chat is active */}
+      {/* Bottom Navigation - Hide when chat is active or review modal is open */}
       <BottomNav show={!isReviewModalOpen && !chatActive} />
     </div>
   );
