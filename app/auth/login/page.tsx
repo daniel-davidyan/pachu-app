@@ -24,7 +24,13 @@ export default function LoginPage() {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's an email not confirmed error
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please verify your email address. Check your inbox for the confirmation link.');
+        }
+        throw error;
+      }
       
       router.push('/feed');
       router.refresh();

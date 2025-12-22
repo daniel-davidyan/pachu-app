@@ -24,10 +24,11 @@ export default function SignUpPage() {
     setSuccess(false);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
             username: username,
@@ -37,12 +38,19 @@ export default function SignUpPage() {
 
       if (error) throw error;
       
-      setSuccess(true);
-      // Redirect to feed after successful signup
-      setTimeout(() => {
-        router.push('/feed');
-        router.refresh();
-      }, 2000);
+      // Check if email confirmation is required
+      if (data?.user && !data.session) {
+        // Email confirmation required
+        setSuccess(true);
+        setError('');
+      } else if (data?.session) {
+        // No email confirmation needed (auto-confirm is enabled)
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/feed');
+          router.refresh();
+        }, 1500);
+      }
     } catch (error: any) {
       setError(error.message || 'An error occurred');
     } finally {
@@ -88,7 +96,8 @@ export default function SignUpPage() {
         {/* Success Message */}
         {success && (
           <div className="mb-3 p-3 bg-white border border-green-200 text-green-600 rounded-lg text-sm">
-            ✅ Account created successfully! Redirecting...
+            <div className="font-semibold mb-1">✅ Account created successfully!</div>
+            <div className="text-xs">Please check your email to confirm your account. Click the link in the email to complete registration.</div>
           </div>
         )}
 
