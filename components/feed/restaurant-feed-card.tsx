@@ -6,6 +6,7 @@ import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
+import { useUser } from '@/hooks/use-user';
 
 interface MutualFriend {
   id: string;
@@ -49,6 +50,7 @@ interface RestaurantFeedCardProps {
 }
 
 export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedCardProps) {
+  const { user } = useUser();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
@@ -268,7 +270,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
             <div className="flex items-center gap-2 mb-4">
               <div className="flex -space-x-2">
                 {restaurant.mutualFriends.slice(0, 3).map((friend, index) => (
-                  <Link key={friend.id} href={`/profile/${friend.id}`}>
+                  <Link key={friend.id} href={user && friend.id === user.id ? '/profile' : `/profile/${friend.id}`}>
                     {friend.avatarUrl ? (
                       <img
                         src={friend.avatarUrl}
@@ -312,7 +314,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                     >
                       {/* Reviewer Info */}
                       {userIsReal ? (
-                        <Link href={`/profile/${review.user.id}`}>
+                        <Link href={user && review.user.id === user.id ? '/profile' : `/profile/${review.user.id}`}>
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               {review.user.avatarUrl ? (

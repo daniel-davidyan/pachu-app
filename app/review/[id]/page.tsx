@@ -10,6 +10,7 @@ import {
 import { ModernRating, CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
+import { useUser } from '@/hooks/use-user';
 
 interface Review {
   id: string;
@@ -58,6 +59,7 @@ interface RecentReview {
 export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useUser();
   const [review, setReview] = useState<Review | null>(null);
   const [mutualFriends, setMutualFriends] = useState<MutualFriend[]>([]);
   const [recentReviews, setRecentReviews] = useState<RecentReview[]>([]);
@@ -327,7 +329,7 @@ export default function ReviewPage() {
         {/* Reviewer Info */}
         <div className="bg-white p-4 border-b border-gray-200">
           <h3 className="text-sm font-semibold text-gray-500 mb-3">REVIEWED BY</h3>
-          <Link href={`/profile/${review.user.id}`}>
+          <Link href={user && review.user.id === user.id ? '/profile' : `/profile/${review.user.id}`}>
             <div className="flex items-center gap-3 mb-3">
               {review.user.avatarUrl ? (
                 <img

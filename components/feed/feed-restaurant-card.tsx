@@ -580,7 +580,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
               >
                 {/* User Info */}
                 <Link
-                  href={`/profile/${experience.user.id}`}
+                  href={user && experience.user.id === user.id ? '/profile' : `/profile/${experience.user.id}`}
                   className="flex items-center gap-2 mb-3"
                 >
                   {experience.user.avatarUrl ? (
@@ -728,7 +728,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                   ) : (
                     state.comments.map((comment: any) => (
                       <div key={comment.id} className="flex gap-3">
-                        <Link href={`/profile/${comment.user.id}`}>
+                        <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`}>
                           {comment.user.avatar_url ? (
                             <img
                               src={comment.user.avatar_url}
@@ -744,7 +744,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                           )}
                         </Link>
                         <div className="flex-1 min-w-0">
-                          <Link href={`/profile/${comment.user.id}`}>
+                          <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`}>
                             <p className="font-semibold text-sm text-gray-900">
                               {comment.user.username}
                             </p>
@@ -755,7 +755,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                               {comment.mentions.map((mentioned: any) => (
                                 <Link
                                   key={mentioned.id}
-                                  href={`/profile/${mentioned.id}`}
+                                  href={user && mentioned.id === user.id ? '/profile' : `/profile/${mentioned.id}`}
                                   className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full hover:bg-primary/20"
                                 >
                                   @{mentioned.username}
@@ -882,7 +882,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                   <div className="space-y-3">
                     {state.likesUsers.map((likeUser: any) => (
                       <div key={likeUser.id} className="flex items-center gap-3">
-                        <Link href={`/profile/${likeUser.id}`} className="flex items-center gap-3 flex-1">
+                        <Link href={user && likeUser.id === user.id ? '/profile' : `/profile/${likeUser.id}`} className="flex items-center gap-3 flex-1">
                           {likeUser.avatar_url ? (
                             <img
                               src={likeUser.avatar_url}

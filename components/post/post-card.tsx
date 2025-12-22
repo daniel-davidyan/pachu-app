@@ -519,7 +519,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
           </Link>
         ) : (
           // Show user info
-          <Link href={`/profile/${post.user.id}`}>
+          <Link href={isOwnPost ? '/profile' : `/profile/${post.user.id}`}>
             <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors mb-3">
               {post.user.avatarUrl ? (
                 <img
@@ -722,7 +722,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
           <div className="space-y-0 -mx-4">
             {likesUsers.map((likeUser) => (
               <div key={likeUser.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
-                <Link href={`/profile/${likeUser.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                <Link href={likeUser.isCurrentUser ? '/profile' : `/profile/${likeUser.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                   {likeUser.avatarUrl ? (
                     <img
                       src={likeUser.avatarUrl}
@@ -782,7 +782,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
               <div className="space-y-4 mb-4">
                 {comments.map((comment) => (
                   <div key={comment.id} className="flex gap-3">
-                    <Link href={`/profile/${comment.user.id}`} className="flex-shrink-0">
+                    <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`} className="flex-shrink-0">
                       {comment.user.avatarUrl ? (
                         <img
                           src={comment.user.avatarUrl}
@@ -801,7 +801,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
-                          <Link href={`/profile/${comment.user.id}`}>
+                          <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`}>
                             <span className="font-semibold text-sm text-gray-900 hover:text-gray-600">
                               {comment.user.username}
                             </span>
