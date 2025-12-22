@@ -616,8 +616,8 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                   </p>
                 )}
 
-                {/* Photos Carousel */}
-                {experience.photos && experience.photos.length > 0 && (
+                {/* Photos Carousel OR Placeholder Shimmer */}
+                {experience.photos && experience.photos.length > 0 ? (
                   <div className="mb-3">
                     {experience.photos.length === 1 ? (
                       <img
@@ -638,9 +638,18 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                       </div>
                     )}
                   </div>
+                ) : (
+                  /* Single placeholder shimmer for experiences without photos */
+                  <div className="mb-3">
+                    <div className="w-full h-28 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 rounded-xl flex items-center justify-center animate-pulse">
+                      <span className="text-7xl opacity-20">
+                        {['🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛'][Math.floor(Math.random() * 10)]}
+                      </span>
+                    </div>
+                  </div>
                 )}
 
-                {/* Instagram-style Like/Comment Bar */}
+                {/* Instagram-style Like/Comment Bar - Always at Bottom */}
                 {showInteractions && (
                   <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
                     {/* Like */}

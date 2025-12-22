@@ -72,11 +72,11 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
         };
 
         return (
-          <div key={review.id} className="bg-white">
+          <div key={review.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Restaurant Header - Clickable */}
             <Link 
               href={`/restaurant/${restaurant.googlePlaceId || restaurant.id}`}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0">
                 {restaurant.imageUrl ? (
@@ -102,11 +102,12 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
               </div>
             </Link>
 
-            {/* Post Content using PostCard */}
+            {/* Post Content - Inline rendering without PostCard wrapper */}
             <PostCard
               post={postData}
               showRestaurantInfo={false}
               onUpdate={onUpdate}
+              embedded={true}
             />
           </div>
         );

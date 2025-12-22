@@ -62,9 +62,10 @@ interface PostCardProps {
   onDelete?: (postId: string) => void;
   onUpdate?: () => void;
   onSheetStateChange?: (isOpen: boolean) => void;
+  embedded?: boolean;
 }
 
-export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, onUpdate, onSheetStateChange }: PostCardProps) {
+export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, onUpdate, onSheetStateChange, embedded = false }: PostCardProps) {
   const { user } = useUser();
   const { showToast } = useToast();
   const [isLiked, setIsLiked] = useState(post.isLiked);
@@ -434,7 +435,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+    <div className={embedded ? "" : "bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"}>
       {/* Content at Top */}
       <div className="p-4">
         {/* User/Restaurant Info with Rating on Right */}
@@ -633,8 +634,8 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
         )}
       </div>
 
-      {/* Photos - Carousel with 20% peek */}
-      {post.photos && post.photos.length > 0 && (
+      {/* Photos - Carousel with 20% peek OR Placeholder Shimmer */}
+      {post.photos && post.photos.length > 0 ? (
         <div className="relative">
           {post.photos.length === 1 ? (
             <img
@@ -659,9 +660,18 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
             </div>
           )}
         </div>
+      ) : (
+        /* Single placeholder shimmer for posts without photos */
+        <div className="relative">
+          <div className="w-full h-32 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 flex items-center justify-center animate-pulse">
+            <span className="text-8xl opacity-20">
+              {['🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛'][Math.floor(Math.random() * 10)]}
+            </span>
+          </div>
+        </div>
       )}
 
-      {/* Interaction Bar - Instagram Style */}
+      {/* Interaction Bar - Instagram Style - Always at Bottom */}
       <div className="px-4 py-2.5 border-t border-gray-50">
         <div className="flex items-center gap-4">
           {/* Like Button + Count */}
