@@ -169,7 +169,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
 
   const handleActivate = () => {
     setIsActive(true);
-    setSheetHeight(200);
+    // Set height to 50% of screen height on first open
+    const halfScreenHeight = window.innerHeight * 0.5;
+    setSheetHeight(Math.min(halfScreenHeight, maxHeight));
     setShowHistory(false);
     // Create new chat if none exists
     if (!currentChatId) {
