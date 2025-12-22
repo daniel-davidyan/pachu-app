@@ -86,7 +86,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   // Handle photo selection
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length + photos.length > 5) {
+    // Check total photos (existing + new)
+    if (files.length + photoUrls.length > 5) {
       showToast('Maximum 5 photos allowed', 'error');
       return;
     }
@@ -128,16 +129,16 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       
       // First, add existing photos that haven't been removed
       // Existing photos are regular URLs (not blob URLs)
-      const existingPhotoCount = existingReview?.photos?.length || 0;
       for (let i = 0; i < photoUrls.length; i++) {
         const url = photoUrls[i];
         if (!url.startsWith('blob:')) {
-          // This is an existing photo URL
+          // This is an existing photo URL (from the database)
           finalPhotoUrls.push(url);
         }
       }
       
-      // Then upload new photos (these are blob URLs)
+      // Then upload only the new photos (files in photos array)
+      // These correspond to blob URLs in photoUrls but we upload the actual files
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         const fileExt = photo.name.split('.').pop() || 'jpg';
@@ -391,7 +392,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                     </div>
                   ))}
                   
-                  {photos.length < 5 && (
+                  {photoUrls.length < 5 && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
