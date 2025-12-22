@@ -54,11 +54,13 @@ export async function GET(request: NextRequest) {
       }
 
       let allResults = data.results || [];
-      const nextPageToken = data.next_page_token;
+      let nextPageToken = data.next_page_token;
 
-      // Only fetch 1 additional page (reduced from 2) and reduce delay to 1s
-      if (nextPageToken) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced from 2000ms
+      // Fetch additional pages (up to 2 more pages = 60 results total per type)
+      // Reduced delay to minimum required by Google (was 2000ms, now 1200ms)
+      let pageCount = 1;
+      while (nextPageToken && pageCount < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1200)); // Optimized from 2000ms
         
         const nextUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${nextPageToken}&key=${apiKey}`;
         
@@ -67,7 +69,11 @@ export async function GET(request: NextRequest) {
         
         if (nextData.status === 'OK' && nextData.results) {
           allResults = [...allResults, ...nextData.results];
+          nextPageToken = nextData.next_page_token;
+        } else {
+          break;
         }
+        pageCount++;
       }
 
       // Cache the results
@@ -82,8 +88,8 @@ export async function GET(request: NextRequest) {
       return allResults;
     };
 
-    // Fetch only essential types for faster response (reduced from 6 to 3)
-    const types = ['restaurant', 'cafe', 'bar'];
+    // Fetch all types of food establishments in parallel for maximum coverage
+    const types = ['restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery'];
     
     const resultsArrays = await Promise.all(
       types.map(type => fetchPlacesByType(type))

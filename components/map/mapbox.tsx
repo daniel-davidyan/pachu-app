@@ -254,7 +254,7 @@ export function Mapbox({
     };
   }, []);
 
-  // Lazy load restaurants based on map bounds (optimized with debouncing)
+  // Lazy load restaurants based on map bounds (optimized with caching and faster delays)
   const loadRestaurantsInBounds = useCallback(async (bounds: mapboxgl.LngLatBounds) => {
     if (isLoadingMore) return;
     
@@ -262,11 +262,11 @@ export function Mapbox({
     const ne = bounds.getNorthEast();
     const sw = bounds.getSouthWest();
     
-    // Calculate radius in meters
+    // Calculate radius in meters - balanced for good coverage
     const radius = Math.min(
-      5000, // Reduced max from 10km to 5km for faster queries
+      10000, // Max 10km for wide area coverage
       Math.max(
-        500, // Reduced min from 1km to 500m 
+        1000, // Min 1km
         Math.sqrt(
           Math.pow((ne.lat - sw.lat) * 111000, 2) + 
           Math.pow((ne.lng - sw.lng) * 111000, 2)
@@ -274,8 +274,8 @@ export function Mapbox({
       )
     );
     
-    // Create a unique key for this area (larger grid to reduce API calls)
-    const gridSize = 0.05; // Increased from 0.02 (~5km instead of ~2km)
+    // Create a unique key for this area - balanced grid size
+    const gridSize = 0.03; // ~3km - balanced between coverage and API calls
     const gridX = Math.floor(center.lng / gridSize);
     const gridY = Math.floor(center.lat / gridSize);
     const areaKey = `${gridX},${gridY}`;
