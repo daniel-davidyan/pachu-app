@@ -150,7 +150,6 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   if (!restaurant) return null;
 
   const isFriendOrOwn = restaurant.source === 'friends' || restaurant.source === 'own';
-  const priceSymbols = restaurant.priceLevel ? '₪'.repeat(restaurant.priceLevel) : '';
 
   const getIcon = (r: Restaurant) => {
     const cuisines = r.cuisineTypes || [];
@@ -300,10 +299,6 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                       <span className="text-[9px] text-gray-500 font-medium">match</span>
                     </div>
                   </div>
-                  <span className="text-xs text-gray-400">({restaurant.totalReviews})</span>
-                  {priceSymbols && (
-                    <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">{priceSymbols}</span>
-                  )}
                 </div>
 
                 {/* Address */}

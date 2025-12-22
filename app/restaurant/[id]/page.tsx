@@ -235,8 +235,6 @@ export default function RestaurantPage() {
     );
   }
 
-  const priceLevelText = restaurant.priceLevel ? '$'.repeat(restaurant.priceLevel) : null;
-
   return (
     <MainLayout showBottomNav={!showWriteReview && !sheetOpen}>
       <div className="min-h-screen bg-gray-50 pb-20">
@@ -310,12 +308,6 @@ export default function RestaurantPage() {
             <span className="text-sm text-gray-500">
               {restaurant.totalReviews} {restaurant.totalReviews === 1 ? 'experience' : 'experiences'}
             </span>
-            {priceLevelText && (
-              <>
-                <span className="text-gray-300">•</span>
-                <span className="text-sm font-semibold text-gray-600">{priceLevelText}</span>
-              </>
-            )}
           </div>
 
           {/* Cuisine Types */}
