@@ -17,6 +17,7 @@ export interface Restaurant {
   source: 'google' | 'friends' | 'own';
   googlePlaceId?: string;
   matchPercentage?: number;
+  website?: string;
 }
 
 interface MapboxProps {

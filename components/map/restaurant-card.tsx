@@ -27,11 +27,18 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [loadingWishlist, setLoadingWishlist] = useState(false);
   const [friendsWhoVisited, setFriendsWhoVisited] = useState<Friend[]>([]);
+  const [loadingWebsite, setLoadingWebsite] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState<string | undefined>(restaurant?.website);
 
   // Notify parent when review modal opens/closes
   useEffect(() => {
     onReviewModalChange?.(showWriteReview);
   }, [showWriteReview, onReviewModalChange]);
+
+  // Update website URL when restaurant changes
+  useEffect(() => {
+    setWebsiteUrl(restaurant?.website);
+  }, [restaurant]);
 
   const handleWishlist = async () => {
     if (loadingWishlist) return;
@@ -228,6 +235,36 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
     router.push(`/restaurant/${placeId}`);
   };
 
+  const handleWebsite = async () => {
+    if (loadingWebsite) return;
+
+    // If we already have the website URL, open it
+    if (websiteUrl) {
+      window.open(websiteUrl, '_blank');
+      return;
+    }
+
+    // Otherwise, fetch it from the details API
+    setLoadingWebsite(true);
+    try {
+      const placeId = restaurant?.googlePlaceId || restaurant?.id;
+      const response = await fetch(`/api/restaurants/details?placeId=${placeId}`);
+      const data = await response.json();
+      
+      if (data.website) {
+        setWebsiteUrl(data.website);
+        window.open(data.website, '_blank');
+      } else {
+        // No website available - could show a toast or message
+        console.log('No website available for this restaurant');
+      }
+    } catch (error) {
+      console.error('Error fetching website:', error);
+    } finally {
+      setLoadingWebsite(false);
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -412,8 +449,16 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                   <Heart className={`w-5 h-5 transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
                 )}
               </button>
-              <button className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors active:scale-95">
-                <Globe className="w-5 h-5 text-gray-600" />
+              <button 
+                onClick={handleWebsite}
+                disabled={loadingWebsite}
+                className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors active:scale-95 disabled:opacity-50"
+              >
+                {loadingWebsite ? (
+                  <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+                ) : (
+                  <Globe className="w-5 h-5 text-gray-600" />
+                )}
               </button>
             </div>
           </div>
