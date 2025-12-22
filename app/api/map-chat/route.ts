@@ -29,9 +29,6 @@ export async function POST(request: NextRequest) {
     const questionCount = assistantMessages.length;
     const userResponseCount = userMessages.length;
     
-    // Ready to show restaurants after 1-3 questions (when user has answered 1-3 times)
-    const shouldSuggestRestaurants = userResponseCount >= 1 && questionCount >= 1 && questionCount <= 3;
-
     // System prompt for conversational restaurant finding
     const systemPrompt = `You are Pachu, a friendly and intelligent AI restaurant finder. Your goal is to understand the user's dining preferences through 1-3 natural questions, then recommend exactly 3 perfect restaurants.
 
@@ -39,17 +36,19 @@ export async function POST(request: NextRequest) {
 **Ask between 1-3 questions based on what you learn:**
 
 1️⃣ **First question**: Ask about their mood/craving (cuisine type, specific dish, or dining atmosphere)
-2️⃣ **Second question** (optional): If needed, ask about budget OR special preferences (romantic, group, outdoor, quick bite, etc.)
-3️⃣ **Third question** (optional): If needed, clarify any remaining preferences
+2️⃣ **After first answer**: If the user gave you enough details, set readyToShow to true! Otherwise ask about budget OR special preferences
+3️⃣ **After second answer**: You MUST set readyToShow to true now!
 
 **Important**: 
-- You can recommend restaurants after just 1 question if the user provides enough detail!
-- Maximum 3 questions - then you MUST recommend restaurants
+- You can recommend restaurants after just 1 answer if the user provides enough detail!
+- Maximum 2 questions - after the user's second answer, you MUST set readyToShow to true
 - Each question should be short, friendly, and conversational (1-2 sentences max)
 - Use natural language and emojis 🍽️ 💰 ❤️ 🌮
-- After enough info, say something like "Perfect! I found 3 great spots for you! 🎉"
 
-## Current stage: ${questionCount === 0 ? 'Start - First question' : questionCount === 1 ? userResponseCount >= 1 ? 'Can ask second question OR recommend' : 'First question asked' : questionCount === 2 ? 'Can ask third question OR recommend' : 'MUST recommend now'}
+## Current conversation state:
+- Questions asked: ${questionCount}
+- User responses: ${userResponseCount}
+- Status: ${userResponseCount === 0 ? 'Ask first question' : userResponseCount === 1 ? 'User answered once - decide if you need more info or recommend' : 'User answered twice - MUST recommend now!'}
 
 ## Extract Information:
 After each response, include this JSON block (user won't see it):
@@ -58,9 +57,13 @@ After each response, include this JSON block (user won't see it):
   "cuisineTypes": [],
   "priceLevel": null,
   "specialPreferences": [],
-  "readyToShow": ${shouldSuggestRestaurants}
+  "readyToShow": false
 }
 </data>
+
+**Set readyToShow to true when:**
+- User has answered at least once AND you have enough info to make recommendations
+- User has answered twice (MANDATORY)
 
 **Extraction examples:**
 - "italian", "pizza", "pasta" → cuisineTypes: ["italian"]
@@ -100,8 +103,8 @@ After each response, include this JSON block (user won't see it):
       }
     }
 
-    // Force readyToShow after 3 user responses
-    if (userResponseCount >= 3) {
+    // Force readyToShow after 2 user responses
+    if (userResponseCount >= 2) {
       extractedData.readyToShow = true;
     }
 
