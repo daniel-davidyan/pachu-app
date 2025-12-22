@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
   ArrowLeft, Heart, MapPin, Phone, Globe, DollarSign, 
-  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star, Edit2, Trash2, MoreVertical
+  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star, Edit2, Trash2, MoreVertical, Utensils
 } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -239,7 +239,7 @@ export default function RestaurantPage() {
     <MainLayout showBottomNav={!showWriteReview && !sheetOpen}>
       <div className="min-h-screen bg-gray-50 pb-20">
         {/* Header Image */}
-        <div className="relative h-64 bg-gray-200">
+        <div className="relative h-72 bg-gray-200">
           {restaurant.imageUrl ? (
             <img 
               src={restaurant.imageUrl} 
@@ -255,19 +255,27 @@ export default function RestaurantPage() {
           {/* Back Button */}
           <button
             onClick={() => router.back()}
-            className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center"
+            className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center z-20"
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
 
           {/* Action Buttons */}
-          <div className="absolute top-4 right-4 flex gap-2">
+          <div className="absolute top-4 right-4 flex gap-2 z-20">
+            {restaurant.website && (
+              <button
+                onClick={() => window.open(restaurant.website, '_blank')}
+                className="w-12 h-12 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center"
+              >
+                <Globe className="w-5 h-5 text-gray-700" />
+              </button>
+            )}
             <button
               onClick={handleWishlist}
               disabled={loadingWishlist}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg disabled:opacity-50 ${
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg disabled:opacity-50 ${
                 isWishlisted
-                  ? 'bg-red-50 backdrop-blur-sm'
+                  ? 'bg-white backdrop-blur-sm'
                   : 'bg-white/95 backdrop-blur-sm'
               }`}
             >
@@ -277,7 +285,7 @@ export default function RestaurantPage() {
                 <Heart
                   className={`w-5 h-5 ${
                     isWishlisted
-                      ? 'fill-red-500 text-red-500'
+                      ? 'fill-primary text-primary'
                     : 'text-gray-700'
                   }`}
                 />
@@ -285,138 +293,89 @@ export default function RestaurantPage() {
             </button>
             <button
               onClick={handleShare}
-              className="w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center"
+              className="w-12 h-12 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center"
             >
               <Share2 className="w-5 h-5 text-gray-700" />
             </button>
           </div>
         </div>
 
-        {/* Restaurant Info */}
-        <div className="bg-white px-4 py-5 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{restaurant.name}</h1>
-          
-          {/* Match Percentage */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
-                <span className="text-sm font-bold text-gray-900">{Math.round((restaurant.averageRating / 5) * 100)}%</span>
-                <span className="text-[10px] text-gray-500 font-medium">match</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Cuisine Types */}
-          {restaurant.cuisineTypes.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {restaurant.cuisineTypes.map((cuisine, index) => (
-                <span 
-                  key={index}
-                  className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full"
-                >
-                  {cuisine}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Description */}
-          {restaurant.description && (
-            <p className="text-gray-600 text-sm leading-relaxed mb-4">
-              {restaurant.description}
-            </p>
-          )}
-
-          {/* Friends Who Reviewed */}
-          {friendsWhoReviewed.length > 0 && (
-            <div className="bg-primary/5 rounded-xl p-3 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-2">
-                  {friendsWhoReviewed.slice(0, 3).map((friend) => (
-                    friend.avatarUrl ? (
-                      <img
-                        key={friend.id}
-                        src={friend.avatarUrl}
-                        alt={friend.fullName}
-                        className="w-7 h-7 rounded-full border-2 border-white object-cover"
-                      />
-                    ) : (
-                      <div
-                        key={friend.id}
-                        className="w-7 h-7 rounded-full border-2 border-white bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center"
-                      >
-                        <span className="text-xs font-bold text-white">
-                          {friend.fullName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )
-                  ))}
+        {/* Floating Restaurant Info Card - overlaps image by ~15% */}
+        <div className="relative -mt-10 px-4 z-10">
+          <div className="bg-white rounded-3xl shadow-xl p-5 relative">
+            {/* Restaurant Story Icon with Instagram-like ring */}
+            <div className="absolute -top-5 right-5 p-[3px] rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 shadow-lg">
+              <div className="bg-white p-[2.5px] rounded-full">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+                  <Utensils className="w-6 h-6 text-slate-600" />
                 </div>
-                <p className="text-xs text-gray-700">
-                  <span className="font-semibold">{friendsWhoReviewed[0].fullName}</span>
-                  {friendsWhoReviewed.length > 1 && (
-                    <> and {friendsWhoReviewed.length - 1} other friend{friendsWhoReviewed.length > 2 ? 's' : ''}</>
-                  )                  }
-                  {' '}experienced this place
-                </p>
               </div>
             </div>
-          )}
 
-          {/* Contact Info */}
-          <div className="space-y-2">
+            {/* Restaurant Name */}
+            <h1 className="text-2xl font-bold text-gray-900 mb-3 pr-16">{restaurant.name}</h1>
+            
+            {/* Cuisine Type Badge */}
+            {restaurant.cuisineTypes.length > 0 && (
+              <div className="mb-3">
+                <span className="inline-block px-3 py-1.5 bg-primary/10 text-primary text-xs font-semibold rounded-full border border-primary/20">
+                  {restaurant.cuisineTypes[0]}
+                </span>
+              </div>
+            )}
+            
+            {/* Match Percentage */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-green-50 border border-green-200 rounded-full px-3 py-1.5">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-bold text-gray-900">{Math.round((restaurant.averageRating / 5) * 100)}% Match</span>
+                </div>
+              </div>
+              <span className="text-xs text-gray-500">Based on your taste profile</span>
+            </div>
+
+            {/* Address */}
             {restaurant.address && (
-              <div className="flex items-start gap-3 text-sm">
+              <div className="flex items-start gap-2 text-sm mb-4">
                 <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-600">{restaurant.address}</span>
               </div>
             )}
+
+            {/* Phone */}
             {restaurant.phone && (
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2 text-sm mb-5">
                 <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <a href={`tel:${restaurant.phone}`} className="text-primary hover:underline">
+                <a href={`tel:${restaurant.phone}`} className="text-primary hover:underline font-medium">
                   {restaurant.phone}
                 </a>
               </div>
             )}
-            {restaurant.website && (
-              <div className="flex items-center gap-3 text-sm">
-                <Globe className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <a 
-                  href={restaurant.website} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline truncate"
-                >
-                  Website
-                </a>
-              </div>
-            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowWriteReview(true)}
+                className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-primary text-white active:scale-95 transition-all shadow-md"
+              >
+                <PenLine className="w-4 h-4 inline-block mr-2 -mt-0.5" />
+                Share experience
+              </button>
+              <button
+                onClick={openInMaps}
+                className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-gray-100 text-gray-900 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <Navigation className="w-4 h-4" />
+                Directions
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="bg-white px-4 py-4 border-b border-gray-200 flex gap-3">
-          <button
-            onClick={() => setShowWriteReview(true)}
-            className="flex-1 py-3 rounded-xl font-semibold text-sm bg-primary text-white active:scale-95 transition-all"
-          >
-            <PenLine className="w-4 h-4 inline-block mr-2 -mt-0.5" />
-            Share Experience
-          </button>
-          <button
-            onClick={openInMaps}
-            className="flex-1 py-3 rounded-xl font-semibold text-sm bg-gray-100 text-gray-700 active:scale-95 transition-all"
-          >
-            <Navigation className="w-4 h-4 inline-block mr-2 -mt-0.5" />
-            Directions
-          </button>
-        </div>
-
         {/* Experiences Section */}
-        <div className="px-4 py-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">
+        <div className="px-4 py-2 mt-4">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">
             Experiences ({reviews.length})
           </h2>
 
