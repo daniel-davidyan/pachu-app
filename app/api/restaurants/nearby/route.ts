@@ -96,10 +96,45 @@ export async function GET(request: NextRequest) {
     );
 
     // Merge all results and deduplicate by place_id
+    // Also filter out non-food establishments
+    const excludedTypes = [
+      'lodging', 
+      'hotel', 
+      'motel', 
+      'campground', 
+      'rv_park',
+      'moving_company',
+      'parking',
+      'car_rental',
+      'car_repair',
+      'car_dealer',
+      'car_wash',
+      'gas_station',
+      'travel_agency',
+      'tourist_attraction',
+      'museum',
+      'art_gallery',
+      'spa',
+      'hair_care',
+      'beauty_salon',
+      'gym',
+      'store',
+      'shopping_mall',
+      'department_store',
+      'supermarket',
+      'convenience_store'
+    ];
+    
     const allResultsMap = new Map();
     resultsArrays.forEach(results => {
       results.forEach((place: any) => {
-        if (!allResultsMap.has(place.place_id)) {
+        // Check if place has any excluded types
+        const hasExcludedType = place.types?.some((type: string) => 
+          excludedTypes.includes(type)
+        );
+        
+        // Only add if it doesn't have excluded types and not already in map
+        if (!hasExcludedType && !allResultsMap.has(place.place_id)) {
           allResultsMap.set(place.place_id, place);
         }
       });
