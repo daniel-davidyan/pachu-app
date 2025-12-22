@@ -143,7 +143,7 @@ After each response, include this JSON block (user won't see it):
         const allRestaurants = nearbyData.restaurants || [];
         
         // Filter and score restaurants based on preferences
-        let scoredRestaurants = allRestaurants.map((r: any) => {
+        const scoredRestaurants = allRestaurants.map((r: any) => {
           let score = r.rating * 20; // Base score from rating (0-100)
           
           // Bonus for matching cuisine types
