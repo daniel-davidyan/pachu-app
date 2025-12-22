@@ -305,9 +305,6 @@ export default function RestaurantPage() {
                 <span className="text-[10px] text-gray-500 font-medium">match</span>
               </div>
             </div>
-            <span className="text-sm text-gray-500">
-              {restaurant.totalReviews} {restaurant.totalReviews === 1 ? 'experience' : 'experiences'}
-            </span>
           </div>
 
           {/* Cuisine Types */}
