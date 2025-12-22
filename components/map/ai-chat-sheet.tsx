@@ -15,6 +15,9 @@ interface Restaurant {
   latitude: number;
   longitude: number;
   matchPercentage?: number;
+  source: 'google' | 'friends' | 'own';
+  googlePlaceId?: string;
+  website?: string;
 }
 
 interface Message {
