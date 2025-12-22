@@ -16,6 +16,7 @@ export interface Restaurant {
   cuisineTypes?: string[];
   source: 'google' | 'friends' | 'own';
   googlePlaceId?: string;
+  matchPercentage?: number;
 }
 
 interface MapboxProps {
@@ -168,6 +169,41 @@ const getRestaurantIcon = (restaurant: Restaurant): { emoji: string; color: stri
   } else {
     return { emoji: '🍽️', color: '#6B7280', bg: '#F3F4F6' }; // Standard
   }
+};
+
+// Calculate match percentage for a restaurant (0-100% range)
+const getMatchPercentage = (restaurant: Restaurant): number => {
+  // If already set, use that value
+  if (restaurant.matchPercentage !== undefined) {
+    return restaurant.matchPercentage;
+  }
+  
+  // Calculate based on rating and reviews
+  // Higher rating + more reviews = better match
+  const ratingScore = (restaurant.rating / 5) * 70; // Max 70 points from rating
+  const reviewScore = Math.min(Math.log(restaurant.totalReviews + 1) * 3, 30); // Max 30 points from reviews
+  const baseScore = ratingScore + reviewScore;
+  
+  // Return 0-100 range
+  const matchPercentage = Math.max(0, Math.min(100, Math.round(baseScore)));
+  
+  return matchPercentage;
+};
+
+// Get border color based on match percentage (gradient from gray to pink)
+const getBorderColor = (matchPercentage: number): string => {
+  // Normalize percentage to 0-1 range (0-100 scale)
+  const normalized = Math.max(0, Math.min(1, matchPercentage / 100));
+  
+  // Interpolate between gray (#E5E7EB) and pink (#C5459C)
+  const gray = { r: 229, g: 231, b: 235 };
+  const pink = { r: 197, g: 69, b: 156 };
+  
+  const r = Math.round(gray.r + (pink.r - gray.r) * normalized);
+  const g = Math.round(gray.g + (pink.g - gray.g) * normalized);
+  const b = Math.round(gray.b + (pink.b - gray.b) * normalized);
+  
+  return `rgb(${r}, ${g}, ${b})`;
 };
 
 export function Mapbox({ 
@@ -512,6 +548,10 @@ export function Mapbox({
       const isFriendOrOwn = restaurant.source === 'friends' || restaurant.source === 'own';
       const iconData = getRestaurantIcon(restaurant);
       
+      // Calculate match percentage
+      const matchPercentage = getMatchPercentage(restaurant);
+      const borderColor = getBorderColor(matchPercentage);
+      
       // Get category label (like "israeli bakery", "shop", etc.)
       const getCategoryLabel = () => {
         if (!restaurant.cuisineTypes || restaurant.cuisineTypes.length === 0) return 'place';
@@ -544,23 +584,58 @@ export function Mapbox({
           opacity: 0;
           transition: opacity 0.2s ease-in;
         ">
-          <!-- White circle with icon (no extra ring) -->
-          <div class="marker-circle" style="
-            width: 40px;
-            height: 40px;
-            background: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            border: 2px solid ${isFriendOrOwn ? '#C5459C' : '#e5e7eb'};
-            transition: all 0.2s ease;
-            flex-shrink: 0;
-            position: relative;
-            z-index: 1000;
-          ">
-            <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
+          <!-- White circle with icon + progress ring -->
+          <div style="position: relative; width: 46px; height: 46px; flex-shrink: 0;">
+            <!-- SVG Progress Ring -->
+            <svg style="
+              position: absolute;
+              top: 0;
+              left: 0;
+              transform: rotate(-90deg);
+              width: 46px;
+              height: 46px;
+            " viewBox="0 0 46 46">
+              <!-- Background ring (gray) -->
+              <circle
+                cx="23"
+                cy="23"
+                r="20"
+                fill="none"
+                stroke="#E5E7EB"
+                stroke-width="4"
+              />
+              <!-- Progress ring (gradient gray to pink) -->
+              <circle
+                cx="23"
+                cy="23"
+                r="20"
+                fill="none"
+                stroke="${borderColor}"
+                stroke-width="4"
+                stroke-dasharray="${(matchPercentage / 100) * 125.6}, 125.6"
+                stroke-linecap="round"
+                style="transition: stroke-dasharray 0.5s ease;"
+              />
+            </svg>
+            
+            <!-- Inner white circle with icon -->
+            <div class="marker-circle" style="
+              position: absolute;
+              top: 3px;
+              left: 3px;
+              width: 40px;
+              height: 40px;
+              background: white;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+              transition: all 0.2s ease;
+              z-index: 1000;
+            ">
+              <span style="font-size: 20px; line-height: 1;">${iconData.emoji}</span>
+            </div>
           </div>
           
           <!-- Text labels (fully transparent, no background) -->

@@ -108,24 +108,35 @@ export async function GET(request: NextRequest) {
     const allResults = Array.from(allResultsMap.values());
 
     // Transform Google Places data to our Restaurant format
-    const restaurants = allResults.map((place: any) => ({
-      id: place.place_id,
-      name: place.name,
-      address: place.vicinity,
-      latitude: place.geometry.location.lat,
-      longitude: place.geometry.location.lng,
-      rating: place.rating || 0,
-      totalReviews: place.user_ratings_total || 0,
-      photoUrl: place.photos?.[0]
-        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photos[0].photo_reference}&key=${apiKey}`
-        : undefined,
-      priceLevel: place.price_level,
-      cuisineTypes: place.types?.filter((t: string) => 
-        !['restaurant', 'food', 'point_of_interest', 'establishment'].includes(t)
-      ),
-      source: 'google',
-      googlePlaceId: place.place_id
-    }));
+    const restaurants = allResults.map((place: any) => {
+      const rating = place.rating || 0;
+      const totalReviews = place.user_ratings_total || 0;
+      
+      // Calculate match percentage based on rating and reviews (0-100 scale)
+      const ratingScore = (rating / 5) * 70;
+      const reviewScore = Math.min(Math.log(totalReviews + 1) * 3, 30);
+      const matchPercentage = Math.max(0, Math.min(100, Math.round(ratingScore + reviewScore)));
+      
+      return {
+        id: place.place_id,
+        name: place.name,
+        address: place.vicinity,
+        latitude: place.geometry.location.lat,
+        longitude: place.geometry.location.lng,
+        rating,
+        totalReviews,
+        photoUrl: place.photos?.[0]
+          ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photos[0].photo_reference}&key=${apiKey}`
+          : undefined,
+        priceLevel: place.price_level,
+        cuisineTypes: place.types?.filter((t: string) => 
+          !['restaurant', 'food', 'point_of_interest', 'establishment'].includes(t)
+        ),
+        source: 'google',
+        googlePlaceId: place.place_id,
+        matchPercentage
+      };
+    });
 
     // If user is logged in, get following users who visited these restaurants
     if (user) {
