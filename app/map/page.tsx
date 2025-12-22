@@ -185,6 +185,29 @@ export default function MapPage() {
     setHighlightedRestaurants(restaurants.map(r => r.id));
   };
 
+  const handleRestaurantClickFromChat = (restaurant: Restaurant) => {
+    // Close the chat
+    setShowChat(false);
+    
+    // Set the selected restaurant (this will open the popup)
+    setSelectedRestaurant(restaurant);
+    
+    // Center the map on the selected restaurant with smooth animation
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: [restaurant.longitude, restaurant.latitude],
+        zoom: 16,
+        duration: 2000, // 2 second smooth animation
+        essential: true,
+        curve: 1.5, // More dramatic curve
+        easing: (t) => {
+          // Custom easing function for smooth deceleration
+          return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        }
+      });
+    }
+  };
+
   const handleChatStateChange = (isActive: boolean, height: number) => {
     setChatActive(isActive);
     setChatHeight(height);
@@ -474,6 +497,7 @@ export default function MapPage() {
         <AIChatSheet 
           onFilterChange={handleFilterChange}
           onRestaurantsFound={handleRestaurantsFound}
+          onRestaurantClick={handleRestaurantClickFromChat}
           matchedCount={filteredRestaurants.length}
           userLocation={userLocation}
           onChatStateChange={handleChatStateChange}

@@ -23,26 +23,33 @@ export async function POST(request: NextRequest) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // Count how many questions we've asked
-    const questionCount = conversationHistory.filter((m: any) => m.role === 'assistant').length;
-    const shouldSuggestRestaurants = questionCount >= 2; // After 2-3 exchanges, suggest restaurants
+    // Count how many questions we've asked and how many the user has answered
+    const assistantMessages = conversationHistory.filter((m: any) => m.role === 'assistant');
+    const userMessages = conversationHistory.filter((m: any) => m.role === 'user');
+    const questionCount = assistantMessages.length;
+    const userResponseCount = userMessages.length;
+    
+    // Ready to show restaurants after 1-3 questions (when user has answered 1-3 times)
+    const shouldSuggestRestaurants = userResponseCount >= 1 && questionCount >= 1 && questionCount <= 3;
 
     // System prompt for conversational restaurant finding
-    const systemPrompt = `You are Pachu, a friendly AI restaurant finder. Your goal is to understand the user's dining preferences through a natural conversation, then help them find perfect restaurants.
+    const systemPrompt = `You are Pachu, a friendly and intelligent AI restaurant finder. Your goal is to understand the user's dining preferences through 1-3 natural questions, then recommend exactly 3 perfect restaurants.
 
 ## Your Process:
-1️⃣ **First message**: Ask about cuisine type
-2️⃣ **Second message**: Ask about budget and any special preferences (romantic, family-friendly, outdoor, etc.)
-3️⃣ **Third message**: Acknowledge their preferences and tell them you're showing matching restaurants on the map
+**Ask between 1-3 questions based on what you learn:**
 
-## Rules:
-- Keep responses conversational and friendly (2-3 sentences max)
-- Use emojis naturally 🍽️ 💰 ❤️ 🏡
-- Ask ONE clear question at a time
-- After 2-3 exchanges, say you'll show restaurants on the map
-- Be encouraging and positive
+1️⃣ **First question**: Ask about their mood/craving (cuisine type, specific dish, or dining atmosphere)
+2️⃣ **Second question** (optional): If needed, ask about budget OR special preferences (romantic, group, outdoor, quick bite, etc.)
+3️⃣ **Third question** (optional): If needed, clarify any remaining preferences
 
-## Current stage: ${questionCount === 0 ? 'Initial greeting' : questionCount === 1 ? 'Second question (budget/preferences)' : 'Ready to suggest restaurants'}
+**Important**: 
+- You can recommend restaurants after just 1 question if the user provides enough detail!
+- Maximum 3 questions - then you MUST recommend restaurants
+- Each question should be short, friendly, and conversational (1-2 sentences max)
+- Use natural language and emojis 🍽️ 💰 ❤️ 🌮
+- After enough info, say something like "Perfect! I found 3 great spots for you! 🎉"
+
+## Current stage: ${questionCount === 0 ? 'Start - First question' : questionCount === 1 ? userResponseCount >= 1 ? 'Can ask second question OR recommend' : 'First question asked' : questionCount === 2 ? 'Can ask third question OR recommend' : 'MUST recommend now'}
 
 ## Extract Information:
 After each response, include this JSON block (user won't see it):
@@ -55,13 +62,17 @@ After each response, include this JSON block (user won't see it):
 }
 </data>
 
-Examples:
-- "italian" or "pizza" → cuisineTypes: ["italian"]
-- "cheap" or "budget" → priceLevel: 1-2
-- "expensive" or "fancy" → priceLevel: 3-4
-- "romantic" or "date night" → specialPreferences: ["romantic"]
-- "family" → specialPreferences: ["family-friendly"]
-- "outdoor" or "patio" → specialPreferences: ["outdoor"]`;
+**Extraction examples:**
+- "italian", "pizza", "pasta" → cuisineTypes: ["italian"]
+- "sushi", "japanese" → cuisineTypes: ["japanese"]
+- "cheap", "budget", "affordable" → priceLevel: 1
+- "mid-range", "moderate" → priceLevel: 2
+- "expensive", "fancy", "upscale", "fine dining" → priceLevel: 3-4
+- "romantic", "date night", "anniversary" → specialPreferences: ["romantic"]
+- "family", "kids" → specialPreferences: ["family-friendly"]
+- "outdoor", "patio", "terrace" → specialPreferences: ["outdoor"]
+
+**When readyToShow is true**, do NOT include any message text - just return empty message so only restaurant cards are shown!`;
 
     const messages: any[] = [
       { role: 'system', content: systemPrompt },
@@ -89,8 +100,18 @@ Examples:
       }
     }
 
+    // Force readyToShow after 3 user responses
+    if (userResponseCount >= 3) {
+      extractedData.readyToShow = true;
+    }
+
     // Remove the data JSON from the visible message
-    const visibleMessage = fullResponse.replace(/<data>[\s\S]*?<\/data>/, '').trim();
+    let visibleMessage = fullResponse.replace(/<data>[\s\S]*?<\/data>/, '').trim();
+    
+    // If showing restaurants, remove the message text entirely
+    if (extractedData.readyToShow) {
+      visibleMessage = '';
+    }
 
     // Build filters from extracted data
     const filters: any = {
@@ -109,17 +130,51 @@ Examples:
       }
     }
 
-    // If ready to show restaurants, fetch some
+    // If ready to show restaurants, fetch and return exactly 3 best matches
     let restaurants: any[] = [];
     if (extractedData.readyToShow && location) {
-      // Call nearby restaurants API
+      // Call nearby restaurants API with larger radius to get more options
       try {
         const nearbyResponse = await fetch(
-          `${request.nextUrl.origin}/api/restaurants/nearby?latitude=${location.lat}&longitude=${location.lng}&radius=2000`,
+          `${request.nextUrl.origin}/api/restaurants/nearby?latitude=${location.lat}&longitude=${location.lng}&radius=3000`,
           { headers: request.headers }
         );
         const nearbyData = await nearbyResponse.json();
-        restaurants = (nearbyData.restaurants || []).slice(0, 5); // Top 5 restaurants
+        const allRestaurants = nearbyData.restaurants || [];
+        
+        // Filter and score restaurants based on preferences
+        let scoredRestaurants = allRestaurants.map((r: any) => {
+          let score = r.rating * 20; // Base score from rating (0-100)
+          
+          // Bonus for matching cuisine types
+          if (filters.cuisineTypes && filters.cuisineTypes.length > 0 && r.cuisineTypes) {
+            const matches = r.cuisineTypes.filter((c: string) => 
+              filters.cuisineTypes.some((fc: string) => c.toLowerCase().includes(fc.toLowerCase()))
+            );
+            score += matches.length * 15;
+          }
+          
+          // Bonus for matching price level
+          if (filters.priceLevel && filters.priceLevel.length > 0 && r.priceLevel) {
+            if (filters.priceLevel.includes(r.priceLevel)) {
+              score += 10;
+            }
+          }
+          
+          // Bonus for highly rated places
+          if (r.rating >= 4.5) score += 10;
+          if (r.totalReviews > 100) score += 5;
+          
+          return { ...r, matchScore: score };
+        });
+        
+        // Sort by score and take top 3
+        scoredRestaurants.sort((a: any, b: any) => b.matchScore - a.matchScore);
+        restaurants = scoredRestaurants.slice(0, 3).map((r: any) => ({
+          ...r,
+          // Calculate match percentage (0-100) based on score
+          matchPercentage: Math.min(100, Math.max(60, Math.round(r.matchScore)))
+        }));
       } catch (error) {
         console.error('Error fetching restaurants:', error);
       }

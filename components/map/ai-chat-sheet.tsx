@@ -3,11 +3,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Loader2, ChevronDown, Plus, Clock, X, Trash2 } from 'lucide-react';
 
+interface Restaurant {
+  id: string;
+  name: string;
+  address: string;
+  rating: number;
+  totalReviews: number;
+  cuisineTypes?: string[];
+  priceLevel?: number;
+  photoUrl?: string;
+  latitude: number;
+  longitude: number;
+  matchPercentage?: number;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  restaurants?: Array<{ id: string; name: string; }>;
+  restaurants?: Restaurant[];
 }
 
 interface ChatConversation {
@@ -19,7 +33,8 @@ interface ChatConversation {
 
 interface AIChatSheetProps {
   onFilterChange?: (filters: RestaurantFilters) => void;
-  onRestaurantsFound?: (restaurants: Array<{ id: string; name: string; }>) => void;
+  onRestaurantsFound?: (restaurants: Restaurant[]) => void;
+  onRestaurantClick?: (restaurant: Restaurant) => void;
   matchedCount?: number;
   userLocation?: { lat: number; lng: number } | null;
   onChatStateChange?: (isActive: boolean, height: number) => void;
@@ -37,7 +52,45 @@ export interface RestaurantFilters {
 
 const STORAGE_KEY = 'pachu-chat-history';
 
-export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount = 0, userLocation, onChatStateChange }: AIChatSheetProps) {
+// Helper function to get restaurant icon emoji
+const getRestaurantIcon = (restaurant: Restaurant): string => {
+  const cuisines = restaurant.cuisineTypes || [];
+  const name = restaurant.name.toLowerCase();
+  const allText = [...cuisines, name].join(' ').toLowerCase();
+  
+  if (allText.includes('coffee') || allText.includes('cafe')) return '☕';
+  if (allText.includes('pizza')) return '🍕';
+  if (allText.includes('sushi') || allText.includes('japanese')) return '🍣';
+  if (allText.includes('chinese')) return '🥡';
+  if (allText.includes('burger')) return '🍔';
+  if (allText.includes('mexican') || allText.includes('taco')) return '🌮';
+  if (allText.includes('indian') || allText.includes('curry')) return '🍛';
+  if (allText.includes('italian') || allText.includes('pasta')) return '🍝';
+  if (allText.includes('bakery')) return '🥐';
+  if (allText.includes('ice cream') || allText.includes('dessert')) return '🍨';
+  if (allText.includes('bar') || allText.includes('wine')) return '🍷';
+  if (allText.includes('seafood') || allText.includes('fish')) return '🦐';
+  if (allText.includes('steak') || allText.includes('grill')) return '🥩';
+  
+  return '🍽️';
+};
+
+// Helper function to get price level string
+const getPriceLevel = (priceLevel?: number): string => {
+  if (!priceLevel) return '$$';
+  return '$'.repeat(priceLevel);
+};
+
+// Helper function to get match percentage color
+const getMatchColor = (percentage: number): string => {
+  if (percentage >= 90) return '#10B981'; // Green
+  if (percentage >= 80) return '#059669'; // Darker green
+  if (percentage >= 70) return '#C5459C'; // Primary pink
+  if (percentage >= 60) return '#EC4899'; // Lighter pink
+  return '#6B7280'; // Gray
+};
+
+export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantClick, matchedCount = 0, userLocation, onChatStateChange }: AIChatSheetProps) {
   const [isActive, setIsActive] = useState(false); // Whether pane is visible
   const [sheetHeight, setSheetHeight] = useState(200); // Height when active
   const [isDragging, setIsDragging] = useState(false);
@@ -318,49 +371,65 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
   // If not active, show only floating search bar (positioned above nav-bar)
   if (!isActive) {
     return (
-      <div 
-        className="fixed z-40"
-        style={{
-          bottom: 'calc(4.75rem + env(safe-area-inset-bottom))',
-          left: 'max(1rem, env(safe-area-inset-left))',
-          right: 'max(1rem, env(safe-area-inset-right))',
-        }}
-      >
-        <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-2 shadow-xl focus-within:border-primary transition-all hover:shadow-2xl">
-          <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              if (!isActive) handleActivate();
-            }}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            onFocus={handleActivate}
-            placeholder="Search restaurants..."
-            className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium"
-          />
-          <button
-            onClick={handleSend}
-            disabled={isLoading}
-            style={{
-              background: inputValue.trim() 
-                ? 'linear-gradient(to right, #C5459C, rgba(197, 69, 156, 0.9))' 
-                : '#E5E7EB'
-            }}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:shadow-lg hover:scale-105 transition-all active:scale-95 flex-shrink-0 shadow-md"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-white" />
-            ) : (
-              <Send 
-                className="w-4 h-4 stroke-[2.5]"
-                style={{ color: inputValue.trim() ? '#FFFFFF' : '#6B7280' }}
-              />
-            )}
-          </button>
+      <>
+        <div 
+          className="fixed z-40"
+          style={{
+            bottom: 'calc(4.75rem + env(safe-area-inset-bottom))',
+            left: 'max(1rem, env(safe-area-inset-left))',
+            right: 'max(1rem, env(safe-area-inset-right))',
+          }}
+        >
+          <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-2 shadow-xl focus-within:border-primary transition-all hover:shadow-2xl">
+            <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                if (!isActive) handleActivate();
+              }}
+              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+              onFocus={handleActivate}
+              placeholder="Search restaurants..."
+              className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium"
+            />
+            <button
+              onClick={handleSend}
+              disabled={isLoading}
+              style={{
+                background: inputValue.trim() 
+                  ? 'linear-gradient(to right, #C5459C, rgba(197, 69, 156, 0.9))' 
+                  : '#E5E7EB'
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:shadow-lg hover:scale-105 transition-all active:scale-95 flex-shrink-0 shadow-md"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+              ) : (
+                <Send 
+                  className="w-4 h-4 stroke-[2.5]"
+                  style={{ color: inputValue.trim() ? '#FFFFFF' : '#6B7280' }}
+                />
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+        
+        {/* Global styles for animations */}
+        <style jsx global>{`
+          @keyframes slideIn {
+            from {
+              opacity: 0;
+              transform: translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}</style>
+      </>
     );
   }
 
@@ -520,15 +589,102 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, matchedCount =
                   key={message.id}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div
-                    className={`max-w-[80%] px-3 py-2 rounded-2xl ${
-                      message.role === 'user'
-                        ? 'bg-primary text-white rounded-br-md'
-                        : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  </div>
+                  {/* Only show message bubble if there's content or no restaurants */}
+                  {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
+                    <div
+                      className={`max-w-[80%] px-3 py-2 rounded-2xl ${
+                        message.role === 'user'
+                          ? 'bg-primary text-white rounded-br-md'
+                          : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    </div>
+                  )}
+                  
+                  {/* Show restaurants if available */}
+                  {message.restaurants && message.restaurants.length > 0 && (
+                    <div className="w-full max-w-full">
+                      <div className={`grid gap-2.5 px-2 pb-2 pt-1 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        {message.restaurants.map((restaurant, index) => {
+                          const matchPercentage = restaurant.matchPercentage || 75;
+                          
+                          return (
+                            <div
+                              key={restaurant.id}
+                              onClick={() => {
+                                if (onRestaurantClick) {
+                                  onRestaurantClick(restaurant);
+                                }
+                              }}
+                              className="group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] active:scale-[0.97]"
+                              style={{
+                                animation: `slideIn 0.5s ease-out ${index * 0.1}s both`,
+                                boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
+                              }}
+                            >
+                              {/* Match percentage badge - top right */}
+                              <div 
+                                className="absolute top-2 right-2 z-10 backdrop-blur-sm rounded-full px-2 py-0.5 font-bold text-[10px] shadow-md"
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.9)',
+                                  color: '#6B7280'
+                                }}
+                              >
+                                {matchPercentage}%
+                              </div>
+                              
+                              {/* Restaurant Photo */}
+                              <div className="relative w-full h-20 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                                {restaurant.photoUrl ? (
+                                  <img
+                                    src={restaurant.photoUrl}
+                                    alt={restaurant.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-primary/20 via-pink-100 to-orange-50 flex items-center justify-center">
+                                    <span className="text-3xl opacity-60">{getRestaurantIcon(restaurant)}</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Restaurant Info */}
+                              <div className="p-2">
+                                {/* Name */}
+                                <h3 className="font-bold text-gray-900 text-[11px] leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2">
+                                  {restaurant.name}
+                                </h3>
+                                
+                                {/* Cuisine Type - show only first one */}
+                                {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
+                                  <div className="mb-1">
+                                    <span className="text-[8px] bg-gradient-to-r from-primary/10 to-pink-50 text-primary font-semibold px-1.5 py-0.5 rounded-full border border-primary/20">
+                                      {restaurant.cuisineTypes[0].replace(/_/g, ' ').toLowerCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Price Level */}
+                                {restaurant.priceLevel && (
+                                  <div className="text-left">
+                                    <span className="font-bold text-emerald-600 text-[11px]">
+                                      {getPriceLevel(restaurant.priceLevel)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Hover indicator bar at bottom */}
+                              <div 
+                                className="h-0.5 bg-gradient-to-r from-primary via-pink-500 to-orange-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
