@@ -92,7 +92,16 @@ export default function RestaurantPage() {
 
   // Check if restaurant is in Israel and fetch ONTOPO link
   useEffect(() => {
-    if (!restaurant) return;
+    if (!restaurant) {
+      // Reset state when no restaurant
+      setIsIsrael(false);
+      setOntopoUrl(null);
+      return;
+    }
+
+    // Reset ONTOPO state when restaurant changes
+    setOntopoUrl(null);
+    setIsIsrael(false);
 
     const checkIsraelAndFetchOntopo = async () => {
       try {
@@ -261,7 +270,13 @@ export default function RestaurantPage() {
 
     // If we already have the ONTOPO URL, open it
     if (ontopoUrl) {
-      window.open(ontopoUrl, '_blank');
+      // Open in new window/tab - this helps with iOS app interception
+      const newWindow = window.open(ontopoUrl, '_blank', 'noopener,noreferrer');
+      
+      // iOS Safari sometimes blocks popups, fallback to direct navigation
+      if (!newWindow) {
+        window.location.href = ontopoUrl;
+      }
       return;
     }
 
@@ -276,7 +291,14 @@ export default function RestaurantPage() {
       if (response.ok) {
         const data = await response.json();
         setOntopoUrl(data.url);
-        window.open(data.url, '_blank');
+        
+        // Open in new window/tab
+        const newWindow = window.open(data.url, '_blank', 'noopener,noreferrer');
+        
+        // iOS Safari fallback
+        if (!newWindow) {
+          window.location.href = data.url;
+        }
       } else {
         showToast('No ONTOPO reservation available', 'error');
       }

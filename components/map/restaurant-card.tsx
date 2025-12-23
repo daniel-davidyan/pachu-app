@@ -45,7 +45,16 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
 
   // Check if restaurant is in Israel and fetch ONTOPO link
   useEffect(() => {
-    if (!restaurant) return;
+    if (!restaurant) {
+      // Reset state when no restaurant
+      setIsIsrael(false);
+      setOntopoUrl(null);
+      return;
+    }
+
+    // Reset ONTOPO state when restaurant changes
+    setOntopoUrl(null);
+    setIsIsrael(false);
 
     const checkIsraelAndFetchOntopo = async () => {
       // Check if restaurant is in Israel by fetching place details
@@ -318,7 +327,13 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
 
     // If we already have the ONTOPO URL, open it
     if (ontopoUrl) {
-      window.open(ontopoUrl, '_blank');
+      // Open in new window/tab - this helps with iOS app interception
+      const newWindow = window.open(ontopoUrl, '_blank', 'noopener,noreferrer');
+      
+      // iOS Safari sometimes blocks popups, fallback to direct navigation
+      if (!newWindow) {
+        window.location.href = ontopoUrl;
+      }
       return;
     }
 
@@ -333,7 +348,14 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
       if (response.ok) {
         const data = await response.json();
         setOntopoUrl(data.url);
-        window.open(data.url, '_blank');
+        
+        // Open in new window/tab
+        const newWindow = window.open(data.url, '_blank', 'noopener,noreferrer');
+        
+        // iOS Safari fallback
+        if (!newWindow) {
+          window.location.href = data.url;
+        }
       } else {
         console.log('No ONTOPO page available for this restaurant');
       }
