@@ -1,215 +1,135 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Levenshtein distance for fuzzy string matching
-function levenshteinDistance(str1: string, str2: string): number {
-  const m = str1.length;
-  const n = str2.length;
-  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+/**
+ * Search Google for ONTOPO restaurant page
+ */
+async function searchGoogleForOntopo(restaurantName: string, city?: string): Promise<string | null> {
+  const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
+  const searchEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
 
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (str1[i - 1] === str2[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1];
-      } else {
-        dp[i][j] = Math.min(
-          dp[i - 1][j - 1] + 1,
-          dp[i - 1][j] + 1,
-          dp[i][j - 1] + 1
-        );
-      }
-    }
-  }
-
-  return dp[m][n];
-}
-
-// Normalize string for comparison
-function normalizeString(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/[^\w\s\u0590-\u05FF]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Calculate similarity percentage between two strings
-function calculateSimilarity(str1: string, str2: string): number {
-  const norm1 = normalizeString(str1);
-  const norm2 = normalizeString(str2);
-  
-  if (!norm1 || !norm2) return 0;
-  
-  // Exact match
-  if (norm1 === norm2) return 100;
-  
-  // Calculate Levenshtein distance
-  const distance = levenshteinDistance(norm1, norm2);
-  const maxLength = Math.max(norm1.length, norm2.length);
-  const similarity = ((maxLength - distance) / maxLength) * 100;
-  
-  return Math.max(0, similarity);
-}
-
-// Extract city name from address
-function extractCity(address: string): string {
-  const normalized = normalizeString(address);
-  const parts = normalized.split(/[,،]/);
-  return parts.length > 0 ? parts[parts.length - 1].trim() : '';
-}
-
-// Find best matching result
-function findBestMatch(searchResults: any[], targetName: string, targetAddress?: string): any | null {
-  if (searchResults.length === 0) return null;
-  
-  // If we only have one result, return it if similarity is reasonable
-  if (searchResults.length === 1) {
-    const nameScore = calculateSimilarity(searchResults[0].title || '', targetName);
-    console.log(`📊 Single result "${searchResults[0].title}": name score ${nameScore.toFixed(1)}%`);
-    
-    // Accept single result with at least 40% name match
-    if (nameScore >= 40) {
-      console.log(`✅ Accepting single result`);
-      return searchResults[0];
-    }
+  if (!apiKey || !searchEngineId) {
+    console.log('⚠️ Google Custom Search not configured, will use fallback');
     return null;
   }
-
-  let bestMatch = null;
-  let bestScore = 0;
-
-  for (const result of searchResults) {
-    // Name similarity (0-100)
-    const nameScore = calculateSimilarity(result.title || '', targetName);
-    
-    // Address/city similarity if available
-    let addressScore = 0;
-    if (targetAddress && result.address) {
-      // Compare full address
-      const fullAddressScore = calculateSimilarity(result.address, targetAddress);
-      
-      // Compare city names
-      const targetCity = extractCity(targetAddress);
-      const resultCity = extractCity(result.address);
-      const cityScore = calculateSimilarity(targetCity, resultCity);
-      
-      // Use best of full address or city match
-      addressScore = Math.max(fullAddressScore, cityScore);
-    }
-    
-    // Weighted score: name 70%, address 30%
-    const totalScore = (nameScore * 0.7) + (addressScore * 0.3);
-    
-    console.log(`📊 "${result.title}": name=${nameScore.toFixed(1)}%, address=${addressScore.toFixed(1)}%, total=${totalScore.toFixed(1)}%`);
-    
-    if (totalScore > bestScore) {
-      bestScore = totalScore;
-      bestMatch = result;
-    }
-  }
-  
-  // Require at least 40% match confidence
-  if (bestScore < 40) {
-    console.log(`❌ No confident match found. Best score: ${bestScore.toFixed(1)}%`);
-    return null;
-  }
-  
-  console.log(`✅ Best match: "${bestMatch?.title}" with score ${bestScore.toFixed(1)}%`);
-  return bestMatch;
-}
-
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const restaurantName = searchParams.get('name');
-  const city = searchParams.get('city');
-  const address = searchParams.get('address') || undefined; // Convert null to undefined
-
-  if (!restaurantName) {
-    return NextResponse.json({ error: 'Restaurant name is required' }, { status: 400 });
-  }
-
-  console.log(`🔍 Searching ONTOPO for: "${restaurantName}" in ${city || 'unknown city'}`);
 
   try {
+    // Try both Hebrew and English search terms
+    const searchQueries = [
+      `אונטופו ${restaurantName}`,
+      `ontopo ${restaurantName}`,
+    ];
+
+    if (city) {
+      searchQueries[0] = `אונטופו ${restaurantName} ${city}`;
+      searchQueries[1] = `ontopo ${restaurantName} ${city}`;
+    }
+
+    for (const query of searchQueries) {
+      const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&num=3`;
+      
+      console.log(`🔍 Searching Google: "${query}"`);
+      
+      const response = await fetch(searchUrl, {
+        signal: AbortSignal.timeout(5000), // 5 second timeout
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Google search failed:', response.status, errorData);
+        
+        // If quota exceeded, break and use fallback
+        if (response.status === 429 || errorData.error?.message?.includes('quota')) {
+          console.log('⚠️ Google API quota exceeded, using fallback');
+          return null;
+        }
+        continue;
+      }
+
+      const data = await response.json();
+
+      if (data.items && data.items.length > 0) {
+        // Find ONTOPO page link
+        for (const item of data.items) {
+          const link = item.link;
+          // Match ONTOPO page URLs like: https://ontopo.com/he/il/page/44216694
+          const ontopoPageMatch = link.match(/https:\/\/ontopo\.com\/[a-z]{2}\/[a-z]{2}\/page\/\d+/);
+          
+          if (ontopoPageMatch) {
+            console.log(`✅ Found ONTOPO link via Google: ${ontopoPageMatch[0]}`);
+            return ontopoPageMatch[0];
+          }
+        }
+      }
+    }
+
+    console.log('❌ No ONTOPO page found in Google results');
+    return null;
+
+  } catch (error: any) {
+    console.error('❌ Error searching Google:', error.message || error);
+    return null;
+  }
+}
+
+/**
+ * Fallback: Search directly on ONTOPO API
+ */
+async function searchOntopoDirectly(restaurantName: string, city?: string): Promise<string | null> {
+  try {
+    console.log('🔄 Using fallback: Direct ONTOPO API search');
+    
     // Step 1: Search for the restaurant on ONTOPO
     const searchTerm = city ? `${restaurantName} ${city}` : restaurantName;
     const searchUrl = `https://ontopo.com/api/venue_search?slug=15171493&version=410&terms=${encodeURIComponent(searchTerm)}&locale=he`;
-    
-    console.log(`🌐 ONTOPO Search URL: ${searchUrl}`);
     
     const searchResponse = await fetch(searchUrl, {
       headers: {
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!searchResponse.ok) {
-      console.error('❌ ONTOPO search failed:', searchResponse.status, searchResponse.statusText);
-      return NextResponse.json({ 
-        error: 'Failed to search ONTOPO',
-        details: `HTTP ${searchResponse.status}`,
-      }, { status: 500 });
+      console.error('❌ ONTOPO search failed:', searchResponse.status);
+      return null;
     }
 
     const searchResults = await searchResponse.json();
-    console.log(`📋 Found ${searchResults?.length || 0} results from ONTOPO`);
 
-    // Check if we got any results
     if (!Array.isArray(searchResults) || searchResults.length === 0) {
       console.log('❌ No results found on ONTOPO');
-      return NextResponse.json({ error: 'No results found on ONTOPO' }, { status: 404 });
+      return null;
     }
 
-    // Step 2: Find the best matching result
-    const bestMatch = findBestMatch(searchResults, restaurantName, address);
-    
-    if (!bestMatch) {
-      console.log('❌ No confident match found');
-      return NextResponse.json({ 
-        error: 'No matching restaurant found on ONTOPO',
-        searched: restaurantName,
-        resultsCount: searchResults.length,
-      }, { status: 404 });
-    }
-
-    const venueSlug = bestMatch.slug;
-    const venueVersion = bestMatch.version;
+    // Step 2: Get the first result's venue slug
+    const firstResult = searchResults[0];
+    const venueSlug = firstResult.slug;
+    const venueVersion = firstResult.version;
 
     if (!venueSlug) {
-      console.error('❌ Invalid venue data - no slug');
-      return NextResponse.json({ error: 'Invalid venue data' }, { status: 500 });
+      return null;
     }
 
     // Step 3: Fetch the venue profile to get the page slug
     const profileUrl = `https://ontopo.com/api/venue_profile?slug=${venueSlug}&version=${venueVersion}&locale=he`;
     
-    console.log(`🔍 Fetching venue profile: ${venueSlug}`);
-    
     const profileResponse = await fetch(profileUrl, {
       headers: {
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!profileResponse.ok) {
-      console.error('❌ ONTOPO profile fetch failed:', profileResponse.status, profileResponse.statusText);
-      return NextResponse.json({ 
-        error: 'Failed to fetch venue profile',
-        details: `HTTP ${profileResponse.status}`,
-      }, { status: 500 });
+      console.error('❌ ONTOPO profile fetch failed:', profileResponse.status);
+      return null;
     }
 
     const profileData = await profileResponse.json();
 
     // Step 4: Extract the page slug from the pages array
     if (!profileData.pages || profileData.pages.length === 0) {
-      console.log('❌ No reservation pages available');
-      return NextResponse.json({ 
-        error: 'No reservation page available',
-        venueSlug,
-      }, { status: 404 });
+      return null;
     }
 
     // Find the reservation page (or take the first page)
@@ -219,33 +139,63 @@ export async function GET(request: NextRequest) {
 
     const pageSlug = reservationPage.slug;
 
-    if (!pageSlug) {
-      console.error('❌ No page slug found');
+    // Step 5: Build the final ONTOPO URL
+    const ontopoUrl = `https://ontopo.com/he/il/page/${pageSlug}`;
+    console.log(`✅ Found ONTOPO link via API: ${ontopoUrl}`);
+    
+    return ontopoUrl;
+
+  } catch (error: any) {
+    console.error('❌ Error in ONTOPO fallback search:', error.message || error);
+    return null;
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const restaurantName = searchParams.get('name');
+  const city = searchParams.get('city');
+
+  if (!restaurantName) {
+    return NextResponse.json({ error: 'Restaurant name is required' }, { status: 400 });
+  }
+
+  console.log(`🔍 Looking for ONTOPO page: "${restaurantName}"${city ? ` in ${city}` : ''}`);
+
+  try {
+    // Try Google Custom Search first
+    let ontopoUrl = await searchGoogleForOntopo(restaurantName, city || undefined);
+
+    // Fallback to direct ONTOPO API search
+    if (!ontopoUrl) {
+      ontopoUrl = await searchOntopoDirectly(restaurantName, city || undefined);
+    }
+
+    if (!ontopoUrl) {
+      console.log(`❌ No ONTOPO page found for "${restaurantName}"`);
       return NextResponse.json({ 
-        error: 'No page slug available',
-        venueSlug,
+        error: 'Restaurant not found on ONTOPO',
+        searched: restaurantName,
       }, { status: 404 });
     }
 
-    // Step 5: Build the final ONTOPO URL
-    const ontopoUrl = `https://ontopo.com/he/il/page/${pageSlug}`;
-
-    console.log(`✅ Successfully found ONTOPO page: ${ontopoUrl}`);
+    // Extract slugs from URL for additional info
+    const urlMatch = ontopoUrl.match(/page\/(\d+)/);
+    const pageSlug = urlMatch ? urlMatch[1] : null;
 
     return NextResponse.json({
       url: ontopoUrl,
-      venueTitle: profileData.title,
-      venueSlug,
       pageSlug,
+      method: ontopoUrl.includes('ontopo.com') ? 'success' : 'unknown',
     });
 
   } catch (error: any) {
-    console.error('❌ Error fetching ONTOPO link:', error);
+    console.error('❌ Unexpected error fetching ONTOPO link:', error.message || error);
+    // Return 404 instead of 500 - this way the button simply won't show
     return NextResponse.json({ 
-      error: 'Internal server error',
-      message: error?.message || 'Unknown error',
-      details: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
-    }, { status: 500 });
+      error: 'Unable to connect to ONTOPO',
+      message: 'Please try again later',
+    }, { status: 404 });
   }
 }
 

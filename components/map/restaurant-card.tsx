@@ -32,7 +32,6 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   const [loadingOntopo, setLoadingOntopo] = useState(false);
   const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
   const [isIsrael, setIsIsrael] = useState(false);
-  const [fetchingOntopo, setFetchingOntopo] = useState(false);
 
   // Notify parent when review modal opens/closes
   useEffect(() => {
@@ -46,21 +45,11 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
 
   // Check if restaurant is in Israel and fetch ONTOPO link
   useEffect(() => {
-    if (!restaurant) {
-      // Reset state when no restaurant
-      setIsIsrael(false);
-      setOntopoUrl(null);
-      setFetchingOntopo(false);
-      return;
-    }
-
-    // Get unique restaurant identifier
-    const restaurantKey = restaurant.googlePlaceId || restaurant.id;
-
-    // Reset ONTOPO state when restaurant changes
+    // Reset state when restaurant changes
     setOntopoUrl(null);
     setIsIsrael(false);
-    setFetchingOntopo(true);
+    
+    if (!restaurant) return;
 
     const checkIsraelAndFetchOntopo = async () => {
       // Check if restaurant is in Israel by fetching place details
@@ -80,32 +69,27 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
         if (inIsrael) {
           const city = data.city || extractCityFromAddress(restaurant.address);
           const ontopoResponse = await fetch(
-            `/api/ontopo?name=${encodeURIComponent(restaurant.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}${restaurant.address ? `&address=${encodeURIComponent(restaurant.address)}` : ''}`
+            `/api/ontopo?name=${encodeURIComponent(restaurant.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`
           );
           
           if (ontopoResponse.ok) {
             const ontopoData = await ontopoResponse.json();
-            // Only set URL if we're still showing the same restaurant
-            const currentKey = restaurant.googlePlaceId || restaurant.id;
-            if (currentKey === restaurantKey) {
-              setOntopoUrl(ontopoData.url);
-            }
+            setOntopoUrl(ontopoData.url);
           } else {
-            // No ONTOPO page found - keep ontopoUrl as null
-            console.log('No ONTOPO match found for', restaurant.name);
+            // If ONTOPO returns error, don't show the button
+            console.log('ONTOPO not available for this restaurant');
             setOntopoUrl(null);
           }
         }
       } catch (error) {
         console.error('Error checking Israel/ONTOPO:', error);
+        // On error, hide the button
         setOntopoUrl(null);
-      } finally {
-        setFetchingOntopo(false);
       }
     };
 
     checkIsraelAndFetchOntopo();
-  }, [restaurant?.id, restaurant?.googlePlaceId, restaurant?.name]);
+  }, [restaurant]);
 
   const extractCityFromAddress = (address?: string) => {
     if (!address) return '';
@@ -344,13 +328,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
 
     // If we already have the ONTOPO URL, open it
     if (ontopoUrl) {
-      // Open in new window/tab - this helps with iOS app interception
-      const newWindow = window.open(ontopoUrl, '_blank', 'noopener,noreferrer');
-      
-      // iOS Safari sometimes blocks popups, fallback to direct navigation
-      if (!newWindow) {
-        window.location.href = ontopoUrl;
-      }
+      window.open(ontopoUrl, '_blank');
       return;
     }
 
@@ -359,20 +337,13 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
     try {
       const city = extractCityFromAddress(restaurant?.address);
       const response = await fetch(
-        `/api/ontopo?name=${encodeURIComponent(restaurant?.name || '')}${city ? `&city=${encodeURIComponent(city)}` : ''}${restaurant?.address ? `&address=${encodeURIComponent(restaurant.address)}` : ''}`
+        `/api/ontopo?name=${encodeURIComponent(restaurant?.name || '')}${city ? `&city=${encodeURIComponent(city)}` : ''}`
       );
       
       if (response.ok) {
         const data = await response.json();
         setOntopoUrl(data.url);
-        
-        // Open in new window/tab
-        const newWindow = window.open(data.url, '_blank', 'noopener,noreferrer');
-        
-        // iOS Safari fallback
-        if (!newWindow) {
-          window.location.href = data.url;
-        }
+        window.open(data.url, '_blank');
       } else {
         console.log('No ONTOPO page available for this restaurant');
       }
@@ -578,8 +549,8 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                   <Globe className="w-5 h-5 text-gray-600" />
                 )}
               </button>
-              {/* ONTOPO Reservation Button - Only show when we have a valid ONTOPO URL */}
-              {isIsrael && ontopoUrl && (
+              {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
+              {isIsrael && (
                 <button 
                   onClick={handleOntopo}
                   disabled={loadingOntopo}
