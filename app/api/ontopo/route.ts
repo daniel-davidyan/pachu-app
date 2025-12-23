@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const restaurantName = searchParams.get('name');
   const city = searchParams.get('city');
-  const address = searchParams.get('address');
+  const address = searchParams.get('address') || undefined; // Convert null to undefined
 
   if (!restaurantName) {
     return NextResponse.json({ error: 'Restaurant name is required' }, { status: 400 });
