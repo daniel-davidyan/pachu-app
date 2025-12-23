@@ -126,7 +126,7 @@ export default function RestaurantPage() {
         if (inIsrael) {
           const city = data.city || extractCityFromAddress(restaurant.address);
           const ontopoResponse = await fetch(
-            `/api/ontopo?name=${encodeURIComponent(restaurant.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`
+            `/api/ontopo?name=${encodeURIComponent(restaurant.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}${restaurant.address ? `&address=${encodeURIComponent(restaurant.address)}` : ''}`
           );
           
           if (ontopoResponse.ok) {
@@ -138,6 +138,7 @@ export default function RestaurantPage() {
             }
           } else {
             // No ONTOPO page found - keep ontopoUrl as null
+            console.log('No ONTOPO match found for', restaurant.name);
             setOntopoUrl(null);
           }
         }
@@ -301,7 +302,7 @@ export default function RestaurantPage() {
     try {
       const city = extractCityFromAddress(restaurant?.address);
       const response = await fetch(
-        `/api/ontopo?name=${encodeURIComponent(restaurant?.name || '')}${city ? `&city=${encodeURIComponent(city)}` : ''}`
+        `/api/ontopo?name=${encodeURIComponent(restaurant?.name || '')}${city ? `&city=${encodeURIComponent(city)}` : ''}${restaurant?.address ? `&address=${encodeURIComponent(restaurant.address)}` : ''}`
       );
       
       if (response.ok) {
