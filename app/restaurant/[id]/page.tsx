@@ -81,6 +81,7 @@ export default function RestaurantPage() {
   const [loadingOntopo, setLoadingOntopo] = useState(false);
   const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
   const [isIsrael, setIsIsrael] = useState(false);
+  const [fetchingOntopo, setFetchingOntopo] = useState(false);
   
   const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -96,12 +97,17 @@ export default function RestaurantPage() {
       // Reset state when no restaurant
       setIsIsrael(false);
       setOntopoUrl(null);
+      setFetchingOntopo(false);
       return;
     }
+
+    // Get unique restaurant identifier
+    const currentRestaurantId = restaurant.googlePlaceId || restaurant.id;
 
     // Reset ONTOPO state when restaurant changes
     setOntopoUrl(null);
     setIsIsrael(false);
+    setFetchingOntopo(true);
 
     const checkIsraelAndFetchOntopo = async () => {
       try {
@@ -125,16 +131,26 @@ export default function RestaurantPage() {
           
           if (ontopoResponse.ok) {
             const ontopoData = await ontopoResponse.json();
-            setOntopoUrl(ontopoData.url);
+            // Only set URL if we're still on the same restaurant
+            const stillSameRestaurant = currentRestaurantId === (restaurant.googlePlaceId || restaurant.id);
+            if (stillSameRestaurant) {
+              setOntopoUrl(ontopoData.url);
+            }
+          } else {
+            // No ONTOPO page found - keep ontopoUrl as null
+            setOntopoUrl(null);
           }
         }
       } catch (error) {
         console.error('Error checking Israel/ONTOPO:', error);
+        setOntopoUrl(null);
+      } finally {
+        setFetchingOntopo(false);
       }
     };
 
     checkIsraelAndFetchOntopo();
-  }, [restaurant, restaurantId]);
+  }, [restaurant?.id, restaurant?.googlePlaceId, restaurant?.name, restaurantId]);
 
   const extractCityFromAddress = (address?: string) => {
     if (!address) return '';
@@ -472,8 +488,8 @@ export default function RestaurantPage() {
               </button>
             </div>
 
-            {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
-            {isIsrael && (
+            {/* ONTOPO Reservation Button - Only show when we have a valid ONTOPO URL */}
+            {isIsrael && ontopoUrl && (
               <button
                 onClick={handleOntopo}
                 disabled={loadingOntopo}

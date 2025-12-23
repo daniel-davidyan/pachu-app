@@ -32,6 +32,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   const [loadingOntopo, setLoadingOntopo] = useState(false);
   const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
   const [isIsrael, setIsIsrael] = useState(false);
+  const [fetchingOntopo, setFetchingOntopo] = useState(false);
 
   // Notify parent when review modal opens/closes
   useEffect(() => {
@@ -49,12 +50,17 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
       // Reset state when no restaurant
       setIsIsrael(false);
       setOntopoUrl(null);
+      setFetchingOntopo(false);
       return;
     }
+
+    // Get unique restaurant identifier
+    const restaurantKey = restaurant.googlePlaceId || restaurant.id;
 
     // Reset ONTOPO state when restaurant changes
     setOntopoUrl(null);
     setIsIsrael(false);
+    setFetchingOntopo(true);
 
     const checkIsraelAndFetchOntopo = async () => {
       // Check if restaurant is in Israel by fetching place details
@@ -79,16 +85,26 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
           
           if (ontopoResponse.ok) {
             const ontopoData = await ontopoResponse.json();
-            setOntopoUrl(ontopoData.url);
+            // Only set URL if we're still showing the same restaurant
+            const currentKey = restaurant.googlePlaceId || restaurant.id;
+            if (currentKey === restaurantKey) {
+              setOntopoUrl(ontopoData.url);
+            }
+          } else {
+            // No ONTOPO page found - keep ontopoUrl as null
+            setOntopoUrl(null);
           }
         }
       } catch (error) {
         console.error('Error checking Israel/ONTOPO:', error);
+        setOntopoUrl(null);
+      } finally {
+        setFetchingOntopo(false);
       }
     };
 
     checkIsraelAndFetchOntopo();
-  }, [restaurant]);
+  }, [restaurant?.id, restaurant?.googlePlaceId, restaurant?.name]);
 
   const extractCityFromAddress = (address?: string) => {
     if (!address) return '';
@@ -561,8 +577,8 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                   <Globe className="w-5 h-5 text-gray-600" />
                 )}
               </button>
-              {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
-              {isIsrael && (
+              {/* ONTOPO Reservation Button - Only show when we have a valid ONTOPO URL */}
+              {isIsrael && ontopoUrl && (
                 <button 
                   onClick={handleOntopo}
                   disabled={loadingOntopo}
