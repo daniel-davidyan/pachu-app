@@ -78,6 +78,9 @@ export default function RestaurantPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [loadingOntopo, setLoadingOntopo] = useState(false);
+  const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
+  const [isIsrael, setIsIsrael] = useState(false);
   
   const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -86,6 +89,50 @@ export default function RestaurantPage() {
       fetchRestaurant();
     }
   }, [restaurantId]);
+
+  // Check if restaurant is in Israel and fetch ONTOPO link
+  useEffect(() => {
+    if (!restaurant) return;
+
+    const checkIsraelAndFetchOntopo = async () => {
+      try {
+        const placeId = restaurant.googlePlaceId || restaurantId;
+        const response = await fetch(`/api/restaurants/details?placeId=${placeId}`);
+        const data = await response.json();
+        
+        // Check if country is Israel
+        const country = data.country || restaurant.address?.toLowerCase();
+        const inIsrael = country?.toLowerCase().includes('israel') || 
+                         country?.toLowerCase().includes('ישראל');
+        
+        setIsIsrael(inIsrael);
+
+        // If in Israel, fetch ONTOPO link
+        if (inIsrael) {
+          const city = data.city || extractCityFromAddress(restaurant.address);
+          const ontopoResponse = await fetch(
+            `/api/ontopo?name=${encodeURIComponent(restaurant.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`
+          );
+          
+          if (ontopoResponse.ok) {
+            const ontopoData = await ontopoResponse.json();
+            setOntopoUrl(ontopoData.url);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Israel/ONTOPO:', error);
+      }
+    };
+
+    checkIsraelAndFetchOntopo();
+  }, [restaurant, restaurantId]);
+
+  const extractCityFromAddress = (address?: string) => {
+    if (!address) return '';
+    // Try to extract city from address (e.g., "Street 123, Tel Aviv" -> "Tel Aviv")
+    const parts = address.split(',');
+    return parts.length > 1 ? parts[parts.length - 1].trim() : '';
+  };
 
   const fetchRestaurant = async () => {
     try {
@@ -206,6 +253,38 @@ export default function RestaurantPage() {
       } catch (error) {
         console.log('Error sharing:', error);
       }
+    }
+  };
+
+  const handleOntopo = async () => {
+    if (loadingOntopo) return;
+
+    // If we already have the ONTOPO URL, open it
+    if (ontopoUrl) {
+      window.open(ontopoUrl, '_blank');
+      return;
+    }
+
+    // Otherwise, try to fetch it
+    setLoadingOntopo(true);
+    try {
+      const city = extractCityFromAddress(restaurant?.address);
+      const response = await fetch(
+        `/api/ontopo?name=${encodeURIComponent(restaurant?.name || '')}${city ? `&city=${encodeURIComponent(city)}` : ''}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setOntopoUrl(data.url);
+        window.open(data.url, '_blank');
+      } else {
+        showToast('No ONTOPO reservation available', 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching ONTOPO link:', error);
+      showToast('Failed to load reservation page', 'error');
+    } finally {
+      setLoadingOntopo(false);
     }
   };
 
@@ -370,6 +449,27 @@ export default function RestaurantPage() {
                 Directions
               </button>
             </div>
+
+            {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
+            {isIsrael && (
+              <button
+                onClick={handleOntopo}
+                disabled={loadingOntopo}
+                className="w-full mt-3 py-3.5 rounded-2xl font-semibold text-sm bg-green-50 text-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+              >
+                {loadingOntopo ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-4 h-4" />
+                    Reserve on ONTOPO
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 

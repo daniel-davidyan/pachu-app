@@ -53,8 +53,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Return the complete place details
-    return NextResponse.json(data.result || {});
+    const result = data.result || {};
+    
+    // Extract country and city from address_components
+    let country = '';
+    let city = '';
+    
+    if (result.address_components) {
+      for (const component of result.address_components) {
+        if (component.types.includes('country')) {
+          country = component.long_name;
+        }
+        if (component.types.includes('locality')) {
+          city = component.long_name;
+        }
+      }
+    }
+
+    // Return the complete place details with parsed country and city
+    return NextResponse.json({
+      ...result,
+      country,
+      city,
+    });
   } catch (error) {
     console.error('Error fetching place details:', error);
     return NextResponse.json(

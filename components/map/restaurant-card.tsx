@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2 } from 'lucide-react';
+import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2, Calendar } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 
@@ -29,6 +29,9 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   const [friendsWhoVisited, setFriendsWhoVisited] = useState<Friend[]>([]);
   const [loadingWebsite, setLoadingWebsite] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState<string | undefined>(restaurant?.website);
+  const [loadingOntopo, setLoadingOntopo] = useState(false);
+  const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
+  const [isIsrael, setIsIsrael] = useState(false);
 
   // Notify parent when review modal opens/closes
   useEffect(() => {
@@ -39,6 +42,51 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   useEffect(() => {
     setWebsiteUrl(restaurant?.website);
   }, [restaurant]);
+
+  // Check if restaurant is in Israel and fetch ONTOPO link
+  useEffect(() => {
+    if (!restaurant) return;
+
+    const checkIsraelAndFetchOntopo = async () => {
+      // Check if restaurant is in Israel by fetching place details
+      try {
+        const placeId = restaurant.googlePlaceId || restaurant.id;
+        const response = await fetch(`/api/restaurants/details?placeId=${placeId}`);
+        const data = await response.json();
+        
+        // Check if country is Israel
+        const country = data.country || restaurant.address?.toLowerCase();
+        const inIsrael = country?.toLowerCase().includes('israel') || 
+                         country?.toLowerCase().includes('ישראל');
+        
+        setIsIsrael(inIsrael);
+
+        // If in Israel, fetch ONTOPO link
+        if (inIsrael) {
+          const city = data.city || extractCityFromAddress(restaurant.address);
+          const ontopoResponse = await fetch(
+            `/api/ontopo?name=${encodeURIComponent(restaurant.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`
+          );
+          
+          if (ontopoResponse.ok) {
+            const ontopoData = await ontopoResponse.json();
+            setOntopoUrl(ontopoData.url);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Israel/ONTOPO:', error);
+      }
+    };
+
+    checkIsraelAndFetchOntopo();
+  }, [restaurant]);
+
+  const extractCityFromAddress = (address?: string) => {
+    if (!address) return '';
+    // Try to extract city from address (e.g., "Street 123, Tel Aviv" -> "Tel Aviv")
+    const parts = address.split(',');
+    return parts.length > 1 ? parts[parts.length - 1].trim() : '';
+  };
 
   const handleWishlist = async () => {
     if (loadingWishlist) return;
@@ -265,6 +313,37 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
     }
   };
 
+  const handleOntopo = async () => {
+    if (loadingOntopo) return;
+
+    // If we already have the ONTOPO URL, open it
+    if (ontopoUrl) {
+      window.open(ontopoUrl, '_blank');
+      return;
+    }
+
+    // Otherwise, try to fetch it
+    setLoadingOntopo(true);
+    try {
+      const city = extractCityFromAddress(restaurant?.address);
+      const response = await fetch(
+        `/api/ontopo?name=${encodeURIComponent(restaurant?.name || '')}${city ? `&city=${encodeURIComponent(city)}` : ''}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setOntopoUrl(data.url);
+        window.open(data.url, '_blank');
+      } else {
+        console.log('No ONTOPO page available for this restaurant');
+      }
+    } catch (error) {
+      console.error('Error fetching ONTOPO link:', error);
+    } finally {
+      setLoadingOntopo(false);
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -460,6 +539,21 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                   <Globe className="w-5 h-5 text-gray-600" />
                 )}
               </button>
+              {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
+              {isIsrael && (
+                <button 
+                  onClick={handleOntopo}
+                  disabled={loadingOntopo}
+                  className="flex items-center justify-center w-12 h-12 bg-green-50 rounded-2xl hover:bg-green-100 transition-colors active:scale-95 disabled:opacity-50 border border-green-200"
+                  title="Reserve on ONTOPO"
+                >
+                  {loadingOntopo ? (
+                    <Loader2 className="w-5 h-5 text-green-600 animate-spin" />
+                  ) : (
+                    <Calendar className="w-5 h-5 text-green-600" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
