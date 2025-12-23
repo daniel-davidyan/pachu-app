@@ -1,71 +1,122 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Helper function to normalize strings for comparison
+// Levenshtein distance for fuzzy string matching
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(
+          dp[i - 1][j - 1] + 1,
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1
+        );
+      }
+    }
+  }
+
+  return dp[m][n];
+}
+
+// Normalize string for comparison
 function normalizeString(str: string): string {
   return str
     .toLowerCase()
-    .replace(/[^\w\s\u0590-\u05FF]/g, '') // Keep only alphanumeric and Hebrew
+    .replace(/[^\w\s\u0590-\u05FF]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-// Calculate similarity score between two strings
+// Calculate similarity percentage between two strings
 function calculateSimilarity(str1: string, str2: string): number {
   const norm1 = normalizeString(str1);
   const norm2 = normalizeString(str2);
   
+  if (!norm1 || !norm2) return 0;
+  
   // Exact match
   if (norm1 === norm2) return 100;
   
-  // Check if one contains the other
-  if (norm1.includes(norm2) || norm2.includes(norm1)) return 80;
+  // Calculate Levenshtein distance
+  const distance = levenshteinDistance(norm1, norm2);
+  const maxLength = Math.max(norm1.length, norm2.length);
+  const similarity = ((maxLength - distance) / maxLength) * 100;
   
-  // Check word overlap
-  const words1 = new Set(norm1.split(' '));
-  const words2 = new Set(norm2.split(' '));
-  const intersection = new Set([...words1].filter(x => words2.has(x)));
-  
-  if (intersection.size > 0) {
-    const avgSize = (words1.size + words2.size) / 2;
-    return (intersection.size / avgSize) * 60;
-  }
-  
-  return 0;
+  return Math.max(0, similarity);
+}
+
+// Extract city name from address
+function extractCity(address: string): string {
+  const normalized = normalizeString(address);
+  const parts = normalized.split(/[,،]/);
+  return parts.length > 0 ? parts[parts.length - 1].trim() : '';
 }
 
 // Find best matching result
 function findBestMatch(searchResults: any[], targetName: string, targetAddress?: string): any | null {
+  if (searchResults.length === 0) return null;
+  
+  // If we only have one result, return it if similarity is reasonable
+  if (searchResults.length === 1) {
+    const nameScore = calculateSimilarity(searchResults[0].title || '', targetName);
+    console.log(`📊 Single result "${searchResults[0].title}": name score ${nameScore.toFixed(1)}%`);
+    
+    // Accept single result with at least 40% name match
+    if (nameScore >= 40) {
+      console.log(`✅ Accepting single result`);
+      return searchResults[0];
+    }
+    return null;
+  }
+
   let bestMatch = null;
   let bestScore = 0;
 
   for (const result of searchResults) {
-    let score = 0;
-    
-    // Compare name (most important)
+    // Name similarity (0-100)
     const nameScore = calculateSimilarity(result.title || '', targetName);
-    score += nameScore * 2; // Weight name heavily
     
-    // Compare address if available
+    // Address/city similarity if available
+    let addressScore = 0;
     if (targetAddress && result.address) {
-      const addressScore = calculateSimilarity(result.address, targetAddress);
-      score += addressScore;
+      // Compare full address
+      const fullAddressScore = calculateSimilarity(result.address, targetAddress);
+      
+      // Compare city names
+      const targetCity = extractCity(targetAddress);
+      const resultCity = extractCity(result.address);
+      const cityScore = calculateSimilarity(targetCity, resultCity);
+      
+      // Use best of full address or city match
+      addressScore = Math.max(fullAddressScore, cityScore);
     }
     
-    console.log(`📊 Match score for "${result.title}": ${score}`);
+    // Weighted score: name 70%, address 30%
+    const totalScore = (nameScore * 0.7) + (addressScore * 0.3);
     
-    if (score > bestScore) {
-      bestScore = score;
+    console.log(`📊 "${result.title}": name=${nameScore.toFixed(1)}%, address=${addressScore.toFixed(1)}%, total=${totalScore.toFixed(1)}%`);
+    
+    if (totalScore > bestScore) {
+      bestScore = totalScore;
       bestMatch = result;
     }
   }
   
   // Require at least 40% match confidence
   if (bestScore < 40) {
-    console.log(`❌ No confident match found. Best score: ${bestScore}`);
+    console.log(`❌ No confident match found. Best score: ${bestScore.toFixed(1)}%`);
     return null;
   }
   
-  console.log(`✅ Best match: "${bestMatch?.title}" with score ${bestScore}`);
+  console.log(`✅ Best match: "${bestMatch?.title}" with score ${bestScore.toFixed(1)}%`);
   return bestMatch;
 }
 
