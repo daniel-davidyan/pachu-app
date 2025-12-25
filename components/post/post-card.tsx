@@ -933,7 +933,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                               </button>
                               
                               {user && comment.user.id === user.id && (
-                                <div className="relative" ref={el => commentMenuRef.current[comment.id] = el}>
+                                <div className="relative" ref={el => { commentMenuRef.current[comment.id] = el; }}>
                                   <button
                                     onClick={() => setCommentMenuOpen(commentMenuOpen === comment.id ? null : comment.id)}
                                     className="text-gray-400 hover:text-gray-600 transition-colors p-1"
