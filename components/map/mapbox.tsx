@@ -605,6 +605,8 @@ export function Mapbox({
           visibility: hidden;
           opacity: 0;
           transition: opacity 0.2s ease-in;
+          pointer-events: auto;
+          touch-action: manipulation;
         ">
           <!-- White circle with icon + progress ring -->
           <div style="position: relative; width: 46px; height: 46px; flex-shrink: 0;">
@@ -773,6 +775,8 @@ export function Mapbox({
           visibility: hidden;
           opacity: 0;
           transition: all 0.2s ease;
+          pointer-events: auto;
+          touch-action: manipulation;
         "></div>
       `;
 
@@ -848,6 +852,18 @@ export function Mapbox({
             transform: translate(-50%, -50%) scale(1.5);
             opacity: 0;
           }
+        }
+        
+        /* Make marker containers pass through touch events to map for smooth zooming */
+        .mapboxgl-marker {
+          pointer-events: none !important;
+        }
+        
+        /* But keep markers themselves interactive */
+        .mapboxgl-marker .marker-wrapper,
+        .mapboxgl-marker .dot-marker,
+        .mapboxgl-marker .user-location-marker {
+          pointer-events: auto !important;
         }
         
         /* Force restaurant markers to stay hidden until explicitly shown */
