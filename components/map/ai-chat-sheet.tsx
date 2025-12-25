@@ -109,7 +109,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const minHeight = 200; // Minimum when pane is visible
 
@@ -383,19 +383,33 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
             right: 'max(1rem, env(safe-area-inset-right))',
           }}
         >
-          <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-2 shadow-xl focus-within:border-primary transition-all hover:shadow-2xl">
-            <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
-            <input
-              type="text"
+          <div className="flex items-start gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-2 shadow-xl focus-within:border-primary transition-all hover:shadow-2xl">
+            <Sparkles className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            <textarea
               value={inputValue}
               onChange={(e) => {
                 setInputValue(e.target.value);
                 if (!isActive) handleActivate();
               }}
-              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               onFocus={handleActivate}
               placeholder="Search restaurants..."
-              className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium"
+              rows={1}
+              className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium resize-none overflow-hidden py-0.5"
+              style={{
+                maxHeight: '100px',
+                minHeight: '20px'
+              }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = Math.min(target.scrollHeight, 100) + 'px';
+              }}
             />
             <button
               onClick={handleSend}
@@ -717,15 +731,28 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
 
             {/* Input Area */}
             <div className="flex-shrink-0">
-              <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-full px-4 py-2 focus-within:border-primary transition-colors shadow-md">
-                <input
+              <div className="flex items-end gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-2 focus-within:border-primary transition-colors shadow-md">
+                <textarea
                   ref={inputRef}
-                  type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
                   placeholder="What are you craving?"
-                  className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400"
+                  rows={1}
+                  className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 resize-none overflow-hidden py-0.5 max-h-32"
+                  style={{
+                    minHeight: '20px'
+                  }}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+                  }}
                 />
                 <button
                   onClick={handleSend}
