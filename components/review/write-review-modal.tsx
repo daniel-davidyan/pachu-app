@@ -298,7 +298,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
             </div>
           ) : (
             /* Experience Step - Compact */
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-3">
               {/* Selected Restaurant - Compact */}
               <div className="flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
                 <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
@@ -322,20 +322,20 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 )}
               </div>
 
-              {/* Star Rating - Compact */}
+              {/* Star Rating - Full Width Compact */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Rating</label>
-                <div className="flex gap-1.5 justify-center">
+                <label className="block text-xs font-semibold text-gray-700 mb-2">Your Rating</label>
+                <div className="flex gap-1 w-full">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       onClick={() => setRating(star)}
                       onMouseEnter={() => setHoverRating(star)}
                       onMouseLeave={() => setHoverRating(0)}
-                      className="p-0.5 transition-transform hover:scale-110"
+                      className="flex-1 transition-transform hover:scale-110"
                     >
                       <Star
-                        className={`w-9 h-9 ${
+                        className={`w-full h-auto max-h-8 ${
                           star <= (hoverRating || rating)
                             ? 'fill-yellow-400 text-yellow-400'
                             : 'text-gray-300'
@@ -345,7 +345,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                   ))}
                 </div>
                 {rating > 0 && (
-                  <p className="text-center text-xs font-medium text-primary mt-1.5">
+                  <p className="text-center text-xs font-medium text-primary mt-1">
                     {rating === 1 && '😞 Poor'}
                     {rating === 2 && '😐 Fair'}
                     {rating === 3 && '😊 Good'}
@@ -355,21 +355,9 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 )}
               </div>
 
-              {/* Experience Text - Compact */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Experience (Optional)</label>
-                <textarea
-                  value={experienceText}
-                  onChange={(e) => setExperienceText(e.target.value)}
-                  placeholder="Share your experience..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none border border-gray-200"
-                />
-              </div>
-
               {/* Photo Upload - Compact */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Add Photos (Optional)</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-2">Add Photos (Optional)</label>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -379,29 +367,56 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                   className="hidden"
                 />
                 
-                <div className="flex gap-1.5 flex-wrap">
-                  {photoUrls.map((url, index) => (
-                    <div key={index} className="relative w-16 h-16">
-                      <img src={url} alt="" className="w-full h-full object-cover rounded-lg border border-gray-200" />
-                      <button
-                        onClick={() => removePhoto(index)}
-                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                {photoUrls.length === 0 ? (
+                  /* Compact upload placeholder */
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full h-28 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:shadow-md transition-shadow">
+                      <Camera className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors" />
                     </div>
-                  ))}
-                  
-                  {photoUrls.length < 5 && (
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
-                    >
-                      <Camera className="w-5 h-5" />
-                      <span className="text-[10px] mt-0.5">Add</span>
-                    </button>
-                  )}
-                </div>
+                    <p className="text-xs font-semibold text-gray-600 group-hover:text-primary">Add Photos</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Tap to upload</p>
+                  </button>
+                ) : (
+                  /* Photo grid when photos exist */
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {photoUrls.map((url, index) => (
+                      <div key={index} className="relative aspect-square">
+                        <img src={url} alt="" className="w-full h-full object-cover rounded-lg border border-gray-200" />
+                        <button
+                          onClick={() => removePhoto(index)}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {photoUrls.length < 6 && (
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <Camera className="w-5 h-5" />
+                        <span className="text-[9px] mt-0.5 font-medium">Add</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Experience Text - Compact */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-2">Your Experience (Optional)</label>
+                <textarea
+                  value={experienceText}
+                  onChange={(e) => setExperienceText(e.target.value)}
+                  placeholder="Share your thoughts..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none border border-gray-200"
+                />
               </div>
 
               {/* Submit Button - Compact & Modern */}
