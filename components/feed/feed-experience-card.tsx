@@ -45,6 +45,7 @@ interface FeedExperienceCardProps {
   restaurant: RestaurantFeed;
   userLocation: { latitude: number; longitude: number } | null;
   onUpdate?: () => void;
+  onSheetStateChange?: (isOpen: boolean) => void;
 }
 
 // Modern gradient + icon placeholders - defined outside component for stability
@@ -56,7 +57,7 @@ const PLACEHOLDER_CONFIGS = [
   { gradient: 'from-fuchsia-400 to-pink-500', Icon: Star },
 ];
 
-export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedExperienceCardProps) {
+export function FeedExperienceCard({ restaurant, userLocation, onUpdate, onSheetStateChange }: FeedExperienceCardProps) {
   const { user } = useUser();
   const { showToast } = useToast();
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -128,6 +129,16 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
       },
     }));
   };
+
+  // Notify parent when any sheet opens or closes
+  useEffect(() => {
+    if (onSheetStateChange) {
+      const hasAnySheetOpen = Object.values(experienceStates).some(
+        state => state.showComments || state.showLikes
+      );
+      onSheetStateChange(hasAnySheetOpen);
+    }
+  }, [experienceStates, onSheetStateChange]);
 
   const scrollCarousel = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return;

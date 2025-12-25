@@ -523,6 +523,7 @@ export default function FeedPage() {
                 restaurant={restaurant}
                 userLocation={userLocation}
                 onUpdate={() => fetchRestaurants(0)}
+                onSheetStateChange={setSheetOpen}
               />
             ) : (
               <FeedRestaurantCard
