@@ -605,8 +605,6 @@ export function Mapbox({
           visibility: hidden;
           opacity: 0;
           transition: opacity 0.2s ease-in;
-          pointer-events: auto;
-          touch-action: manipulation;
         ">
           <!-- White circle with icon + progress ring -->
           <div style="position: relative; width: 46px; height: 46px; flex-shrink: 0;">
@@ -711,6 +709,21 @@ export function Mapbox({
       const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
       const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
       
+      // Track touch state to differentiate between tap and multi-touch gestures
+      let touchCount = 0;
+      
+      el.addEventListener('touchstart', (e) => {
+        touchCount = e.touches.length;
+        // If multi-touch (pinch zoom), don't interfere - let it pass through
+        if (touchCount > 1) {
+          e.stopPropagation(); // Stop it from being treated as marker interaction
+        }
+      });
+      
+      el.addEventListener('touchend', (e) => {
+        touchCount = 0;
+      });
+      
       el.addEventListener('mouseenter', () => {
         if (markerCircle) {
           markerCircle.style.transform = 'scale(1.1)';
@@ -724,8 +737,9 @@ export function Mapbox({
         }
       });
 
-      el.addEventListener('click', () => {
-        if (onRestaurantClick) {
+      el.addEventListener('click', (e) => {
+        // Only handle single-touch taps
+        if (touchCount <= 1 && onRestaurantClick) {
           onRestaurantClick(restaurant);
         }
       });
@@ -775,12 +789,25 @@ export function Mapbox({
           visibility: hidden;
           opacity: 0;
           transition: all 0.2s ease;
-          pointer-events: auto;
-          touch-action: manipulation;
         "></div>
       `;
 
       const dotContent = el.querySelector('.dot-marker') as HTMLElement;
+      
+      // Track touch state for dot markers too
+      let dotTouchCount = 0;
+      
+      el.addEventListener('touchstart', (e) => {
+        dotTouchCount = e.touches.length;
+        // If multi-touch (pinch zoom), don't interfere
+        if (dotTouchCount > 1) {
+          e.stopPropagation();
+        }
+      });
+      
+      el.addEventListener('touchend', (e) => {
+        dotTouchCount = 0;
+      });
       
       el.addEventListener('mouseenter', () => {
         if (dotContent) {
@@ -795,8 +822,9 @@ export function Mapbox({
         }
       });
 
-      el.addEventListener('click', () => {
-        if (onRestaurantClick) {
+      el.addEventListener('click', (e) => {
+        // Only handle single-touch taps
+        if (dotTouchCount <= 1 && onRestaurantClick) {
           onRestaurantClick(restaurant);
         }
       });
@@ -854,16 +882,20 @@ export function Mapbox({
           }
         }
         
-        /* Make marker containers pass through touch events to map for smooth zooming */
+        /* Make marker containers completely transparent to touch/pointer events */
         .mapboxgl-marker {
           pointer-events: none !important;
         }
         
-        /* But keep markers themselves interactive */
+        /* Allow markers to be clickable */
         .mapboxgl-marker .marker-wrapper,
-        .mapboxgl-marker .dot-marker,
-        .mapboxgl-marker .user-location-marker {
+        .mapboxgl-marker .dot-marker {
           pointer-events: auto !important;
+        }
+        
+        /* User location marker should be visible but not block gestures */
+        .mapboxgl-marker .user-location-marker {
+          pointer-events: none !important;
         }
         
         /* Force restaurant markers to stay hidden until explicitly shown */
