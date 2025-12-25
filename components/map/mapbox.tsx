@@ -709,71 +709,65 @@ export function Mapbox({
       const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
       const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
       
-      // Track touch gestures to differentiate between tap and zoom
-      let touchStartTime = 0;
-      let touchStartX = 0;
-      let touchStartY = 0;
+      // Track gesture state to differentiate tap from drag/zoom
+      let gestureStartTime = 0;
+      let gestureStartX = 0;
+      let gestureStartY = 0;
+      let isDragging = false;
       let isMultiTouch = false;
+      let touchIdentifier: number | null = null;
       
       el.addEventListener('touchstart', (e) => {
+        // Record initial touch state
+        const touch = e.touches[0];
+        touchIdentifier = touch.identifier;
+        gestureStartTime = Date.now();
+        gestureStartX = touch.clientX;
+        gestureStartY = touch.clientY;
+        isDragging = false;
         isMultiTouch = e.touches.length > 1;
-        
-        if (isMultiTouch) {
-          // Multi-touch detected - make marker transparent to events
-          el.style.pointerEvents = 'none';
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
-        } else {
-          // Single touch - could be a tap
-          el.style.pointerEvents = 'auto';
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
-          touchStartTime = Date.now();
-          touchStartX = e.touches[0].clientX;
-          touchStartY = e.touches[0].clientY;
-        }
       });
       
       el.addEventListener('touchmove', (e) => {
+        // Check if user is dragging or multi-touch zooming
         if (e.touches.length > 1) {
           isMultiTouch = true;
-          // Make marker transparent during multi-touch
-          el.style.pointerEvents = 'none';
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
-        }
-      });
-      
-      el.addEventListener('touchend', (e) => {
-        // Re-enable pointer events after touch ends
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
-          isMultiTouch = false;
-        }, 50);
-        
-        // Check if this was a tap (quick, no movement, single touch)
-        if (!isMultiTouch && e.changedTouches.length === 1) {
-          const touchEndTime = Date.now();
-          const touchEndX = e.changedTouches[0].clientX;
-          const touchEndY = e.changedTouches[0].clientY;
-          const timeDiff = touchEndTime - touchStartTime;
-          const distance = Math.sqrt(
-            Math.pow(touchEndX - touchStartX, 2) + 
-            Math.pow(touchEndY - touchStartY, 2)
-          );
+          isDragging = true; // Treat zoom as non-clickable
+        } else if (e.touches[0].identifier === touchIdentifier) {
+          // Calculate movement distance
+          const moveX = e.touches[0].clientX - gestureStartX;
+          const moveY = e.touches[0].clientY - gestureStartY;
+          const distance = Math.sqrt(moveX * moveX + moveY * moveY);
           
-          // If it was a quick tap with minimal movement, open the restaurant
-          if (timeDiff < 300 && distance < 10 && onRestaurantClick) {
-            onRestaurantClick(restaurant);
+          // If moved more than 10px, it's a drag
+          if (distance > 10) {
+            isDragging = true;
           }
         }
       });
       
+      el.addEventListener('touchend', (e) => {
+        const touchDuration = Date.now() - gestureStartTime;
+        
+        // Only trigger click if:
+        // 1. It was a single touch (not multi-touch zoom)
+        // 2. User didn't drag
+        // 3. Touch duration was reasonable (< 500ms)
+        if (!isMultiTouch && !isDragging && touchDuration < 500 && onRestaurantClick) {
+          onRestaurantClick(restaurant);
+        }
+        
+        // Reset state
+        isDragging = false;
+        isMultiTouch = false;
+        touchIdentifier = null;
+      });
+      
       el.addEventListener('touchcancel', (e) => {
-        // Also re-enable on touch cancel
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
-          isMultiTouch = false;
-        }, 50);
+        // Reset on cancel
+        isDragging = false;
+        isMultiTouch = false;
+        touchIdentifier = null;
       });
       
       el.addEventListener('mouseenter', () => {
@@ -791,8 +785,8 @@ export function Mapbox({
       });
 
       el.addEventListener('click', (e) => {
-        // For mouse clicks (desktop) - don't trigger if it was a multi-touch
-        if (!isMultiTouch && onRestaurantClick) {
+        // For mouse clicks (desktop)
+        if (onRestaurantClick) {
           onRestaurantClick(restaurant);
         }
       });
@@ -847,65 +841,57 @@ export function Mapbox({
 
       const dotContent = el.querySelector('.dot-marker') as HTMLElement;
       
-      // Track touch gestures for dots
-      let dotTouchStartTime = 0;
-      let dotTouchStartX = 0;
-      let dotTouchStartY = 0;
+      // Track gesture state for dot markers
+      let dotGestureStartTime = 0;
+      let dotGestureStartX = 0;
+      let dotGestureStartY = 0;
+      let dotIsDragging = false;
       let dotIsMultiTouch = false;
+      let dotTouchIdentifier: number | null = null;
       
       el.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        dotTouchIdentifier = touch.identifier;
+        dotGestureStartTime = Date.now();
+        dotGestureStartX = touch.clientX;
+        dotGestureStartY = touch.clientY;
+        dotIsDragging = false;
         dotIsMultiTouch = e.touches.length > 1;
-        
-        if (dotIsMultiTouch) {
-          // Multi-touch - make dot transparent
-          el.style.pointerEvents = 'none';
-          if (dotContent) dotContent.style.pointerEvents = 'none';
-        } else {
-          el.style.pointerEvents = 'auto';
-          if (dotContent) dotContent.style.pointerEvents = 'auto';
-          dotTouchStartTime = Date.now();
-          dotTouchStartX = e.touches[0].clientX;
-          dotTouchStartY = e.touches[0].clientY;
-        }
       });
       
       el.addEventListener('touchmove', (e) => {
         if (e.touches.length > 1) {
           dotIsMultiTouch = true;
-          el.style.pointerEvents = 'none';
-          if (dotContent) dotContent.style.pointerEvents = 'none';
-        }
-      });
-      
-      el.addEventListener('touchend', (e) => {
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-          if (dotContent) dotContent.style.pointerEvents = 'auto';
-          dotIsMultiTouch = false;
-        }, 50);
-        
-        if (!dotIsMultiTouch && e.changedTouches.length === 1) {
-          const touchEndTime = Date.now();
-          const touchEndX = e.changedTouches[0].clientX;
-          const touchEndY = e.changedTouches[0].clientY;
-          const timeDiff = touchEndTime - dotTouchStartTime;
-          const distance = Math.sqrt(
-            Math.pow(touchEndX - dotTouchStartX, 2) + 
-            Math.pow(touchEndY - dotTouchStartY, 2)
-          );
+          dotIsDragging = true;
+        } else if (e.touches[0].identifier === dotTouchIdentifier) {
+          const moveX = e.touches[0].clientX - dotGestureStartX;
+          const moveY = e.touches[0].clientY - dotGestureStartY;
+          const distance = Math.sqrt(moveX * moveX + moveY * moveY);
           
-          if (timeDiff < 300 && distance < 10 && onRestaurantClick) {
-            onRestaurantClick(restaurant);
+          if (distance > 10) {
+            dotIsDragging = true;
           }
         }
       });
       
+      el.addEventListener('touchend', (e) => {
+        const touchDuration = Date.now() - dotGestureStartTime;
+        
+        // Only trigger click if it was a tap (not drag/zoom)
+        if (!dotIsMultiTouch && !dotIsDragging && touchDuration < 500 && onRestaurantClick) {
+          onRestaurantClick(restaurant);
+        }
+        
+        // Reset state
+        dotIsDragging = false;
+        dotIsMultiTouch = false;
+        dotTouchIdentifier = null;
+      });
+      
       el.addEventListener('touchcancel', (e) => {
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-          if (dotContent) dotContent.style.pointerEvents = 'auto';
-          dotIsMultiTouch = false;
-        }, 50);
+        dotIsDragging = false;
+        dotIsMultiTouch = false;
+        dotTouchIdentifier = null;
       });
       
       el.addEventListener('mouseenter', () => {
@@ -924,7 +910,7 @@ export function Mapbox({
 
       el.addEventListener('click', (e) => {
         // For mouse clicks (desktop)
-        if (!dotIsMultiTouch && onRestaurantClick) {
+        if (onRestaurantClick) {
           onRestaurantClick(restaurant);
         }
       });
