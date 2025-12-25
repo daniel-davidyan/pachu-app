@@ -152,15 +152,24 @@ if (googleReviews.length > 0) {
 
 ## Visual Treatment
 
+### Google Reviews - Read-Only
+**Google reviews are external content and should not have social interactions:**
+- ❌ **NO like button** for Google reviews
+- ❌ **NO comment button** for Google reviews
+- ✅ **Read-only display** - users can read but not interact
+- **Detection**: Reviews with ID starting with `google-` are treated as read-only
+- This keeps social interactions limited to user-generated content
+
 ### Google Reviews - Photo Strategy
 **Since Google API doesn't provide per-review photos:**
 - **First 3 reviews**: Use restaurant's photos (one per review)
 - **Remaining reviews**: Use beautiful gradient placeholders
 - This ensures visual variety and avoids repetition
 
-### User Reviews (Friends & Own)
+### User Reviews (Friends & Own) - Interactive
 - Display uploaded photos from database
 - Use gradient placeholders if no photos uploaded
+- ✅ **Full social interactions**: likes and comments enabled
 - Gradients: orange→pink, purple→indigo, blue→cyan, violet→purple, fuchsia→pink
 - Each includes an icon (utensils, chef hat, sparkles, star)
 
@@ -193,6 +202,8 @@ if (googleReviews.length > 0) {
 4. **User Transparency**: Banner explains why they're seeing Google reviews
 5. **Social Encouragement**: Motivates users to be first among friends
 6. **API Limitation Handled**: Works within Google Places API constraints
+7. **Read-Only External Content**: Google reviews don't clutter social interactions - no fake likes/comments
+8. **Social Focus**: Likes and comments are exclusive to user-generated content from friends and self
 
 ## Technical Notes
 

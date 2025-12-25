@@ -630,6 +630,7 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
         >
           {restaurant.reviews.map((experience) => {
             const state = getExperienceState(experience.id);
+            const isGoogleReview = experience.id.startsWith('google-');
             
             return (
               <div
@@ -710,46 +711,48 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
                   </p>
                 )}
 
-                {/* Instagram-style Like/Comment Bar */}
-                <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
-                  {/* Like */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleLike(experience)}
-                      className="transition-transform active:scale-90"
-                    >
-                      <Heart
-                        className={`w-6 h-6 ${state.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
-                        strokeWidth={state.isLiked ? 0 : 1.5}
-                      />
-                    </button>
-                    <button
-                      onClick={() => loadLikes(experience.id)}
-                      className="text-sm font-semibold text-gray-900 hover:text-gray-600"
-                    >
-                      {state.likesCount || experience.likesCount || 0}
-                    </button>
-                  </div>
+                {/* Instagram-style Like/Comment Bar - Only for user/friend reviews, NOT Google reviews */}
+                {!isGoogleReview && (
+                  <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
+                    {/* Like */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleLike(experience)}
+                        className="transition-transform active:scale-90"
+                      >
+                        <Heart
+                          className={`w-6 h-6 ${state.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
+                          strokeWidth={state.isLiked ? 0 : 1.5}
+                        />
+                      </button>
+                      <button
+                        onClick={() => loadLikes(experience.id)}
+                        className="text-sm font-semibold text-gray-900 hover:text-gray-600"
+                      >
+                        {state.likesCount || experience.likesCount || 0}
+                      </button>
+                    </div>
 
-                  {/* Comment */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => loadComments(experience.id)}
-                      className="transition-transform active:scale-90"
-                    >
-                      <MessageCircle
-                        className="w-6 h-6 text-gray-900"
-                        strokeWidth={1.5}
-                      />
-                    </button>
-                    <button
-                      onClick={() => loadComments(experience.id)}
-                      className="text-sm font-semibold text-gray-900 hover:text-gray-600"
-                    >
-                      {state.commentsCount > 0 ? state.commentsCount : (experience.commentsCount || 0)}
-                    </button>
+                    {/* Comment */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => loadComments(experience.id)}
+                        className="transition-transform active:scale-90"
+                      >
+                        <MessageCircle
+                          className="w-6 h-6 text-gray-900"
+                          strokeWidth={1.5}
+                        />
+                      </button>
+                      <button
+                        onClick={() => loadComments(experience.id)}
+                        className="text-sm font-semibold text-gray-900 hover:text-gray-600"
+                      >
+                        {state.commentsCount > 0 ? state.commentsCount : (experience.commentsCount || 0)}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}

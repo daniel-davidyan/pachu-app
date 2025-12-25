@@ -95,6 +95,9 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
   const commentMenuRef = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
+  // Check if this is a Google review (ID starts with "google-")
+  const isGoogleReview = post.id.startsWith('google-');
+
   // Generate random food emoji once and keep it stable
   const randomFoodEmoji = useMemo(() => {
     const foodEmojis = ['🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛'];
@@ -745,52 +748,54 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
         </div>
       </div>
 
-      {/* Interaction Bar - Instagram Style - Always at Bottom */}
-      <div className="px-4 py-2.5 border-t border-gray-50">
-        <div className="flex items-center gap-4">
-          {/* Like Button + Count */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleLike}
-              className="transition-transform active:scale-90"
-            >
-              <Heart 
-                className={`w-[26px] h-[26px] ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
-                strokeWidth={isLiked ? 0 : 1.5}
-              />
-            </button>
-            {likesCount > 0 && (
+      {/* Interaction Bar - Instagram Style - Only for user/friend reviews, NOT Google reviews */}
+      {!isGoogleReview && (
+        <div className="px-4 py-2.5 border-t border-gray-50">
+          <div className="flex items-center gap-4">
+            {/* Like Button + Count */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={loadLikes}
-                className="text-sm font-semibold text-gray-900"
+                onClick={handleLike}
+                className="transition-transform active:scale-90"
               >
-                {likesCount}
+                <Heart 
+                  className={`w-[26px] h-[26px] ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-900'}`}
+                  strokeWidth={isLiked ? 0 : 1.5}
+                />
               </button>
-            )}
-          </div>
-          
-          {/* Comment Button + Count */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadComments}
-              className="transition-transform active:scale-90"
-            >
-              <MessageCircle 
-                className="w-[26px] h-[26px] text-gray-900" 
-                strokeWidth={1.5}
-              />
-            </button>
-            {post.commentsCount > 0 && (
+              {likesCount > 0 && (
+                <button
+                  onClick={loadLikes}
+                  className="text-sm font-semibold text-gray-900"
+                >
+                  {likesCount}
+                </button>
+              )}
+            </div>
+            
+            {/* Comment Button + Count */}
+            <div className="flex items-center gap-2">
               <button
                 onClick={loadComments}
-                className="text-sm font-semibold text-gray-900"
+                className="transition-transform active:scale-90"
               >
-                {post.commentsCount}
+                <MessageCircle 
+                  className="w-[26px] h-[26px] text-gray-900" 
+                  strokeWidth={1.5}
+                />
               </button>
-            )}
+              {post.commentsCount > 0 && (
+                <button
+                  onClick={loadComments}
+                  className="text-sm font-semibold text-gray-900"
+                >
+                  {post.commentsCount}
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Likes Bottom Sheet */}
       <BottomSheet
