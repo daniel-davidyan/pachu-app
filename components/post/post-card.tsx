@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical, Camera } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -668,75 +668,82 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
           </Link>
         )}
 
-        {/* Review Title */}
-        {post.title && (
-          <h3 className="font-semibold text-gray-900 mb-2">
-            {post.title}
-          </h3>
-        )}
-
-        {/* Review Content */}
-        {post.content && (
-          <div className="mb-3">
-            <p className={`text-sm text-gray-700 leading-relaxed ${!expandedContent && shouldShowExpand ? 'line-clamp-3' : ''}`}>
-              {post.content}
-            </p>
-            {shouldShowExpand && (
-              <button
-                onClick={() => setExpandedContent(!expandedContent)}
-                className="text-primary text-sm font-semibold mt-1"
-              >
-                {expandedContent ? 'Show less' : 'Read more'}
-              </button>
+        {/* Photos - Carousel with 20% peek OR Placeholder Shimmer */}
+        {post.photos && post.photos.length > 0 ? (
+          <div className="relative">
+            {post.photos.length === 1 ? (
+              <img
+                src={post.photos[0]}
+                alt="Experience photo"
+                className="w-full h-64 object-cover"
+              />
+            ) : (
+              <div className="overflow-hidden">
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
+                  {post.photos.map((photo, index) => (
+                    <img
+                      key={index}
+                      src={photo}
+                      alt={`Experience photo ${index + 1}`}
+                      className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
+                      style={{ width: 'calc(80vw - 2rem)' }}
+                    />
+                  ))}
+                  <div className="w-4 flex-shrink-0" />
+                </div>
+              </div>
             )}
           </div>
-        )}
-
-        {/* Visit Date */}
-        {post.visitDate && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Visited {format(new Date(post.visitDate), 'MMM d, yyyy')}</span>
+        ) : (
+          /* Modern upload placeholder for posts without photos */
+          <div className="relative bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 border-2 border-dashed border-gray-300">
+            <div className="w-full h-48 flex flex-col items-center justify-center gap-3 py-8">
+              <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center">
+                <Camera className="w-8 h-8 text-gray-400" />
+              </div>
+              <div className="text-center px-4">
+                <p className="text-sm font-semibold text-gray-600">No photos yet</p>
+                <p className="text-xs text-gray-400 mt-1">Add photos to share your experience</p>
+              </div>
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Photos - Carousel with 20% peek OR Placeholder Shimmer */}
-      {post.photos && post.photos.length > 0 ? (
-        <div className="relative">
-          {post.photos.length === 1 ? (
-            <img
-              src={post.photos[0]}
-              alt="Experience photo"
-              className="w-full h-64 object-cover"
-            />
-          ) : (
-            <div className="overflow-hidden">
-              <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
-                {post.photos.map((photo, index) => (
-                  <img
-                    key={index}
-                    src={photo}
-                    alt={`Experience photo ${index + 1}`}
-                    className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
-                    style={{ width: 'calc(80vw - 2rem)' }}
-                  />
-                ))}
-                <div className="w-4 flex-shrink-0" />
-              </div>
+        {/* Content section after photos */}
+        <div className="px-4 pt-3">
+          {/* Review Title */}
+          {post.title && (
+            <h3 className="font-semibold text-gray-900 mb-2">
+              {post.title}
+            </h3>
+          )}
+
+          {/* Review Content */}
+          {post.content && (
+            <div className="mb-3">
+              <p className={`text-sm text-gray-700 leading-relaxed ${!expandedContent && shouldShowExpand ? 'line-clamp-3' : ''}`}>
+                {post.content}
+              </p>
+              {shouldShowExpand && (
+                <button
+                  onClick={() => setExpandedContent(!expandedContent)}
+                  className="text-primary text-sm font-semibold mt-1"
+                >
+                  {expandedContent ? 'Show less' : 'Read more'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Visit Date */}
+          {post.visitDate && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Visited {format(new Date(post.visitDate), 'MMM d, yyyy')}</span>
             </div>
           )}
         </div>
-      ) : (
-        /* Single placeholder shimmer for posts without photos */
-        <div className="relative">
-          <div className="w-full h-32 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 flex items-center justify-center animate-pulse">
-            <span className="text-8xl opacity-20">
-              {randomFoodEmoji}
-            </span>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Interaction Bar - Instagram Style - Always at Bottom */}
       <div className="px-4 py-2.5 border-t border-gray-50">
