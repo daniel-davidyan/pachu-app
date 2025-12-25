@@ -214,20 +214,24 @@ export async function GET(
               })) || [];
             }
 
-            // Determine which reviews to show
+            // Determine which reviews to show - Priority system:
+            // 1. Friend reviews (if they exist)
+            // 2. Google reviews with photos (if friend reviews don't exist)
+            // 3. User's own reviews (if nothing else exists)
             let reviewsToShow: any[] = [];
             
-            // If we have reviews from following users (friends), show only those
+            // Check for friend reviews first
             if (user && followingIds.length > 0) {
               const friendReviews = ourReviews.filter(review => followingIds.includes(review.user.id));
               if (friendReviews.length > 0) {
+                // Friends have reviewed - show only their reviews
                 reviewsToShow = friendReviews;
               }
             }
             
-            // If no friend reviews or user not logged in, show Google reviews with photos only
-            if (reviewsToShow.length === 0 && googleData.reviews) {
-              reviewsToShow = (googleData.reviews || [])
+            // If no friend reviews (or user not logged in), try Google reviews with photos
+            if (reviewsToShow.length === 0 && googleData.reviews && googleData.reviews.length > 0) {
+              const googleReviewsWithPhotos = (googleData.reviews || [])
                 .filter((review: any) => {
                   // Only show Google reviews that have photos
                   return review.photos && review.photos.length > 0;
@@ -255,10 +259,35 @@ export async function GET(
                       : null
                   ).filter((url: string | null) => url !== null),
                 }));
+              
+              if (googleReviewsWithPhotos.length > 0) {
+                reviewsToShow = googleReviewsWithPhotos;
+              } else {
+                // No Google reviews with photos - show all Google reviews with gradient placeholders
+                reviewsToShow = (googleData.reviews || [])
+                  .map((review: any) => ({
+                    id: `google-${review.time}`,
+                    rating: review.rating,
+                    title: null,
+                    content: review.text || '',
+                    visitDate: null,
+                    createdAt: new Date(review.time * 1000).toISOString(),
+                    likesCount: 0,
+                    commentsCount: 0,
+                    isLiked: false,
+                    user: {
+                      id: review.author_name,
+                      username: review.author_name,
+                      fullName: review.author_name,
+                      avatarUrl: review.profile_photo_url,
+                    },
+                    photos: [], // Empty array will trigger gradient placeholders
+                  }));
+              }
             }
             
-            // If still no reviews to show, include all our reviews (including user's own)
-            if (reviewsToShow.length === 0) {
+            // Last resort: show user's own reviews if they exist
+            if (reviewsToShow.length === 0 && ourReviews.length > 0) {
               reviewsToShow = ourReviews;
             }
 
@@ -408,8 +437,9 @@ export async function GET(
     }) || [];
 
     // Prioritize friend reviews if user is logged in
+    // But if friends haven't reviewed, show all reviews (don't leave empty)
     let reviews = allReviews;
-    if (user) {
+    if (user && allReviews.length > 0) {
       const { data: followingData } = await supabase
         .from('follows')
         .select('following_id')
@@ -419,10 +449,11 @@ export async function GET(
       
       if (followingIds.length > 0) {
         const friendReviews = allReviews.filter(review => followingIds.includes(review.user.id));
-        // If there are friend reviews, show only those, otherwise show all
+        // Only show friend reviews if they exist, otherwise show all reviews
         if (friendReviews.length > 0) {
           reviews = friendReviews;
         }
+        // If friendReviews.length === 0, keep showing all reviews (don't filter)
       }
     }
 
