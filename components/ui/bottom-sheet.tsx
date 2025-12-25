@@ -18,26 +18,35 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef<number>(0);
 
   useEffect(() => {
     if (isOpen) {
+      // Save the current scroll position
+      scrollPositionRef.current = window.scrollY;
+      
+      // Lock the body scroll
       document.body.style.overflow = 'hidden';
-      // Prevent touch move on the body to stop background scrolling
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
-      document.body.style.top = `-${window.scrollY}px`;
+      document.body.style.top = `-${scrollPositionRef.current}px`;
     } else {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = 'unset';
+      // Restore the scroll position
+      const scrollY = scrollPositionRef.current;
+      
+      // Reset body styles
+      document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
+      
+      // Restore scroll position
+      window.scrollTo(0, scrollY);
     }
+    
     return () => {
-      document.body.style.overflow = 'unset';
+      // Cleanup on unmount
+      document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
