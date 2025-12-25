@@ -37,37 +37,51 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const [searching, setSearching] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(initialRestaurant || null);
   
-  const [rating, setRating] = useState(existingReview?.rating || 0);
+  // IMPORTANT: Initialize state to empty, let useEffect handle initial values
+  // This prevents any stale state issues
+  const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [experienceText, setExperienceText] = useState(existingReview?.content || '');
+  const [experienceText, setExperienceText] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
-  const [photoUrls, setPhotoUrls] = useState<string[]>(existingReview?.photos || []);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
   const { showToast } = useToast();
-  
-  // Track the review ID to detect when we're editing a different review
-  const existingReviewIdRef = useRef<string | null>(existingReview?.id || null);
 
-  // Update form when existingReview changes (only when editing a DIFFERENT review)
+  // Initialize/reset form when modal opens or existingReview changes
+  // This runs EVERY time isOpen becomes true or existingReview changes
   useEffect(() => {
-    if (existingReview && existingReview.id !== existingReviewIdRef.current) {
-      existingReviewIdRef.current = existingReview.id;
+    if (!isOpen) {
+      // When modal closes, reset initialized flag so next open will re-initialize
+      setInitialized(false);
+      return;
+    }
+    
+    // Only initialize once per modal open
+    if (initialized) return;
+    
+    console.log('[WriteReviewModal] Initializing with existingReview:', existingReview?.id, 'photos:', existingReview?.photos?.length);
+    
+    if (existingReview) {
+      // Editing mode - load existing data
       setRating(existingReview.rating);
-      setExperienceText(existingReview.content);
-      setPhotoUrls(existingReview.photos || []);
-      setPhotos([]);
-    } else if (!existingReview && existingReviewIdRef.current !== null) {
-      // Reset when switching from edit mode to create mode
-      existingReviewIdRef.current = null;
+      setExperienceText(existingReview.content || '');
+      // IMPORTANT: Create a fresh copy of the photos array to avoid reference issues
+      setPhotoUrls([...(existingReview.photos || [])]);
+      setPhotos([]); // No new files yet
+    } else {
+      // Create mode - start fresh
       setRating(0);
       setExperienceText('');
       setPhotoUrls([]);
       setPhotos([]);
     }
-  }, [existingReview]);
+    
+    setInitialized(true);
+  }, [isOpen, existingReview, initialized]);
 
   if (!isOpen) return null;
 
@@ -145,6 +159,11 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
     setSubmitting(true);
     try {
+      console.log('[WriteReviewModal] handleSubmit called');
+      console.log('[WriteReviewModal] Current photoUrls state:', photoUrls);
+      console.log('[WriteReviewModal] Current photos (files) state:', photos.length, 'files');
+      console.log('[WriteReviewModal] existingReview:', existingReview?.id);
+      
       // Build the final photo URLs array using a Set to prevent duplicates
       const photoUrlSet = new Set<string>();
       
@@ -154,9 +173,12 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
         const url = photoUrls[i];
         if (!url.startsWith('blob:')) {
           // This is an existing photo URL (from the database)
+          console.log('[WriteReviewModal] Adding existing photo:', url.substring(0, 50) + '...');
           photoUrlSet.add(url);
         }
       }
+      
+      console.log('[WriteReviewModal] After existing photos, set size:', photoUrlSet.size);
       
       // Then upload only the new photos (files in photos array)
       // These correspond to blob URLs in photoUrls but we upload the actual files
@@ -164,6 +186,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
         const photo = photos[i];
         const fileExt = photo.name.split('.').pop() || 'jpg';
         const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        console.log('[WriteReviewModal] Uploading new photo:', fileName);
         
         const { data, error } = await supabase.storage
           .from('review-photos')
@@ -178,11 +202,13 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           .from('review-photos')
           .getPublicUrl(`reviews/${fileName}`);
         
+        console.log('[WriteReviewModal] Uploaded, adding URL:', publicUrl.substring(0, 50) + '...');
         photoUrlSet.add(publicUrl);
       }
       
       // Convert Set back to array to preserve order and eliminate duplicates
       const finalPhotoUrls = Array.from(photoUrlSet);
+      console.log('[WriteReviewModal] Final photoUrls to send:', finalPhotoUrls.length, 'photos');
 
       // Submit experience
       const response = await fetch('/api/reviews', {

@@ -123,12 +123,30 @@ export async function POST(request: NextRequest) {
       }
 
       // Update photos
+      console.log('[API reviews] Updating photos for review:', reviewId);
+      console.log('[API reviews] Received photoUrls:', photoUrls?.length, 'photos');
+      
       if (photoUrls?.length > 0) {
+        // First, check how many photos exist before delete
+        const { data: existingPhotos, error: countError } = await supabase
+          .from('review_photos')
+          .select('id, photo_url')
+          .eq('review_id', reviewId);
+        
+        console.log('[API reviews] Existing photos before delete:', existingPhotos?.length || 0);
+        
         // Delete old photos
-        await supabase
+        const { error: deleteError, count: deleteCount } = await supabase
           .from('review_photos')
           .delete()
-          .eq('review_id', reviewId);
+          .eq('review_id', reviewId)
+          .select();
+
+        if (deleteError) {
+          console.error('[API reviews] Delete error:', deleteError);
+        } else {
+          console.log('[API reviews] Deleted photos count:', deleteCount);
+        }
 
         // Add new photos
         const photoInserts = photoUrls.map((url: string, index: number) => ({
@@ -137,13 +155,29 @@ export async function POST(request: NextRequest) {
           sort_order: index,
         }));
 
-        await supabase.from('review_photos').insert(photoInserts);
+        console.log('[API reviews] Inserting photos:', photoInserts.length);
+        const { error: insertError } = await supabase.from('review_photos').insert(photoInserts);
+        
+        if (insertError) {
+          console.error('[API reviews] Insert error:', insertError);
+        }
+        
+        // Verify final count
+        const { data: finalPhotos } = await supabase
+          .from('review_photos')
+          .select('id')
+          .eq('review_id', reviewId);
+        console.log('[API reviews] Final photos count after update:', finalPhotos?.length || 0);
       } else {
         // If no photos provided, delete all existing photos
-        await supabase
+        const { error: deleteError } = await supabase
           .from('review_photos')
           .delete()
           .eq('review_id', reviewId);
+        
+        if (deleteError) {
+          console.error('[API reviews] Delete all error:', deleteError);
+        }
       }
 
       return NextResponse.json({ 
