@@ -72,6 +72,7 @@ export default function FeedPage() {
   const scrollThreshold = 50; // Minimum scroll distance to trigger hide/show
   const hasFetchedOnMount = useRef(false);
   const scrollRestored = useRef(false);
+  const latestRequestId = useRef(0); // Track latest request to prevent race conditions
 
   // Restore feed settings IMMEDIATELY
   useLayoutEffect(() => {
@@ -235,6 +236,9 @@ export default function FeedPage() {
   const fetchRestaurants = useCallback(async (pageNum: number) => {
     if (!userLocation) return;
     
+    // Increment request ID to track this request
+    const requestId = ++latestRequestId.current;
+    
     try {
       if (pageNum === 0) {
         setLoading(true);
@@ -321,23 +325,26 @@ export default function FeedPage() {
 
           const validRestaurants = restaurantsWithReviews.filter(r => r !== null) as RestaurantFeed[];
           
-          if (pageNum === 0) {
-            setRestaurants(validRestaurants);
-          } else {
-            // Deduplicate when appending new restaurants
-            setRestaurants(prev => {
-              const combined = [...prev, ...validRestaurants];
-              const unique = combined.reduce((acc, restaurant) => {
-                if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
-                  acc.push(restaurant);
-                }
-                return acc;
-              }, [] as RestaurantFeed[]);
-              return unique;
-            });
+          // Only update state if this is still the latest request
+          if (requestId === latestRequestId.current) {
+            if (pageNum === 0) {
+              setRestaurants(validRestaurants);
+            } else {
+              // Deduplicate when appending new restaurants
+              setRestaurants(prev => {
+                const combined = [...prev, ...validRestaurants];
+                const unique = combined.reduce((acc, restaurant) => {
+                  if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
+                    acc.push(restaurant);
+                  }
+                  return acc;
+                }, [] as RestaurantFeed[]);
+                return unique;
+              });
+            }
+            setHasMore(googleData.restaurants.length > (pageNum + 1) * 5);
+            setPage(pageNum);
           }
-          setHasMore(googleData.restaurants.length > (pageNum + 1) * 5);
-          setPage(pageNum);
         }
       } else {
         // Use selected city location or user location
@@ -351,30 +358,36 @@ export default function FeedPage() {
         const data = await response.json();
 
         if (data.restaurants) {
-          if (pageNum === 0) {
-            setRestaurants(data.restaurants);
-          } else {
-            // Deduplicate when appending new restaurants
-            setRestaurants(prev => {
-              const combined = [...prev, ...data.restaurants];
-              const unique = combined.reduce((acc, restaurant) => {
-                if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
-                  acc.push(restaurant);
-                }
-                return acc;
-              }, [] as RestaurantFeed[]);
-              return unique;
-            });
+          // Only update state if this is still the latest request
+          if (requestId === latestRequestId.current) {
+            if (pageNum === 0) {
+              setRestaurants(data.restaurants);
+            } else {
+              // Deduplicate when appending new restaurants
+              setRestaurants(prev => {
+                const combined = [...prev, ...data.restaurants];
+                const unique = combined.reduce((acc, restaurant) => {
+                  if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
+                    acc.push(restaurant);
+                  }
+                  return acc;
+                }, [] as RestaurantFeed[]);
+                return unique;
+              });
+            }
+            setHasMore(data.hasMore);
+            setPage(pageNum);
           }
-          setHasMore(data.hasMore);
-          setPage(pageNum);
         }
       }
     } catch (error) {
       console.error('Error fetching restaurants:', error);
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      // Only clear loading if this is still the latest request
+      if (requestId === latestRequestId.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, [userLocation, feedMode, locationFilterEnabled, distanceKm, selectedCity]);
 
