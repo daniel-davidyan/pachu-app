@@ -473,6 +473,20 @@ export default function RestaurantPage() {
               </button>
             </div>
 
+            {/* Goto Map Button */}
+            <div className="mt-3">
+              <button
+                onClick={() => {
+                  const placeId = restaurant.googlePlaceId || restaurant.id;
+                  router.push(`/map?restaurantId=${encodeURIComponent(placeId)}&lat=${restaurant.latitude}&lng=${restaurant.longitude}`);
+                }}
+                className="w-full py-3.5 rounded-2xl font-semibold text-sm bg-blue-50 text-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-blue-200 hover:bg-blue-100"
+              >
+                <MapPin className="w-4 h-4" />
+                Go to Map
+              </button>
+            </div>
+
             {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
             {isIsrael && (
               <button

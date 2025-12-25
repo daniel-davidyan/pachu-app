@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
 import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
@@ -34,6 +35,7 @@ const categories = [
 export default function MapPage() {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,7 @@ export default function MapPage() {
   const [isTogglingView, setIsTogglingView] = useState(false);
   const [showViewDropup, setShowViewDropup] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [hasHandledUrlParams, setHasHandledUrlParams] = useState(false);
 
   const handleViewModeChange = (mode: 'following' | 'all') => {
     if (mode !== viewMode) {
@@ -174,6 +177,69 @@ export default function MapPage() {
 
     fetchRestaurants();
   }, [userLocation]);
+
+  // Handle URL parameters for navigating to specific restaurant
+  useEffect(() => {
+    if (hasHandledUrlParams || !mapRef.current || loading) return;
+
+    const restaurantId = searchParams.get('restaurantId');
+    const lat = searchParams.get('lat');
+    const lng = searchParams.get('lng');
+
+    if (restaurantId && lat && lng) {
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(lng);
+
+      // First, fetch restaurant details to show in popup
+      const fetchAndShowRestaurant = async () => {
+        try {
+          const response = await fetch(`/api/restaurants/${restaurantId}`);
+          const data = await response.json();
+          
+          if (data.restaurant) {
+            // Hide the chat
+            setShowChat(false);
+            
+            // Center map on the restaurant
+            mapRef.current?.flyTo({
+              center: [longitude, latitude],
+              zoom: 16,
+              duration: 2000,
+              essential: true,
+              curve: 1.5,
+              easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+            });
+
+            // After a short delay, open the restaurant popup
+            setTimeout(() => {
+              setSelectedRestaurant({
+                id: data.restaurant.id,
+                name: data.restaurant.name,
+                address: data.restaurant.address || '',
+                latitude: data.restaurant.latitude,
+                longitude: data.restaurant.longitude,
+                rating: data.restaurant.averageRating,
+                totalReviews: data.restaurant.totalReviews,
+                photoUrl: data.restaurant.imageUrl,
+                priceLevel: data.restaurant.priceLevel,
+                cuisineTypes: data.restaurant.cuisineTypes || [],
+                source: 'google',
+                googlePlaceId: data.restaurant.googlePlaceId,
+                website: data.restaurant.website,
+              });
+            }, 1000);
+
+            setHasHandledUrlParams(true);
+          }
+        } catch (error) {
+          console.error('Error fetching restaurant for URL params:', error);
+          showToast('Could not load restaurant', 'error');
+        }
+      };
+
+      fetchAndShowRestaurant();
+    }
+  }, [searchParams, hasHandledUrlParams, loading, showToast]);
 
   const handleFilterChange = (newFilters: RestaurantFilters) => {
     setFilters(newFilters);
