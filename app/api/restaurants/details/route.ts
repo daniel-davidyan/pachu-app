@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
       'reviews',
       'photos',
       'types',
-      'editorial_summary'
+      'editorial_summary',
+      'opening_hours',
+      'current_opening_hours'
     ].join(',');
     
     const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${apiKey}`;

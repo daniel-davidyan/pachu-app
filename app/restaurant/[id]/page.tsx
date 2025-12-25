@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
   ArrowLeft, Heart, MapPin, Phone, Globe, DollarSign, 
-  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star, Edit2, Trash2, MoreVertical, Utensils
+  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star, Edit2, Trash2, MoreVertical, Utensils, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -52,6 +52,14 @@ interface Restaurant {
   googlePlaceId?: string;
   latitude: number;
   longitude: number;
+  openingHours?: {
+    open_now?: boolean;
+    weekday_text?: string[];
+    periods?: Array<{
+      open: { day: number; time: string };
+      close?: { day: number; time: string };
+    }>;
+  };
 }
 
 interface RestaurantData {
@@ -92,28 +100,41 @@ export default function RestaurantPage() {
   const [isIsrael, setIsIsrael] = useState(false);
   const [showingGoogleReviews, setShowingGoogleReviews] = useState(false);
   const [showingNonFriendReviews, setShowingNonFriendReviews] = useState(false);
+  const [showAllHours, setShowAllHours] = useState(false);
   
   const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   useEffect(() => {
     if (restaurantId) {
+      setOntopoUrl(null);
+      setIsIsrael(false);
       fetchRestaurant();
     }
   }, [restaurantId]);
 
-  // Check if restaurant is in Israel and fetch ONTOPO link
+  // Check if restaurant is in Israel and fetch ONTOPO link + opening hours
   useEffect(() => {
-    // Reset state when restaurant changes
-    setOntopoUrl(null);
-    setIsIsrael(false);
-    
     if (!restaurant) return;
+    // Skip if opening hours already loaded
+    if (restaurant.openingHours) return;
 
     const checkIsraelAndFetchOntopo = async () => {
       try {
         const placeId = restaurant.googlePlaceId || restaurantId;
         const response = await fetch(`/api/restaurants/details?placeId=${placeId}`);
         const data = await response.json();
+        
+        console.log('Google Places API response:', data); // Debug log
+        
+        // Update restaurant with opening hours if available
+        if (data.opening_hours || data.current_opening_hours) {
+          const hoursData = data.opening_hours || data.current_opening_hours;
+          console.log('Opening hours data:', hoursData); // Debug log
+          setRestaurant(prev => prev ? {
+            ...prev,
+            openingHours: hoursData
+          } : null);
+        }
         
         // Check if country is Israel
         const country = data.country || restaurant.address?.toLowerCase();
@@ -133,20 +154,18 @@ export default function RestaurantPage() {
             const ontopoData = await ontopoResponse.json();
             setOntopoUrl(ontopoData.url);
           } else {
-            // If ONTOPO returns error, don't show the button
             console.log('ONTOPO not available for this restaurant');
             setOntopoUrl(null);
           }
         }
       } catch (error) {
-        console.error('Error checking Israel/ONTOPO:', error);
-        // On error, hide the button
+        console.error('Error checking Israel/ONTOPO/OpeningHours:', error);
         setOntopoUrl(null);
       }
     };
 
     checkIsraelAndFetchOntopo();
-  }, [restaurant, restaurantId]);
+  }, [restaurant?.id, restaurantId]);
 
   const extractCityFromAddress = (address?: string) => {
     if (!address) return '';
@@ -438,11 +457,78 @@ export default function RestaurantPage() {
 
             {/* Phone */}
             {restaurant.phone && (
-              <div className="flex items-center gap-2 text-sm mb-5">
+              <div className="flex items-center gap-2 text-sm mb-4">
                 <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <a href={`tel:${restaurant.phone}`} className="text-primary hover:underline font-medium">
                   {restaurant.phone}
                 </a>
+              </div>
+            )}
+
+            {/* Opening Hours */}
+            {restaurant.openingHours && restaurant.openingHours.weekday_text && restaurant.openingHours.weekday_text.length > 0 && (
+              <div className="mb-5">
+                <button
+                  onClick={() => setShowAllHours(!showAllHours)}
+                  className="w-full"
+                >
+                  <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all">
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+                      restaurant.openingHours.open_now 
+                        ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30' 
+                        : 'bg-gray-400 shadow-lg shadow-gray-400/20'
+                    }`}>
+                      <Clock className="w-5 h-5 text-white" strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-gray-900">Hours</span>
+                        {restaurant.openingHours.open_now !== undefined && (
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            restaurant.openingHours.open_now 
+                              ? 'bg-emerald-100 text-emerald-700' 
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {restaurant.openingHours.open_now ? 'Open Now' : 'Closed'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {/* Today's hours */}
+                        <div className="text-xs text-gray-600 font-medium">
+                          {restaurant.openingHours.weekday_text[new Date().getDay()]}
+                        </div>
+                        
+                        {/* All hours - expandable */}
+                        {showAllHours && (
+                          <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5">
+                            {restaurant.openingHours.weekday_text.map((day, index) => {
+                              const isToday = index === new Date().getDay();
+                              return (
+                                <div 
+                                  key={index} 
+                                  className={`text-xs flex justify-between ${
+                                    isToday 
+                                      ? 'font-bold text-gray-900' 
+                                      : 'text-gray-600'
+                                  }`}
+                                >
+                                  <span>{day.split(': ')[0]}</span>
+                                  <span>{day.split(': ')[1]}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {showAllHours ? (
+                      <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0 mt-2" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0 mt-2" />
+                    )}
+                  </div>
+                </button>
               </div>
             )}
 
