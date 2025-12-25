@@ -417,15 +417,6 @@ export default function RestaurantPage() {
             {/* Restaurant Name */}
             <h1 className="text-2xl font-bold text-gray-900 mb-3 pr-16">{restaurant.name}</h1>
             
-            {/* Cuisine Type Badge */}
-            {restaurant.cuisineTypes.length > 0 && (
-              <div className="mb-3">
-                <span className="inline-block px-3 py-1.5 bg-primary/10 text-primary text-xs font-semibold rounded-full border border-primary/20">
-                  {restaurant.cuisineTypes[0]}
-                </span>
-              </div>
-            )}
-            
             {/* Match Percentage */}
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-green-50 border border-green-200 rounded-full px-3 py-1.5">
@@ -434,7 +425,7 @@ export default function RestaurantPage() {
                   <span className="text-sm font-bold text-gray-900">{Math.round((restaurant.averageRating / 5) * 100)}% Match</span>
                 </div>
               </div>
-              <span className="text-xs text-gray-500">Based on your taste profile</span>
+              <span className="text-xs text-gray-500">Based on your taste</span>
             </div>
 
             {/* Address */}
@@ -473,40 +464,40 @@ export default function RestaurantPage() {
               </button>
             </div>
 
-            {/* Goto Map Button */}
-            <div className="mt-3">
+            {/* Go to Map & Reserve Table Buttons */}
+            <div className="flex gap-3 mt-3">
               <button
                 onClick={() => {
                   const placeId = restaurant.googlePlaceId || restaurant.id;
                   router.push(`/map?restaurantId=${encodeURIComponent(placeId)}&lat=${restaurant.latitude}&lng=${restaurant.longitude}`);
                 }}
-                className="w-full py-3.5 rounded-2xl font-semibold text-sm bg-blue-50 text-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-blue-200 hover:bg-blue-100"
+                className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-blue-50 text-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-blue-200 hover:bg-blue-100"
               >
                 <MapPin className="w-4 h-4" />
                 Go to Map
               </button>
+              
+              {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
+              {isIsrael && (
+                <button
+                  onClick={handleOntopo}
+                  disabled={loadingOntopo}
+                  className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-green-50 text-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                >
+                  {loadingOntopo ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4" />
+                      Reserve a table
+                    </>
+                  )}
+                </button>
+              )}
             </div>
-
-            {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
-            {isIsrael && (
-              <button
-                onClick={handleOntopo}
-                disabled={loadingOntopo}
-                className="w-full mt-3 py-3.5 rounded-2xl font-semibold text-sm bg-green-50 text-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-green-200 hover:bg-green-100 disabled:opacity-50"
-              >
-                {loadingOntopo ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <Calendar className="w-4 h-4" />
-                    Reserve on ONTOPO
-                  </>
-                )}
-              </button>
-            )}
           </div>
         </div>
 
