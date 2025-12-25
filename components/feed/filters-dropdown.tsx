@@ -119,9 +119,9 @@ export function FiltersDropdown({
       {isOpen && (
         <>
           {/* Full Screen Overlay */}
-          <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-gray-50 to-white animate-fade-in flex flex-col w-screen" style={{ height: '100dvh', overflow: 'hidden', overscrollBehavior: 'none' }}>
-            {/* Header - Fixed at top */}
-            <div className="flex-shrink-0 px-6 py-3 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+          <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-gray-50 to-white animate-fade-in flex flex-col w-screen" style={{ height: '100dvh', overflow: 'hidden', overscrollBehavior: 'none', top: 0 }}>
+            {/* Header - Fixed at top with safe area */}
+            <div className="flex-shrink-0 px-6 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl" style={{ paddingTop: 'env(safe-area-inset-top, 12px)', paddingBottom: '12px' }}>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleBack}
