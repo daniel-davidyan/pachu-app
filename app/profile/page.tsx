@@ -760,6 +760,7 @@ export default function ProfilePage() {
       {/* Edit Review Modal */}
       {editingReview && (
         <WriteReviewModal
+          key={`edit-review-${editingReview.id}-${showEditModal}`}
           isOpen={showEditModal}
           onClose={() => {
             setShowEditModal(false);

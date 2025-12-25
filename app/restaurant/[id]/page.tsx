@@ -518,6 +518,7 @@ export default function RestaurantPage() {
       {/* Write Review Modal */}
       {restaurant && (
         <WriteReviewModal
+          key={`review-${editingReview?.id || 'new'}-${showWriteReview}`}
           isOpen={showWriteReview}
           onClose={() => {
             setShowWriteReview(false);
