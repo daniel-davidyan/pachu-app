@@ -22,12 +22,11 @@ Since Google doesn't provide per-review photos, we:
 3. This ensures users ALWAYS see Google reviews when friends haven't reviewed
 
 ## Requirements
-1. **Priority 1**: Show reviews from users that the current user is following (friends) - BUT ONLY if friends have actually reviewed
-2. **Priority 2**: If friends haven't reviewed, ALWAYS show Google reviews 
-   - Use restaurant photos for first few reviews
-   - Use gradient placeholders for remaining reviews
-3. **Priority 3**: If no Google reviews exist, show user's own reviews
-4. **Inform users** when they're seeing Google/non-friend reviews because their friends haven't shared experiences yet
+1. **Priority 1**: Show reviews from friends (people user follows) - NO BANNER
+2. **Priority 2**: If no friend reviews, show user's own review if exists - NO BANNER
+3. **Priority 3**: If neither friends nor user have reviewed, show Google reviews - SHOW BANNER
+4. **Banner only shows** when displaying Google reviews (meaning no friends or user have reviewed)
+5. **Friend reviews are exclusive** - when friends have reviewed, show ONLY their reviews
 
 ## Solution
 
@@ -120,27 +119,35 @@ if (googleReviews.length > 0) {
 
 ## User Experience Flow
 
-### Scenario 1: User with Friends Who Reviewed
+### Scenario 1: Friends Have Reviewed
 1. User opens restaurant page
-2. → **Show ONLY friend reviews**
-3. **No banner** is shown
+2. System finds friend reviews
+3. → **Show ONLY friend reviews**
+4. → **NO banner** (user is seeing trusted friend content)
 
-### Scenario 2: User with Friends Who Haven't Reviewed
+### Scenario 2: User Has Reviewed (but friends haven't)
 1. User opens restaurant page
-2. Friends exist but haven't reviewed
-3. → **Show info banner** (personalized message about friends)
+2. No friend reviews exist
+3. System finds user's own review
+4. → **Show user's own review**
+5. → **NO banner** (user is seeing their own content)
+
+### Scenario 3: Neither Friends Nor User Have Reviewed
+1. User opens restaurant page
+2. No friend reviews, no user review
+3. → **Show banner** (explaining Google reviews)
 4. → **Show Google reviews** with:
    - Restaurant photos for first few reviews
    - Gradient placeholders for remaining reviews
 
-### Scenario 3: User without Friends / Not Logged In
+### Scenario 4: Not Logged In
 1. User opens restaurant page
-2. → **Show Google reviews** (with restaurant photos distributed)
-3. → **Show banner** (general message about Google reviews)
+2. → **Show banner** (general message)
+3. → **Show Google reviews**
 
-### Scenario 4: Restaurant with No Reviews at All
+### Scenario 5: No Reviews at All
 1. User opens restaurant page
-2. No friend reviews, no Google reviews, no user reviews
+2. No friend, user, or Google reviews
 3. → **Show "No experiences yet" empty state**
 
 ## Visual Treatment

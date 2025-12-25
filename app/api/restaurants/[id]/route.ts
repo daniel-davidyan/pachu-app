@@ -215,9 +215,9 @@ export async function GET(
             }
 
             // Determine which reviews to show - Priority system:
-            // 1. Friend reviews (if they exist)
-            // 2. Google reviews with photos (if friend reviews don't exist)
-            // 3. User's own reviews (if nothing else exists)
+            // 1. Friend reviews (if they exist) - NO BANNER
+            // 2. User's own review (if exists) - NO BANNER
+            // 3. Google reviews (if nothing else) - SHOW BANNER
             let reviewsToShow: any[] = [];
             let showingGoogleReviews = false;
             let hasFollowing = false;
@@ -227,15 +227,22 @@ export async function GET(
               hasFollowing = true;
               const friendReviews = ourReviews.filter(review => followingIds.includes(review.user.id));
               if (friendReviews.length > 0) {
-                // Friends have reviewed - show only their reviews
+                // Friends have reviewed - show ONLY their reviews, NO BANNER
                 reviewsToShow = friendReviews;
               }
             }
             
-            // If no friend reviews (or user not logged in), show Google reviews
-            // Note: Google Places API doesn't provide photos per review, only restaurant-level photos
+            // If no friend reviews but user has their own review, show it (NO BANNER)
+            if (reviewsToShow.length === 0 && user && ourReviews.length > 0) {
+              const userOwnReviews = ourReviews.filter(review => review.user.id === user.id);
+              if (userOwnReviews.length > 0) {
+                reviewsToShow = userOwnReviews;
+              }
+            }
+            
+            // If no friend reviews AND no user review, show Google reviews WITH BANNER
             if (reviewsToShow.length === 0 && googleData.reviews && googleData.reviews.length > 0) {
-              // Get restaurant photos to use for Google reviews (since reviews don't have individual photos)
+              // Get restaurant-level photos (Google doesn't provide per-review photos)
               const restaurantPhotos = googleData.photos 
                 ? googleData.photos.slice(0, 3).map((photo: any) => 
                     photo.photo_reference 
@@ -271,11 +278,6 @@ export async function GET(
                 showingGoogleReviews = true;
                 reviewsToShow = googleReviews;
               }
-            }
-            
-            // Last resort: show user's own reviews if they exist
-            if (reviewsToShow.length === 0 && ourReviews.length > 0) {
-              reviewsToShow = ourReviews;
             }
 
             // Return Google data formatted as our restaurant structure
@@ -424,10 +426,13 @@ export async function GET(
       };
     }) || [];
 
-    // Prioritize friend reviews if user is logged in
-    // But if friends haven't reviewed, show all reviews (don't leave empty)
+    // Priority system: 
+    // 1. Friend reviews (if exist) - NO BANNER
+    // 2. User's own reviews (if exist) - NO BANNER  
+    // 3. All reviews (last resort) - SHOW BANNER if has friends
     let reviews = allReviews;
     let showingNonFriendReviews = false;
+    
     if (user && allReviews.length > 0) {
       const { data: followingData } = await supabase
         .from('follows')
@@ -438,14 +443,29 @@ export async function GET(
       
       if (followingIds.length > 0) {
         const friendReviews = allReviews.filter(review => followingIds.includes(review.user.id));
-        // Only show friend reviews if they exist, otherwise show all reviews
+        
         if (friendReviews.length > 0) {
+          // Friends have reviewed - show ONLY their reviews, NO BANNER
           reviews = friendReviews;
         } else {
-          // Friends haven't reviewed, showing all reviews
-          showingNonFriendReviews = true;
+          // Friends haven't reviewed - check if user has their own review
+          const userOwnReviews = allReviews.filter(review => review.user.id === user.id);
+          
+          if (userOwnReviews.length > 0) {
+            // User has reviewed - show their review, NO BANNER
+            reviews = userOwnReviews;
+          } else {
+            // No friend reviews and no user review - show all reviews with banner
+            showingNonFriendReviews = true;
+          }
         }
-        // If friendReviews.length === 0, keep showing all reviews (don't filter)
+      } else {
+        // No following - check if user has their own review
+        const userOwnReviews = allReviews.filter(review => review.user.id === user.id);
+        if (userOwnReviews.length > 0) {
+          // User has reviewed - show only their review, NO BANNER
+          reviews = userOwnReviews;
+        }
       }
     }
 
