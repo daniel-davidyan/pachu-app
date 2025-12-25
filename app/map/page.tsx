@@ -193,10 +193,27 @@ export default function MapPage() {
       // First, fetch restaurant details to show in popup
       const fetchAndShowRestaurant = async () => {
         try {
+          // Fetch the specific restaurant details
           const response = await fetch(`/api/restaurants/${restaurantId}`);
           const data = await response.json();
           
           if (data.restaurant) {
+            // Fetch nearby restaurants around this location
+            try {
+              const nearbyResponse = await fetch(
+                `/api/restaurants/nearby?latitude=${latitude}&longitude=${longitude}&radius=5000`
+              );
+              const nearbyData = await nearbyResponse.json();
+              const nearbyRestaurants = nearbyData.restaurants || [];
+              
+              // Update the restaurants list with nearby restaurants
+              if (nearbyRestaurants.length > 0) {
+                setAllRestaurants(nearbyRestaurants);
+              }
+            } catch (nearbyError) {
+              console.error('Error fetching nearby restaurants:', nearbyError);
+            }
+            
             // Hide the chat
             setShowChat(false);
             
