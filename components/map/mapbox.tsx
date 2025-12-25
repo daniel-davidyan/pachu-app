@@ -718,27 +718,37 @@ export function Mapbox({
       el.addEventListener('touchstart', (e) => {
         isMultiTouch = e.touches.length > 1;
         
-        if (!isMultiTouch) {
+        if (isMultiTouch) {
+          // Multi-touch detected - make marker transparent to events
+          el.style.pointerEvents = 'none';
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
+        } else {
           // Single touch - could be a tap
+          el.style.pointerEvents = 'auto';
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
           touchStartTime = Date.now();
           touchStartX = e.touches[0].clientX;
           touchStartY = e.touches[0].clientY;
-        } else {
-          // Multi-touch detected - prevent marker interaction
-          e.preventDefault();
-          e.stopPropagation();
         }
       });
       
       el.addEventListener('touchmove', (e) => {
         if (e.touches.length > 1) {
           isMultiTouch = true;
-          e.preventDefault();
-          e.stopPropagation();
+          // Make marker transparent during multi-touch
+          el.style.pointerEvents = 'none';
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
         }
       });
       
       el.addEventListener('touchend', (e) => {
+        // Re-enable pointer events after touch ends
+        setTimeout(() => {
+          el.style.pointerEvents = 'auto';
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
+          isMultiTouch = false;
+        }, 50);
+        
         // Check if this was a tap (quick, no movement, single touch)
         if (!isMultiTouch && e.changedTouches.length === 1) {
           const touchEndTime = Date.now();
@@ -755,9 +765,13 @@ export function Mapbox({
             onRestaurantClick(restaurant);
           }
         }
-        
-        // Reset multi-touch flag
+      });
+      
+      el.addEventListener('touchcancel', (e) => {
+        // Also re-enable on touch cancel
         setTimeout(() => {
+          el.style.pointerEvents = 'auto';
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
           isMultiTouch = false;
         }, 50);
       });
@@ -842,25 +856,34 @@ export function Mapbox({
       el.addEventListener('touchstart', (e) => {
         dotIsMultiTouch = e.touches.length > 1;
         
-        if (!dotIsMultiTouch) {
+        if (dotIsMultiTouch) {
+          // Multi-touch - make dot transparent
+          el.style.pointerEvents = 'none';
+          if (dotContent) dotContent.style.pointerEvents = 'none';
+        } else {
+          el.style.pointerEvents = 'auto';
+          if (dotContent) dotContent.style.pointerEvents = 'auto';
           dotTouchStartTime = Date.now();
           dotTouchStartX = e.touches[0].clientX;
           dotTouchStartY = e.touches[0].clientY;
-        } else {
-          e.preventDefault();
-          e.stopPropagation();
         }
       });
       
       el.addEventListener('touchmove', (e) => {
         if (e.touches.length > 1) {
           dotIsMultiTouch = true;
-          e.preventDefault();
-          e.stopPropagation();
+          el.style.pointerEvents = 'none';
+          if (dotContent) dotContent.style.pointerEvents = 'none';
         }
       });
       
       el.addEventListener('touchend', (e) => {
+        setTimeout(() => {
+          el.style.pointerEvents = 'auto';
+          if (dotContent) dotContent.style.pointerEvents = 'auto';
+          dotIsMultiTouch = false;
+        }, 50);
+        
         if (!dotIsMultiTouch && e.changedTouches.length === 1) {
           const touchEndTime = Date.now();
           const touchEndX = e.changedTouches[0].clientX;
@@ -875,8 +898,12 @@ export function Mapbox({
             onRestaurantClick(restaurant);
           }
         }
-        
+      });
+      
+      el.addEventListener('touchcancel', (e) => {
         setTimeout(() => {
+          el.style.pointerEvents = 'auto';
+          if (dotContent) dotContent.style.pointerEvents = 'auto';
           dotIsMultiTouch = false;
         }, 50);
       });
