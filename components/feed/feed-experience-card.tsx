@@ -559,6 +559,9 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
           searchingFriends: false,
           friendsList: [],
           postingComment: false,
+          editingCommentId: null,
+          editCommentContent: '',
+          commentMenuOpen: null,
         },
       }));
     }
