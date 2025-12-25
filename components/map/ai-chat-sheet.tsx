@@ -146,7 +146,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
 
     setChatHistory(prev => {
       const filtered = prev.filter(c => c.id !== currentChatId);
-      const updated = [conversation, ...filtered].slice(0, 20); // Keep max 20 conversations
+      const updated = [conversation, ...filtered].slice(0, 10); // Keep max 10 conversations
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
@@ -431,6 +431,15 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
               transform: translateY(0);
             }
           }
+          /* Hide scrollbar for webkit browsers */
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          /* Hide scrollbar for IE, Edge and Firefox */
+          .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
         `}</style>
       </>
     );
@@ -481,7 +490,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
             </div>
 
             {/* History List */}
-            <div className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-gray-300">
+            <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar" style={{
+              WebkitOverflowScrolling: 'touch'
+            }}>
               {chatHistory.length === 0 ? (
                 <div className="text-center py-8">
                   <Clock className="w-12 h-12 text-gray-300 mx-auto mb-2" strokeWidth={1.5} />
@@ -576,7 +587,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto mb-3 space-y-3 scrollbar-thin scrollbar-thumb-gray-300">
+            <div className="flex-1 overflow-y-auto mb-3 space-y-3 hide-scrollbar" style={{
+              WebkitOverflowScrolling: 'touch'
+            }}>
               {messages.length === 0 && (
                 <div className="text-center py-6">
                   <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
