@@ -47,32 +47,32 @@ interface FeedExperienceCardProps {
   onUpdate?: () => void;
 }
 
+// All food emojis for animated placeholder - defined outside component for stability
+const ALL_FOOD_EMOJIS = [
+  '🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛',
+  '🍷', '🍖', '🥩', '🐟', '🥟', '🍲', '🥐', '🍰', '🍳', '☕',
+  '🍽️', '🍴', '🥙', '🍤', '🦐', '🦞', '🍗', '🥓', '🌭', '🥪'
+];
+
 export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedExperienceCardProps) {
   const { user } = useUser();
   const { showToast } = useToast();
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  // All food emojis for animated placeholder
-  const allFoodEmojis = [
-    '🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛',
-    '🍷', '🍖', '🥩', '🐟', '🥟', '🍲', '🥐', '🍰', '🍳', '☕',
-    '🍽️', '🍴', '🥙', '🍤', '🦐', '🦞', '🍗', '🥓', '🌭', '🥪'
-  ];
-  
-  // State for animated placeholder emoji
-  const [placeholderEmoji, setPlaceholderEmoji] = useState(
-    allFoodEmojis[Math.floor(Math.random() * allFoodEmojis.length)]
+  // State for animated placeholder emoji - use function initializer to avoid impure function during render
+  const [placeholderEmoji, setPlaceholderEmoji] = useState(() => 
+    ALL_FOOD_EMOJIS[Math.floor(Math.random() * ALL_FOOD_EMOJIS.length)]
   );
   
   // Animate placeholder emoji every 1 second
   useEffect(() => {
     const interval = setInterval(() => {
-      setPlaceholderEmoji(allFoodEmojis[Math.floor(Math.random() * allFoodEmojis.length)]);
+      setPlaceholderEmoji(ALL_FOOD_EMOJIS[Math.floor(Math.random() * ALL_FOOD_EMOJIS.length)]);
     }, 1000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, []); // Empty dependency array is correct - we want this to run once on mount
   
   // State for each experience's comments and likes
   const [experienceStates, setExperienceStates] = useState<{
