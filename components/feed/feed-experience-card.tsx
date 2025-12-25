@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, X, Loader2, UserPlus, UserCheck } from 'lucide-react';
+import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, X, Loader2, UserPlus, UserCheck, UtensilsCrossed, ChefHat, Coffee, Soup, Wine, Cake, Pizza, IceCream } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
@@ -47,11 +47,16 @@ interface FeedExperienceCardProps {
   onUpdate?: () => void;
 }
 
-// All food emojis for animated placeholder - defined outside component for stability
-const ALL_FOOD_EMOJIS = [
-  '🍕', '🍔', '🍣', '🍜', '🥗', '🍝', '🥘', '🍱', '🌮', '🍛',
-  '🍷', '🍖', '🥩', '🐟', '🥟', '🍲', '🥐', '🍰', '🍳', '☕',
-  '🍽️', '🍴', '🥙', '🍤', '🦐', '🦞', '🍗', '🥓', '🌭', '🥪'
+// Modern gradient + icon placeholders - defined outside component for stability
+const PLACEHOLDER_CONFIGS = [
+  { gradient: 'from-orange-400 to-pink-500', Icon: UtensilsCrossed },
+  { gradient: 'from-purple-400 to-indigo-500', Icon: ChefHat },
+  { gradient: 'from-amber-400 to-orange-500', Icon: Coffee },
+  { gradient: 'from-emerald-400 to-teal-500', Icon: Soup },
+  { gradient: 'from-rose-400 to-red-500', Icon: Wine },
+  { gradient: 'from-pink-400 to-purple-500', Icon: Cake },
+  { gradient: 'from-yellow-400 to-orange-500', Icon: Pizza },
+  { gradient: 'from-cyan-400 to-blue-500', Icon: IceCream },
 ];
 
 export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedExperienceCardProps) {
@@ -60,19 +65,10 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  // State for animated placeholder emoji - use function initializer to avoid impure function during render
-  const [placeholderEmoji, setPlaceholderEmoji] = useState(() => 
-    ALL_FOOD_EMOJIS[Math.floor(Math.random() * ALL_FOOD_EMOJIS.length)]
+  // Pick a random placeholder config once - use function initializer to avoid impure function during render
+  const [placeholderConfig] = useState(() => 
+    PLACEHOLDER_CONFIGS[Math.floor(Math.random() * PLACEHOLDER_CONFIGS.length)]
   );
-  
-  // Animate placeholder emoji every 1 second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPlaceholderEmoji(ALL_FOOD_EMOJIS[Math.floor(Math.random() * ALL_FOOD_EMOJIS.length)]);
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, []); // Empty dependency array is correct - we want this to run once on mount
   
   // State for each experience's comments and likes
   const [experienceStates, setExperienceStates] = useState<{
@@ -603,12 +599,10 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
                     )}
                   </div>
                 ) : (
-                  /* Animated placeholder for experiences without photos */
+                  /* Modern gradient + icon placeholder for experiences without photos */
                   <div className="mb-3">
-                    <div className="w-full h-48 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 rounded-xl flex items-center justify-center">
-                      <span className="text-9xl opacity-20 transition-opacity duration-150">
-                        {placeholderEmoji}
-                      </span>
+                    <div className={`w-full h-48 bg-gradient-to-br ${placeholderConfig.gradient} rounded-xl flex items-center justify-center opacity-20`}>
+                      <placeholderConfig.Icon className="w-24 h-24 text-white" strokeWidth={1.5} />
                     </div>
                   </div>
                 )}
