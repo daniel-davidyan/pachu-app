@@ -58,6 +58,7 @@ export async function GET(
             let userHasReviewed = false;
             let isWishlisted = false;
             let ourReviews: any[] = [];
+            let followingIds: string[] = [];
 
             // If restaurant exists in our DB, get friends who reviewed it
             if (dbRestaurantCheck && user) {
@@ -69,7 +70,7 @@ export async function GET(
                 .select('following_id')
                 .eq('follower_id', user.id);
 
-              const followingIds = followingData?.map(f => f.following_id) || [];
+              followingIds = followingData?.map(f => f.following_id) || [];
               
               if (followingIds.length > 0) {
                 const { data: friendReviewsData } = await supabase
@@ -213,6 +214,54 @@ export async function GET(
               })) || [];
             }
 
+            // Determine which reviews to show
+            let reviewsToShow: any[] = [];
+            
+            // If we have reviews from following users (friends), show only those
+            if (user && followingIds.length > 0) {
+              const friendReviews = ourReviews.filter(review => followingIds.includes(review.user.id));
+              if (friendReviews.length > 0) {
+                reviewsToShow = friendReviews;
+              }
+            }
+            
+            // If no friend reviews or user not logged in, show Google reviews with photos only
+            if (reviewsToShow.length === 0 && googleData.reviews) {
+              reviewsToShow = (googleData.reviews || [])
+                .filter((review: any) => {
+                  // Only show Google reviews that have photos
+                  return review.photos && review.photos.length > 0;
+                })
+                .map((review: any) => ({
+                  id: `google-${review.time}`,
+                  rating: review.rating,
+                  title: null,
+                  content: review.text || '',
+                  visitDate: null,
+                  createdAt: new Date(review.time * 1000).toISOString(),
+                  likesCount: 0,
+                  commentsCount: 0,
+                  isLiked: false,
+                  user: {
+                    id: review.author_name,
+                    username: review.author_name,
+                    fullName: review.author_name,
+                    avatarUrl: review.profile_photo_url,
+                  },
+                  // Map Google photos to photo URLs
+                  photos: (review.photos || []).map((photo: any) => 
+                    photo.photo_reference 
+                      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
+                      : null
+                  ).filter((url: string | null) => url !== null),
+                }));
+            }
+            
+            // If still no reviews to show, include all our reviews (including user's own)
+            if (reviewsToShow.length === 0) {
+              reviewsToShow = ourReviews;
+            }
+
             // Return Google data formatted as our restaurant structure
             return NextResponse.json({
               restaurant: {
@@ -237,24 +286,7 @@ export async function GET(
                 latitude: googleData.geometry?.location?.lat || 0,
                 longitude: googleData.geometry?.location?.lng || 0,
               },
-              reviews: ourReviews.length > 0 ? ourReviews : (googleData.reviews || []).map((review: any) => ({
-                id: `google-${review.time}`,
-                rating: review.rating,
-                title: null,
-                content: review.text || '',
-                visitDate: null,
-                createdAt: new Date(review.time * 1000).toISOString(),
-                likesCount: 0,
-                commentsCount: 0,
-                isLiked: false,
-                user: {
-                  id: review.author_name,
-                  username: review.author_name,
-                  fullName: review.author_name,
-                  avatarUrl: review.profile_photo_url,
-                },
-                photos: [],
-              })),
+              reviews: reviewsToShow,
               isWishlisted,
               userHasReviewed,
               friendsWhoReviewed,
@@ -353,7 +385,7 @@ export async function GET(
       likedReviewIds = new Set(userLikesData?.map(l => l.review_id) || []);
     }
 
-    const reviews = reviewsData?.map((review: any) => {
+    const allReviews = reviewsData?.map((review: any) => {
       const profile = profilesMap.get(review.user_id);
       return {
         id: review.id,
@@ -374,6 +406,25 @@ export async function GET(
         photos: photosByReview.get(review.id) || [],
       };
     }) || [];
+
+    // Prioritize friend reviews if user is logged in
+    let reviews = allReviews;
+    if (user) {
+      const { data: followingData } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id);
+
+      const followingIds = followingData?.map(f => f.following_id) || [];
+      
+      if (followingIds.length > 0) {
+        const friendReviews = allReviews.filter(review => followingIds.includes(review.user.id));
+        // If there are friend reviews, show only those, otherwise show all
+        if (friendReviews.length > 0) {
+          reviews = friendReviews;
+        }
+      }
+    }
 
     // Check if user has wishlisted this restaurant
     let isWishlisted = false;
