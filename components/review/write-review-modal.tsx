@@ -47,13 +47,24 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
   const { showToast } = useToast();
+  
+  // Track the review ID to detect when we're editing a different review
+  const existingReviewIdRef = useRef<string | null>(existingReview?.id || null);
 
-  // Update form when existingReview changes
+  // Update form when existingReview changes (only when editing a DIFFERENT review)
   useEffect(() => {
-    if (existingReview) {
+    if (existingReview && existingReview.id !== existingReviewIdRef.current) {
+      existingReviewIdRef.current = existingReview.id;
       setRating(existingReview.rating);
       setExperienceText(existingReview.content);
       setPhotoUrls(existingReview.photos || []);
+      setPhotos([]);
+    } else if (!existingReview && existingReviewIdRef.current !== null) {
+      // Reset when switching from edit mode to create mode
+      existingReviewIdRef.current = null;
+      setRating(0);
+      setExperienceText('');
+      setPhotoUrls([]);
       setPhotos([]);
     }
   }, [existingReview]);
@@ -86,19 +97,29 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   // Handle photo selection
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    
+    // Reset the file input to allow selecting the same files again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
+    if (files.length === 0) return;
+    
     // Check total photos (existing + new)
     if (files.length + photoUrls.length > 5) {
       showToast('Maximum 5 photos allowed', 'error');
       return;
     }
     
-    setPhotos(prev => [...prev, ...files]);
-    
-    // Create preview URLs
+    // Create preview URLs and add to state
+    const newUrls: string[] = [];
     files.forEach(file => {
       const url = URL.createObjectURL(file);
-      setPhotoUrls(prev => [...prev, url]);
+      newUrls.push(url);
     });
+    
+    setPhotos(prev => [...prev, ...files]);
+    setPhotoUrls(prev => [...prev, ...newUrls]);
   };
 
   // Remove photo
@@ -124,8 +145,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
     setSubmitting(true);
     try {
-      // Build the final photo URLs array
-      const finalPhotoUrls: string[] = [];
+      // Build the final photo URLs array using a Set to prevent duplicates
+      const photoUrlSet = new Set<string>();
       
       // First, add existing photos that haven't been removed
       // Existing photos are regular URLs (not blob URLs)
@@ -133,7 +154,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
         const url = photoUrls[i];
         if (!url.startsWith('blob:')) {
           // This is an existing photo URL (from the database)
-          finalPhotoUrls.push(url);
+          photoUrlSet.add(url);
         }
       }
       
@@ -157,8 +178,11 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           .from('review-photos')
           .getPublicUrl(`reviews/${fileName}`);
         
-        finalPhotoUrls.push(publicUrl);
+        photoUrlSet.add(publicUrl);
       }
+      
+      // Convert Set back to array to preserve order and eliminate duplicates
+      const finalPhotoUrls = Array.from(photoUrlSet);
 
       // Submit experience
       const response = await fetch('/api/reviews', {
