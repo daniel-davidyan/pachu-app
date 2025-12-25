@@ -178,113 +178,106 @@ export default function EditProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <h1 className="text-xl font-bold text-gray-900 text-center">Edit Profile</h1>
       </div>
 
-      {/* Form Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto pb-24">
-        <div className="px-4 py-6 space-y-6">
-          {/* Avatar Section */}
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <div className="flex flex-col items-center">
-              <div className="relative mb-4">
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.full_name || profile.username}
-                    className="w-32 h-32 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-                    <span className="text-4xl font-bold text-white">
-                      {(fullName || username).charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
+      {/* Form Content - Fixed, No Scroll */}
+      <div className="flex-1 flex flex-col px-4 py-4 space-y-4">
+        {/* Avatar Section - Compact */}
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <div className="flex items-center justify-center">
+            <div className="relative">
+              {profile.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name || profile.username}
+                  className="w-24 h-24 rounded-full object-cover"
                 />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingAvatar}
-                  className="absolute bottom-1 right-1 w-10 h-10 bg-black rounded-full shadow-lg flex items-center justify-center border-2 border-white hover:bg-gray-900 transition-colors disabled:opacity-50"
-                >
-                  {uploadingAvatar ? (
-                    <Loader2 className="w-5 h-5 text-white animate-spin" />
-                  ) : (
-                    <Camera className="w-5 h-5 text-white" />
-                  )}
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 text-center">
-                Tap the camera icon to change your photo
-              </p>
-            </div>
-          </div>
-
-          {/* Form Fields */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Full Name
-              </label>
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                  <span className="text-3xl font-bold text-white">
+                    {(fullName || username).charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
               <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
-                placeholder="Your full name"
-                disabled={saving}
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
-                placeholder="username"
-                required
-                disabled={saving}
-              />
-              <p className="text-xs text-gray-500 mt-1.5">
-                Your unique username
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Bio
-              </label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white resize-none"
-                placeholder="Tell us about yourself..."
-                rows={4}
-                maxLength={160}
-                disabled={saving}
-              />
-              <p className="text-xs text-gray-500 mt-1.5 text-right">
-                {bio.length}/160
-              </p>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-black rounded-full shadow-lg flex items-center justify-center border-2 border-white hover:bg-gray-900 transition-colors disabled:opacity-50"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4 text-white" />
+                )}
+              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Fixed Bottom Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 shadow-lg">
-        <div className="flex gap-3">
+        {/* Form Fields - Compact */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              Full Name
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
+              placeholder="Your full name"
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
+              placeholder="username"
+              required
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              Bio
+            </label>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white resize-none"
+              placeholder="Tell us about yourself..."
+              rows={3}
+              maxLength={160}
+              disabled={saving}
+            />
+            <p className="text-xs text-gray-500 mt-1 text-right">
+              {bio.length}/160
+            </p>
+          </div>
+        </div>
+
+        {/* Spacer to push buttons to bottom */}
+        <div className="flex-1"></div>
+
+        {/* Bottom Buttons - Part of flex layout */}
+        <div className="flex gap-3 pb-2">
           <button
             onClick={handleCancel}
             disabled={saving}
