@@ -709,37 +709,86 @@ export function Mapbox({
       const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
       const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
       
-      // Track touch state to differentiate between tap and multi-touch gestures
-      let touchCount = 0;
+      // Disable pointer events by default to allow map gestures
+      if (markerWrapper) {
+        markerWrapper.style.pointerEvents = 'none';
+      }
+      
+      // Track touch gestures to differentiate between tap and zoom
+      let touchStartTime = 0;
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let isSingleTouch = false;
       
       el.addEventListener('touchstart', (e) => {
-        touchCount = e.touches.length;
-        // If multi-touch (pinch zoom), don't interfere - let it pass through
-        if (touchCount > 1) {
-          e.stopPropagation(); // Stop it from being treated as marker interaction
+        isSingleTouch = e.touches.length === 1;
+        if (isSingleTouch) {
+          // Enable pointer events only for potential single tap
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
+          touchStartTime = Date.now();
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        } else {
+          // Multi-touch (zoom) - disable pointer events completely
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
         }
-      });
+      }, { passive: true });
+      
+      el.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 1) {
+          // Multi-touch detected - disable pointer events
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
+          isSingleTouch = false;
+        }
+      }, { passive: true });
       
       el.addEventListener('touchend', (e) => {
-        touchCount = 0;
-      });
+        // Re-disable pointer events after touch ends
+        setTimeout(() => {
+          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
+        }, 100);
+        
+        // Check if this was a tap (quick, no movement, single touch)
+        if (isSingleTouch && e.changedTouches.length === 1) {
+          const touchEndTime = Date.now();
+          const touchEndX = e.changedTouches[0].clientX;
+          const touchEndY = e.changedTouches[0].clientY;
+          const timeDiff = touchEndTime - touchStartTime;
+          const distance = Math.sqrt(
+            Math.pow(touchEndX - touchStartX, 2) + 
+            Math.pow(touchEndY - touchStartY, 2)
+          );
+          
+          // If it was a quick tap with minimal movement
+          if (timeDiff < 300 && distance < 10) {
+            if (onRestaurantClick) {
+              onRestaurantClick(restaurant);
+            }
+          }
+        }
+      }, { passive: true });
       
       el.addEventListener('mouseenter', () => {
         if (markerCircle) {
           markerCircle.style.transform = 'scale(1.1)';
           markerCircle.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
         }
+        // Enable pointer events on hover for desktop
+        if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
       });
+      
       el.addEventListener('mouseleave', () => {
         if (markerCircle) {
           markerCircle.style.transform = 'scale(1)';
           markerCircle.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
         }
+        // Disable pointer events when not hovering
+        if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
       });
 
       el.addEventListener('click', (e) => {
-        // Only handle single-touch taps
-        if (touchCount <= 1 && onRestaurantClick) {
+        // For mouse clicks (desktop)
+        if (onRestaurantClick && !('ontouchstart' in window)) {
           onRestaurantClick(restaurant);
         }
       });
@@ -794,37 +843,78 @@ export function Mapbox({
 
       const dotContent = el.querySelector('.dot-marker') as HTMLElement;
       
-      // Track touch state for dot markers too
-      let dotTouchCount = 0;
+      // Disable pointer events by default for dots too
+      if (dotContent) {
+        dotContent.style.pointerEvents = 'none';
+      }
+      
+      // Track touch gestures for dots
+      let dotTouchStartTime = 0;
+      let dotTouchStartX = 0;
+      let dotTouchStartY = 0;
+      let dotIsSingleTouch = false;
       
       el.addEventListener('touchstart', (e) => {
-        dotTouchCount = e.touches.length;
-        // If multi-touch (pinch zoom), don't interfere
-        if (dotTouchCount > 1) {
-          e.stopPropagation();
+        dotIsSingleTouch = e.touches.length === 1;
+        if (dotIsSingleTouch) {
+          if (dotContent) dotContent.style.pointerEvents = 'auto';
+          dotTouchStartTime = Date.now();
+          dotTouchStartX = e.touches[0].clientX;
+          dotTouchStartY = e.touches[0].clientY;
+        } else {
+          if (dotContent) dotContent.style.pointerEvents = 'none';
         }
-      });
+      }, { passive: true });
+      
+      el.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 1) {
+          if (dotContent) dotContent.style.pointerEvents = 'none';
+          dotIsSingleTouch = false;
+        }
+      }, { passive: true });
       
       el.addEventListener('touchend', (e) => {
-        dotTouchCount = 0;
-      });
+        setTimeout(() => {
+          if (dotContent) dotContent.style.pointerEvents = 'none';
+        }, 100);
+        
+        if (dotIsSingleTouch && e.changedTouches.length === 1) {
+          const touchEndTime = Date.now();
+          const touchEndX = e.changedTouches[0].clientX;
+          const touchEndY = e.changedTouches[0].clientY;
+          const timeDiff = touchEndTime - dotTouchStartTime;
+          const distance = Math.sqrt(
+            Math.pow(touchEndX - dotTouchStartX, 2) + 
+            Math.pow(touchEndY - dotTouchStartY, 2)
+          );
+          
+          if (timeDiff < 300 && distance < 10) {
+            if (onRestaurantClick) {
+              onRestaurantClick(restaurant);
+            }
+          }
+        }
+      }, { passive: true });
       
       el.addEventListener('mouseenter', () => {
         if (dotContent) {
           dotContent.style.transform = 'scale(1.5)';
           dotContent.style.boxShadow = '0 3px 10px rgba(0,0,0,0.4), 0 0 0 2px white';
+          dotContent.style.pointerEvents = 'auto';
         }
       });
+      
       el.addEventListener('mouseleave', () => {
         if (dotContent) {
           dotContent.style.transform = 'scale(1)';
           dotContent.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px white';
+          dotContent.style.pointerEvents = 'none';
         }
       });
 
       el.addEventListener('click', (e) => {
-        // Only handle single-touch taps
-        if (dotTouchCount <= 1 && onRestaurantClick) {
+        // For mouse clicks (desktop)
+        if (onRestaurantClick && !('ontouchstart' in window)) {
           onRestaurantClick(restaurant);
         }
       });
@@ -882,19 +972,15 @@ export function Mapbox({
           }
         }
         
-        /* Make marker containers completely transparent to touch/pointer events */
-        .mapboxgl-marker {
+        /* Make all markers completely transparent to pointer events by default */
+        .mapboxgl-marker,
+        .mapboxgl-marker * {
           pointer-events: none !important;
         }
         
-        /* Allow markers to be clickable */
-        .mapboxgl-marker .marker-wrapper,
-        .mapboxgl-marker .dot-marker {
-          pointer-events: auto !important;
-        }
-        
         /* User location marker should be visible but not block gestures */
-        .mapboxgl-marker .user-location-marker {
+        .mapboxgl-marker .user-location-marker,
+        .mapboxgl-marker .user-location-marker * {
           pointer-events: none !important;
         }
         
