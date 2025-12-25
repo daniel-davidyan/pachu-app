@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -90,6 +90,10 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [mentionSearch, setMentionSearch] = useState('');
   const [availableFriends, setAvailableFriends] = useState<Array<{ id: string; username: string; fullName: string }>>([]);
   const [mentionedUsers, setMentionedUsers] = useState<Array<{ id: string; username: string }>>([]);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState('');
+  const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
+  const commentMenuRef = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   // Generate random food emoji once and keep it stable
   const randomFoodEmoji = useMemo(() => {
@@ -106,6 +110,21 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       onSheetStateChange(showComments || showLikes);
     }
   }, [showComments, showLikes, onSheetStateChange]);
+
+  // Close comment menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (commentMenuOpen) {
+        const menuElement = commentMenuRef.current[commentMenuOpen];
+        if (menuElement && !menuElement.contains(event.target as Node)) {
+          setCommentMenuOpen(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [commentMenuOpen]);
 
   // Get user profile for optimistic updates
   const [profile, setProfile] = useState<any>(null);
@@ -341,6 +360,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    setCommentMenuOpen(null);
     try {
       const response = await fetch(`/api/reviews/${post.id}/comments/${commentId}`, {
         method: 'DELETE',
@@ -349,6 +369,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       if (response.ok) {
         setComments(comments.filter(c => c.id !== commentId));
         if (onUpdate) onUpdate();
+        showToast('Comment deleted', 'success');
       } else {
         showToast('Failed to delete comment', 'error');
       }
@@ -356,6 +377,46 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       console.error('Error deleting comment:', error);
       showToast('Failed to delete comment', 'error');
     }
+  };
+
+  const handleEditComment = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setEditCommentContent(comment.content);
+    setCommentMenuOpen(null);
+  };
+
+  const handleUpdateComment = async (commentId: string) => {
+    if (!editCommentContent.trim()) {
+      showToast('Comment cannot be empty', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/reviews/${post.id}/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editCommentContent.trim() }),
+      });
+
+      if (response.ok) {
+        const { comment: updatedComment } = await response.json();
+        setComments(comments.map(c => c.id === commentId ? updatedComment : c));
+        setEditingCommentId(null);
+        setEditCommentContent('');
+        if (onUpdate) onUpdate();
+        showToast('Comment updated', 'success');
+      } else {
+        showToast('Failed to update comment', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      showToast('Failed to update comment', 'error');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditCommentContent('');
   };
 
   const handleMentionInput = async (value: string) => {
@@ -803,61 +864,115 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                         <img
                           src={comment.user.avatarUrl}
                           alt={comment.user.fullName}
-                          className="w-9 h-9 rounded-full object-cover"
+                          className="w-10 h-10 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                          <span className="text-sm font-bold text-white">
-                            {comment.user.fullName.charAt(0).toUpperCase()}
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                          <span className="text-base font-bold text-white">
+                            {(comment.user.fullName || comment.user.username).charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
                     </Link>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`}>
-                            <span className="font-semibold text-sm text-gray-900 hover:text-gray-600">
-                              {comment.user.username}
-                            </span>
-                          </Link>
-                          <span className="text-sm text-gray-900 ml-2">
-                            {comment.content}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleLikeComment(comment.id)}
-                          className="flex-shrink-0 transition-transform active:scale-90"
-                        >
-                          <Heart 
-                            className={`w-4 h-4 ${comment.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
-                            strokeWidth={comment.isLiked ? 0 : 2}
+                      {editingCommentId === comment.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editCommentContent}
+                            onChange={(e) => setEditCommentContent(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary text-sm resize-none"
+                            rows={2}
+                            autoFocus
                           />
-                        </button>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 mt-1.5">
-                        <span className="text-xs text-gray-500">
-                          {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                        </span>
-                        {comment.likesCount > 0 && (
-                          <button
-                            onClick={() => handleLikeComment(comment.id)}
-                            className="text-xs font-semibold text-gray-500"
-                          >
-                            {comment.likesCount} {comment.likesCount === 1 ? 'like' : 'likes'}
-                          </button>
-                        )}
-                        {user && comment.user.id === user.id && (
-                          <button
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="text-xs font-semibold text-red-500 hover:text-red-600"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleUpdateComment(comment.id)}
+                              className="px-3 py-1 bg-primary text-white text-xs rounded-lg hover:bg-primary/90"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-lg hover:bg-gray-300"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`}>
+                                <span className="font-semibold text-sm text-gray-900 hover:text-gray-600">
+                                  {comment.user.fullName || comment.user.username}
+                                </span>
+                              </Link>
+                              <span className="text-sm text-gray-900 ml-2">
+                                {comment.content}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => handleLikeComment(comment.id)}
+                                className="transition-transform active:scale-90"
+                              >
+                                <Heart 
+                                  className={`w-4 h-4 ${comment.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
+                                  strokeWidth={comment.isLiked ? 0 : 2}
+                                />
+                              </button>
+                              
+                              {user && comment.user.id === user.id && (
+                                <div className="relative" ref={el => commentMenuRef.current[comment.id] = el}>
+                                  <button
+                                    onClick={() => setCommentMenuOpen(commentMenuOpen === comment.id ? null : comment.id)}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                    title="More options"
+                                  >
+                                    <MoreVertical className="w-3.5 h-3.5" />
+                                  </button>
+                                  
+                                  {commentMenuOpen === comment.id && (
+                                    <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[9999] min-w-[120px]">
+                                      <button
+                                        onClick={() => handleEditComment(comment)}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteComment(comment.id)}
+                                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-xs text-gray-500">
+                              {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                            </span>
+                            {comment.likesCount > 0 && (
+                              <button
+                                onClick={() => handleLikeComment(comment.id)}
+                                className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                              >
+                                {comment.likesCount} {comment.likesCount === 1 ? 'like' : 'likes'}
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}

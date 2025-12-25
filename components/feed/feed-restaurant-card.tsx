@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, Send, X, Loader2, UserPlus, UserCheck } from 'lucide-react';
+import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, Send, X, Loader2, UserPlus, UserCheck, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
@@ -82,9 +82,13 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
       searchingFriends: boolean;
       friendsList: any[];
       postingComment: boolean;
+      editingCommentId: string | null;
+      editCommentContent: string;
+      commentMenuOpen: string | null;
     };
   }>({});
   const commentInputRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
+  const commentMenuRefs = useRef<{ [key: string]: { [commentId: string]: HTMLDivElement | null } }>({});
 
   const getExperienceState = (experienceId: string) => {
     return experienceStates[experienceId] || {
@@ -102,6 +106,9 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
       searchingFriends: false,
       friendsList: [],
       postingComment: false,
+      editingCommentId: null,
+      editCommentContent: '',
+      commentMenuOpen: null,
     };
   };
 
@@ -126,6 +133,23 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
       return newState;
     });
   };
+
+  // Close comment menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      Object.entries(experienceStates).forEach(([experienceId, state]) => {
+        if (state.commentMenuOpen && commentMenuRefs.current[experienceId]) {
+          const menuElement = commentMenuRefs.current[experienceId][state.commentMenuOpen];
+          if (menuElement && !menuElement.contains(event.target as Node)) {
+            updateExperienceState(experienceId, { commentMenuOpen: null });
+          }
+        }
+      });
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [experienceStates]);
 
   const handleLike = async (experience: Review) => {
     if (!user) {
@@ -473,6 +497,90 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
     }
   };
 
+  const handleDeleteComment = async (experienceId: string, commentId: string) => {
+    updateExperienceState(experienceId, { commentMenuOpen: null });
+    try {
+      const response = await fetch(`/api/reviews/${experienceId}/comments/${commentId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const state = getExperienceState(experienceId);
+        updateExperienceState(experienceId, {
+          comments: state.comments.filter(c => c.id !== commentId),
+          commentsCount: state.commentsCount - 1,
+        });
+        if (onUpdate) onUpdate();
+        showToast('Comment deleted', 'success');
+      } else {
+        showToast('Failed to delete comment', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      showToast('Failed to delete comment', 'error');
+    }
+  };
+
+  const handleEditComment = (experienceId: string, comment: any) => {
+    updateExperienceState(experienceId, {
+      editingCommentId: comment.id,
+      editCommentContent: comment.content,
+      commentMenuOpen: null,
+    });
+  };
+
+  const handleUpdateComment = async (experienceId: string, commentId: string) => {
+    const state = getExperienceState(experienceId);
+    if (!state.editCommentContent.trim()) {
+      showToast('Comment cannot be empty', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/reviews/${experienceId}/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: state.editCommentContent.trim() }),
+      });
+
+      if (response.ok) {
+        const { comment: updatedComment } = await response.json();
+        // Transform the updated comment to match the existing format (snake_case)
+        const transformedComment = {
+          ...updatedComment,
+          created_at: updatedComment.createdAt,
+          updated_at: updatedComment.updatedAt,
+          user: {
+            id: updatedComment.user.id,
+            username: updatedComment.user.username,
+            full_name: updatedComment.user.fullName,
+            avatar_url: updatedComment.user.avatarUrl,
+          },
+          mentions: updatedComment.mentions || [],
+        };
+        updateExperienceState(experienceId, {
+          comments: state.comments.map(c => c.id === commentId ? transformedComment : c),
+          editingCommentId: null,
+          editCommentContent: '',
+        });
+        if (onUpdate) onUpdate();
+        showToast('Comment updated', 'success');
+      } else {
+        showToast('Failed to update comment', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      showToast('Failed to update comment', 'error');
+    }
+  };
+
+  const handleCancelEdit = (experienceId: string) => {
+    updateExperienceState(experienceId, {
+      editingCommentId: null,
+      editCommentContent: '',
+    });
+  };
+
   const scrollCarousel = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return;
     
@@ -604,13 +712,13 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                   ) : (
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
                       <span className="text-sm font-bold text-white">
-                        {experience.user.fullName.charAt(0).toUpperCase()}
+                        {(experience.user.fullName || experience.user.username).charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-gray-900 truncate">
-                      {experience.user.username}
+                      {experience.user.fullName || experience.user.username}
                     </p>
                     <div className="flex items-center gap-1">
                       <CompactRating rating={experience.rating} />
@@ -754,52 +862,134 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                             <img
                               src={comment.user.avatar_url}
                               alt={comment.user.full_name}
-                              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-bold text-white">
-                                {comment.user.full_name?.charAt(0).toUpperCase()}
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                              <span className="text-base font-bold text-white">
+                                {(comment.user.full_name || comment.user.username)?.charAt(0).toUpperCase()}
                               </span>
                             </div>
                           )}
                         </Link>
                         <div className="flex-1 min-w-0">
-                          <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`}>
-                            <p className="font-semibold text-sm text-gray-900">
-                              {comment.user.username}
-                            </p>
-                          </Link>
-                          <p className="text-sm text-gray-700 mt-1 break-words">{comment.content}</p>
-                          {comment.mentions && comment.mentions.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {comment.mentions.map((mentioned: any) => (
-                                <Link
-                                  key={mentioned.id}
-                                  href={user && mentioned.id === user.id ? '/profile' : `/profile/${mentioned.id}`}
-                                  className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full hover:bg-primary/20"
-                                >
-                                  @{mentioned.username}
-                                </Link>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-3 mt-2">
-                            <button
-                              onClick={() => handleLikeComment(experience.id, comment.id)}
-                              className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500"
-                            >
-                              <Heart
-                                className={`w-4 h-4 ${comment.isLiked ? 'fill-red-500 text-red-500' : ''}`}
+                          {state.editingCommentId === comment.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={state.editCommentContent}
+                                onChange={(e) => updateExperienceState(experience.id, { editCommentContent: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary text-sm resize-none"
+                                rows={2}
+                                autoFocus
                               />
-                              {comment.likesCount > 0 && <span>{comment.likesCount}</span>}
-                            </button>
-                            {comment.created_at && (
-                              <span className="text-xs text-gray-400">
-                                {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                              </span>
-                            )}
-                          </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleUpdateComment(experience.id, comment.id)}
+                                  className="px-3 py-1 bg-primary text-white text-xs rounded-lg hover:bg-primary/90"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => handleCancelEdit(experience.id)}
+                                  className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-lg hover:bg-gray-300"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-start gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <Link href={user && comment.user.id === user.id ? '/profile' : `/profile/${comment.user.id}`}>
+                                    <p className="font-semibold text-sm text-gray-900">
+                                      {comment.user.full_name || comment.user.username}
+                                    </p>
+                                  </Link>
+                                  <p className="text-sm text-gray-700 mt-1 break-words">{comment.content}</p>
+                                  {comment.mentions && comment.mentions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {comment.mentions.map((mentioned: any) => (
+                                        <Link
+                                          key={mentioned.id}
+                                          href={user && mentioned.id === user.id ? '/profile' : `/profile/${mentioned.id}`}
+                                          className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full hover:bg-primary/20"
+                                        >
+                                          @{mentioned.username}
+                                        </Link>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <button
+                                    onClick={() => handleLikeComment(experience.id, comment.id)}
+                                    className="transition-transform active:scale-90"
+                                  >
+                                    <Heart
+                                      className={`w-4 h-4 ${comment.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
+                                      strokeWidth={comment.isLiked ? 0 : 2}
+                                    />
+                                  </button>
+                                  
+                                  {user && comment.user.id === user.id && (
+                                    <div className="relative" ref={el => {
+                                      if (!commentMenuRefs.current[experience.id]) {
+                                        commentMenuRefs.current[experience.id] = {};
+                                      }
+                                      commentMenuRefs.current[experience.id][comment.id] = el;
+                                    }}>
+                                      <button
+                                        onClick={() => updateExperienceState(experience.id, { 
+                                          commentMenuOpen: state.commentMenuOpen === comment.id ? null : comment.id 
+                                        })}
+                                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                        title="More options"
+                                      >
+                                        <MoreVertical className="w-3.5 h-3.5" />
+                                      </button>
+                                      
+                                      {state.commentMenuOpen === comment.id && (
+                                        <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[9999] min-w-[120px]">
+                                          <button
+                                            onClick={() => handleEditComment(experience.id, comment)}
+                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                          >
+                                            <Edit2 className="w-3.5 h-3.5" />
+                                            Edit
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteComment(experience.id, comment.id)}
+                                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-3 mt-1">
+                                {comment.created_at && (
+                                  <span className="text-xs text-gray-500">
+                                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                  </span>
+                                )}
+                                {comment.likesCount > 0 && (
+                                  <button
+                                    onClick={() => handleLikeComment(experience.id, comment.id)}
+                                    className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                                  >
+                                    {comment.likesCount} {comment.likesCount === 1 ? 'like' : 'likes'}
+                                  </button>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))

@@ -140,16 +140,16 @@ export function FullScreenReviewViewer({
             {currentReview.user.avatarUrl ? (
               <img
                 src={currentReview.user.avatarUrl}
-                alt={currentReview.user.username}
+                alt={currentReview.user.fullName}
                 className="w-8 h-8 rounded-full"
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
-                {currentReview.user.username.charAt(0).toUpperCase()}
+                {(currentReview.user.fullName || currentReview.user.username).charAt(0).toUpperCase()}
               </div>
             )}
             <div>
-              <p className="text-white font-semibold text-sm">{currentReview.user.username}</p>
+              <p className="text-white font-semibold text-sm">{currentReview.user.fullName || currentReview.user.username}</p>
               <p className="text-white/70 text-xs">{timeAgo}</p>
             </div>
           </div>
