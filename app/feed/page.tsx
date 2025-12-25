@@ -273,8 +273,9 @@ export default function FeedPage() {
                   }
                   
                   // If no review photos, use restaurant photos (Google reviews typically don't have individual photos)
-                  if (reviewPhotos.length === 0 && detailsData.photos && detailsData.photos[index]) {
-                    const photo = detailsData.photos[index];
+                  // Skip the first photo (index 0) as it's used as the main restaurant photo
+                  if (reviewPhotos.length === 0 && detailsData.photos && detailsData.photos[index + 1]) {
+                    const photo = detailsData.photos[index + 1];
                     if (photo.photo_reference) {
                       reviewPhotos.push(
                         `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
