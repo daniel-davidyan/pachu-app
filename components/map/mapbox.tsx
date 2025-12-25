@@ -29,14 +29,6 @@ interface MapboxProps {
   userLocationOverride?: { lat: number; lng: number } | null;
 }
 
-interface Cluster {
-  id: string;
-  latitude: number;
-  longitude: number;
-  count: number;
-  restaurants: Restaurant[];
-}
-
 // Enhanced icon mapping with more categories and variety
 const getRestaurantIcon = (restaurant: Restaurant): { emoji: string; color: string; bg: string } => {
   const cuisines = restaurant.cuisineTypes || [];
@@ -227,6 +219,20 @@ export function Mapbox({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadedBounds = useRef<Set<string>>(new Set());
   const loadRestaurantsRef = useRef<((bounds: mapboxgl.LngLatBounds) => Promise<void>) | null>(null);
+  
+  // Gesture detection state for map-level click handling
+  const gestureState = useRef({
+    startTime: 0,
+    startX: 0,
+    startY: 0,
+    isDragging: false,
+    isMultiTouch: false,
+    touchCount: 0,
+    isGestureActive: false, // Track if we're in an active gesture
+  });
+  
+  // Store marker positions for hit testing
+  const markerPositions = useRef<Map<string, { restaurant: Restaurant; element: HTMLElement }>>(new Map());
 
   // Smart de-duplication and categorization based on proximity and zoom
   const categorizeRestaurants = useCallback((restaurants: Restaurant[], zoom: number) => {
@@ -352,6 +358,182 @@ export function Mapbox({
     loadRestaurantsRef.current = loadRestaurantsInBounds;
   }, [loadRestaurantsInBounds]);
 
+  // Find restaurant at screen coordinates using hit testing
+  const findRestaurantAtPoint = useCallback((screenX: number, screenY: number): Restaurant | null => {
+    const hitRadius = 60; // Larger radius for easier tapping on mobile
+    let closestRestaurant: Restaurant | null = null;
+    let closestDistance = Infinity;
+    
+    markerPositions.current.forEach(({ restaurant, element }) => {
+      const rect = element.getBoundingClientRect();
+      
+      // Check if click is within the element's bounding box (with some padding)
+      const padding = 15;
+      const isWithinBounds = 
+        screenX >= rect.left - padding &&
+        screenX <= rect.right + padding &&
+        screenY >= rect.top - padding &&
+        screenY <= rect.bottom + padding;
+      
+      if (isWithinBounds) {
+        // Calculate distance to center for finding closest
+        const markerCenterX = rect.left + rect.width / 2;
+        const markerCenterY = rect.top + rect.height / 2;
+        
+        const distance = Math.sqrt(
+          Math.pow(screenX - markerCenterX, 2) + 
+          Math.pow(screenY - markerCenterY, 2)
+        );
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestRestaurant = restaurant;
+        }
+      }
+    });
+    
+    // Fallback: if no bounding box match, try radius-based detection
+    if (!closestRestaurant) {
+      markerPositions.current.forEach(({ restaurant, element }) => {
+        const rect = element.getBoundingClientRect();
+        const markerCenterX = rect.left + rect.width / 2;
+        const markerCenterY = rect.top + rect.height / 2;
+        
+        const distance = Math.sqrt(
+          Math.pow(screenX - markerCenterX, 2) + 
+          Math.pow(screenY - markerCenterY, 2)
+        );
+        
+        if (distance < hitRadius && distance < closestDistance) {
+          closestDistance = distance;
+          closestRestaurant = restaurant;
+        }
+      });
+    }
+    
+    return closestRestaurant;
+  }, []);
+
+  // Handle map-level gesture for click detection
+  const handleMapGestureStart = useCallback((e: TouchEvent | MouseEvent) => {
+    gestureState.current.isGestureActive = true;
+    
+    if ('touches' in e) {
+      // Touch event
+      gestureState.current.touchCount = e.touches.length;
+      gestureState.current.isMultiTouch = e.touches.length > 1;
+      
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        gestureState.current.startTime = Date.now();
+        gestureState.current.startX = touch.clientX;
+        gestureState.current.startY = touch.clientY;
+        gestureState.current.isDragging = false;
+      } else {
+        // Multi-touch immediately cancels any potential click
+        gestureState.current.isMultiTouch = true;
+      }
+    } else {
+      // Mouse event
+      gestureState.current.startTime = Date.now();
+      gestureState.current.startX = e.clientX;
+      gestureState.current.startY = e.clientY;
+      gestureState.current.isDragging = false;
+      gestureState.current.isMultiTouch = false;
+    }
+  }, []);
+
+  const handleMapGestureMove = useCallback((e: TouchEvent | MouseEvent) => {
+    // Only track movement if we're in an active gesture
+    if (!gestureState.current.isGestureActive) return;
+    
+    if ('touches' in e) {
+      // If more touches added during gesture, mark as multi-touch
+      if (e.touches.length > 1) {
+        gestureState.current.isMultiTouch = true;
+        gestureState.current.touchCount = e.touches.length;
+        return;
+      }
+      
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const moveX = touch.clientX - gestureState.current.startX;
+        const moveY = touch.clientY - gestureState.current.startY;
+        const distance = Math.sqrt(moveX * moveX + moveY * moveY);
+        
+        // If moved more than 12px, it's a drag (more forgiving for taps)
+        if (distance > 12) {
+          gestureState.current.isDragging = true;
+        }
+      }
+    } else {
+      // Mouse movement - only track if gesture is active (mouse button pressed)
+      const moveX = e.clientX - gestureState.current.startX;
+      const moveY = e.clientY - gestureState.current.startY;
+      const distance = Math.sqrt(moveX * moveX + moveY * moveY);
+      
+      // For mouse, use a smaller threshold since mouse is more precise
+      if (distance > 5) {
+        gestureState.current.isDragging = true;
+      }
+    }
+  }, []);
+
+  const handleMapGestureEnd = useCallback((e: TouchEvent | MouseEvent) => {
+    const { startTime, isDragging, isMultiTouch } = gestureState.current;
+    const duration = Date.now() - startTime;
+    
+    // Only process as a click if:
+    // 1. Not multi-touch (pinch zoom)
+    // 2. Not dragging (pan)
+    // 3. Duration is reasonable (< 500ms for tap - increased for better mobile support)
+    if (!isMultiTouch && !isDragging && duration < 500) {
+      let endX: number, endY: number;
+      
+      if ('changedTouches' in e && e.changedTouches.length > 0) {
+        endX = e.changedTouches[0].clientX;
+        endY = e.changedTouches[0].clientY;
+      } else if ('clientX' in e) {
+        endX = e.clientX;
+        endY = e.clientY;
+      } else {
+        // Reset and return
+        gestureState.current.isDragging = false;
+        gestureState.current.isMultiTouch = false;
+        gestureState.current.touchCount = 0;
+        gestureState.current.isGestureActive = false;
+        return;
+      }
+      
+      // Find if there's a restaurant marker at this point
+      const restaurant = findRestaurantAtPoint(endX, endY);
+      
+      // Debug logging (can be removed in production)
+      console.log('[Map Click]', { 
+        endX, 
+        endY, 
+        duration, 
+        isDragging, 
+        isMultiTouch, 
+        markerCount: markerPositions.current.size,
+        foundRestaurant: restaurant?.name || 'none'
+      });
+      
+      if (restaurant && onRestaurantClick) {
+        // Small delay to ensure it doesn't interfere with map
+        setTimeout(() => {
+          onRestaurantClick(restaurant);
+        }, 10);
+      }
+    }
+    
+    // Reset state
+    gestureState.current.isDragging = false;
+    gestureState.current.isMultiTouch = false;
+    gestureState.current.touchCount = 0;
+    gestureState.current.isGestureActive = false;
+  }, [findRestaurantAtPoint, onRestaurantClick]);
+
   // Update user location marker when override changes
   useEffect(() => {
     if (userLocationOverride && userLocationMarker.current) {
@@ -423,6 +605,26 @@ export function Mapbox({
     map.current.addControl(geolocate, 'bottom-right');
 
     const currentMap = map.current;
+    const container = mapContainer.current;
+    
+    // Attach gesture detection listeners to the map container
+    // These detect if a touch/click is a simple tap vs drag/pinch
+    if (container) {
+      container.addEventListener('touchstart', handleMapGestureStart, { passive: true });
+      container.addEventListener('touchmove', handleMapGestureMove, { passive: true });
+      container.addEventListener('touchend', handleMapGestureEnd, { passive: true });
+      container.addEventListener('touchcancel', () => {
+        gestureState.current.isDragging = false;
+        gestureState.current.isMultiTouch = false;
+        gestureState.current.touchCount = 0;
+        gestureState.current.isGestureActive = false;
+      }, { passive: true });
+      
+      // Mouse events for desktop
+      container.addEventListener('mousedown', handleMapGestureStart);
+      container.addEventListener('mousemove', handleMapGestureMove);
+      container.addEventListener('mouseup', handleMapGestureEnd);
+    }
     
     // Track zoom changes
     currentMap.on('zoom', () => {
@@ -526,6 +728,16 @@ export function Mapbox({
     });
 
     return () => {
+      // Remove gesture listeners
+      if (container) {
+        container.removeEventListener('touchstart', handleMapGestureStart);
+        container.removeEventListener('touchmove', handleMapGestureMove);
+        container.removeEventListener('touchend', handleMapGestureEnd);
+        container.removeEventListener('mousedown', handleMapGestureStart);
+        container.removeEventListener('mousemove', handleMapGestureMove);
+        container.removeEventListener('mouseup', handleMapGestureEnd);
+      }
+      
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -534,8 +746,11 @@ export function Mapbox({
         userLocationMarker.current.remove();
         userLocationMarker.current = null;
       }
+      
+      // Clear marker positions
+      markerPositions.current.clear();
     };
-  }, [accessToken, userLocation]);
+  }, [accessToken, userLocation, handleMapGestureStart, handleMapGestureMove, handleMapGestureEnd]);
 
   // Add markers for restaurants (icons for main, dots for others)
   useEffect(() => {
@@ -543,7 +758,7 @@ export function Mapbox({
     
     const currentMap = map.current;
 
-    // Remove existing markers
+    // Remove existing markers and clear position tracking
     markers.current.forEach(marker => {
       try {
         marker.remove();
@@ -552,6 +767,7 @@ export function Mapbox({
       }
     });
     markers.current = [];
+    markerPositions.current.clear();
 
     // Combine loaded restaurants with prop restaurants
     const allRestaurants = [...loadedRestaurants, ...restaurants];
@@ -567,7 +783,6 @@ export function Mapbox({
       if (!currentMap) return;
       const el = document.createElement('div');
       el.className = 'restaurant-marker';
-      const isFriendOrOwn = restaurant.source === 'friends' || restaurant.source === 'own';
       const iconData = getRestaurantIcon(restaurant);
       
       // Calculate match percentage
@@ -594,12 +809,12 @@ export function Mapbox({
       };
       
       // Main restaurant marker - white circle with icon + text label (always on top)
+      // NON-INTERACTIVE: pointer-events handled at map level for smooth gestures
       el.innerHTML = `
         <div class="marker-wrapper" style="
           display: flex;
           align-items: center;
           gap: 4px;
-          cursor: pointer;
           position: relative;
           z-index: 1000;
           visibility: hidden;
@@ -706,114 +921,11 @@ export function Mapbox({
         </div>
       `;
 
-      const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
       const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
-      
-      // Track gesture state to differentiate tap from drag/zoom
-      let gestureStartTime = 0;
-      let gestureStartX = 0;
-      let gestureStartY = 0;
-      let isDragging = false;
-      let isMultiTouch = false;
-      let touchIdentifier: number | null = null;
-      
-      el.addEventListener('touchstart', (e) => {
-        // Immediately check for multi-touch
-        isMultiTouch = e.touches.length > 1;
-        
-        if (isMultiTouch) {
-          // Multi-touch detected - make this marker transparent immediately
-          el.style.pointerEvents = 'none';
-          isDragging = true;
-          return; // Don't record gesture start for multi-touch
-        }
-        
-        // Single touch - could be a tap, record state
-        const touch = e.touches[0];
-        touchIdentifier = touch.identifier;
-        gestureStartTime = Date.now();
-        gestureStartX = touch.clientX;
-        gestureStartY = touch.clientY;
-        isDragging = false;
-      }, { passive: true });
-      
-      el.addEventListener('touchmove', (e) => {
-        // Check if this became multi-touch during the gesture
-        if (e.touches.length > 1) {
-          isMultiTouch = true;
-          isDragging = true;
-          // Make marker transparent so zoom can work
-          el.style.pointerEvents = 'none';
-          return;
-        }
-        
-        // Check for dragging (single touch movement)
-        if (!isMultiTouch && e.touches[0] && e.touches[0].identifier === touchIdentifier) {
-          const moveX = e.touches[0].clientX - gestureStartX;
-          const moveY = e.touches[0].clientY - gestureStartY;
-          const distance = Math.sqrt(moveX * moveX + moveY * moveY);
-          
-          // If moved more than 10px, it's a drag
-          if (distance > 10) {
-            isDragging = true;
-          }
-        }
-      }, { passive: true });
-      
-      el.addEventListener('touchend', (e) => {
-        const touchDuration = Date.now() - gestureStartTime;
-        
-        // Only trigger click if:
-        // 1. It was a single touch (not multi-touch zoom)
-        // 2. User didn't drag
-        // 3. Touch duration was reasonable (< 500ms)
-        if (!isMultiTouch && !isDragging && touchDuration < 500 && onRestaurantClick) {
-          onRestaurantClick(restaurant);
-        }
-        
-        // Re-enable pointer events after a short delay
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-        }, 100);
-        
-        // Reset state
-        isDragging = false;
-        isMultiTouch = false;
-        touchIdentifier = null;
-      }, { passive: true });
-      
-      el.addEventListener('touchcancel', (e) => {
-        // Re-enable pointer events
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-        }, 100);
-        
-        // Reset state
-        isDragging = false;
-        isMultiTouch = false;
-        touchIdentifier = null;
-      }, { passive: true });
-      
-      el.addEventListener('mouseenter', () => {
-        if (markerCircle) {
-          markerCircle.style.transform = 'scale(1.1)';
-          markerCircle.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
-        }
-      });
-      
-      el.addEventListener('mouseleave', () => {
-        if (markerCircle) {
-          markerCircle.style.transform = 'scale(1)';
-          markerCircle.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-        }
-      });
+      const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
 
-      el.addEventListener('click', (e) => {
-        // For mouse clicks (desktop)
-        if (onRestaurantClick) {
-          onRestaurantClick(restaurant);
-        }
-      });
+      // NO individual event listeners - all gesture detection happens at map level
+      // Markers are completely non-interactive to ensure smooth panning/zooming
 
       try {
         const marker = new mapboxgl.Marker({ 
@@ -832,6 +944,13 @@ export function Mapbox({
           markerWrapper.style.opacity = '1';
         }
         
+        // Register the VISUAL element (marker circle) for accurate hit testing
+        // This is the actual clickable area users see
+        markerPositions.current.set(restaurant.id, { 
+          restaurant, 
+          element: markerCircle || markerWrapper || el 
+        });
+        
         markers.current.push(marker);
       } catch (e) {
         console.warn('Error adding main restaurant marker:', e);
@@ -847,16 +966,15 @@ export function Mapbox({
       const isFriendOrOwn = restaurant.source === 'friends' || restaurant.source === 'own';
       const iconData = getRestaurantIcon(restaurant);
       
-      // Small dot marker
+      // Small dot marker - NON-INTERACTIVE (pointer-events: none handled in CSS)
       el.innerHTML = `
         <div class="dot-marker" style="
-          width: 8px;
-          height: 8px;
+          width: 12px;
+          height: 12px;
           background: ${isFriendOrOwn ? '#C5459C' : iconData.color};
           border-radius: 50%;
           box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px white;
           border: 2px solid white;
-          cursor: pointer;
           visibility: hidden;
           opacity: 0;
           transition: all 0.2s ease;
@@ -864,104 +982,9 @@ export function Mapbox({
       `;
 
       const dotContent = el.querySelector('.dot-marker') as HTMLElement;
-      
-      // Track gesture state for dot markers
-      let dotGestureStartTime = 0;
-      let dotGestureStartX = 0;
-      let dotGestureStartY = 0;
-      let dotIsDragging = false;
-      let dotIsMultiTouch = false;
-      let dotTouchIdentifier: number | null = null;
-      
-      el.addEventListener('touchstart', (e) => {
-        // Immediately check for multi-touch
-        dotIsMultiTouch = e.touches.length > 1;
-        
-        if (dotIsMultiTouch) {
-          // Multi-touch - make transparent immediately
-          el.style.pointerEvents = 'none';
-          dotIsDragging = true;
-          return;
-        }
-        
-        // Single touch
-        const touch = e.touches[0];
-        dotTouchIdentifier = touch.identifier;
-        dotGestureStartTime = Date.now();
-        dotGestureStartX = touch.clientX;
-        dotGestureStartY = touch.clientY;
-        dotIsDragging = false;
-      }, { passive: true });
-      
-      el.addEventListener('touchmove', (e) => {
-        if (e.touches.length > 1) {
-          dotIsMultiTouch = true;
-          dotIsDragging = true;
-          el.style.pointerEvents = 'none';
-          return;
-        }
-        
-        if (!dotIsMultiTouch && e.touches[0] && e.touches[0].identifier === dotTouchIdentifier) {
-          const moveX = e.touches[0].clientX - dotGestureStartX;
-          const moveY = e.touches[0].clientY - dotGestureStartY;
-          const distance = Math.sqrt(moveX * moveX + moveY * moveY);
-          
-          if (distance > 10) {
-            dotIsDragging = true;
-          }
-        }
-      }, { passive: true });
-      
-      el.addEventListener('touchend', (e) => {
-        const touchDuration = Date.now() - dotGestureStartTime;
-        
-        // Only trigger click if it was a tap (not drag/zoom)
-        if (!dotIsMultiTouch && !dotIsDragging && touchDuration < 500 && onRestaurantClick) {
-          onRestaurantClick(restaurant);
-        }
-        
-        // Re-enable pointer events
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-        }, 100);
-        
-        // Reset state
-        dotIsDragging = false;
-        dotIsMultiTouch = false;
-        dotTouchIdentifier = null;
-      }, { passive: true });
-      
-      el.addEventListener('touchcancel', (e) => {
-        // Re-enable pointer events
-        setTimeout(() => {
-          el.style.pointerEvents = 'auto';
-        }, 100);
-        
-        dotIsDragging = false;
-        dotIsMultiTouch = false;
-        dotTouchIdentifier = null;
-      }, { passive: true });
-      
-      el.addEventListener('mouseenter', () => {
-        if (dotContent) {
-          dotContent.style.transform = 'scale(1.5)';
-          dotContent.style.boxShadow = '0 3px 10px rgba(0,0,0,0.4), 0 0 0 2px white';
-        }
-      });
-      
-      el.addEventListener('mouseleave', () => {
-        if (dotContent) {
-          dotContent.style.transform = 'scale(1)';
-          dotContent.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px white';
-        }
-      });
 
-      el.addEventListener('click', (e) => {
-        // For mouse clicks (desktop)
-        if (onRestaurantClick) {
-          onRestaurantClick(restaurant);
-        }
-      });
+      // NO individual event listeners - all gesture detection happens at map level
+      // Markers are completely non-interactive to ensure smooth panning/zooming
 
       try {
         const marker = new mapboxgl.Marker({ 
@@ -979,11 +1002,22 @@ export function Mapbox({
           dotContent.style.opacity = '1';
         }
         
+        // Register the VISUAL element (dot) for accurate hit testing
+        markerPositions.current.set(restaurant.id, { 
+          restaurant, 
+          element: dotContent || el 
+        });
+        
         markers.current.push(marker);
       } catch (e) {
         console.warn('Error adding dot marker:', e);
       }
     });
+    
+    // Cleanup: clear marker positions on unmount
+    return () => {
+      markerPositions.current.clear();
+    };
 
   }, [restaurants, loadedRestaurants, onRestaurantClick, currentZoom, categorizeRestaurants]);
 
@@ -1003,7 +1037,7 @@ export function Mapbox({
         </div>
       )}
       
-      {/* CSS for pulsing animation */}
+      {/* CSS for pulsing animation and NON-INTERACTIVE markers */}
       <style jsx global>{`
         @keyframes pulse {
           0% {
@@ -1016,18 +1050,23 @@ export function Mapbox({
           }
         }
         
-        /* Allow markers to receive touch events */
+        /* CRITICAL: Make ALL markers completely non-interactive
+           This ensures smooth panning, zooming, and pinching
+           Click detection happens at the map container level via hit testing */
         .mapboxgl-marker {
-          pointer-events: auto !important;
+          pointer-events: none !important;
         }
         
-        /* Marker content should be interactive */
+        /* All marker content should be non-interactive */
         .mapboxgl-marker .marker-wrapper,
-        .mapboxgl-marker .dot-marker {
-          pointer-events: auto !important;
+        .mapboxgl-marker .dot-marker,
+        .mapboxgl-marker .restaurant-marker,
+        .mapboxgl-marker .restaurant-dot {
+          pointer-events: none !important;
+          cursor: default !important;
         }
         
-        /* User location marker should be visible but not block gestures */
+        /* User location marker should also be non-interactive */
         .mapboxgl-marker .user-location-marker,
         .mapboxgl-marker .user-location-marker * {
           pointer-events: none !important;
@@ -1047,6 +1086,16 @@ export function Mapbox({
         .mapboxgl-marker:has(.user-location-marker) {
           visibility: visible !important;
           z-index: 2000 !important;
+        }
+        
+        /* Ensure mapbox canvas receives all touch events */
+        .mapboxgl-canvas {
+          touch-action: pan-x pan-y pinch-zoom !important;
+        }
+        
+        /* Make map container receive all touch events */
+        .mapboxgl-map {
+          touch-action: manipulation !important;
         }
       `}</style>
     </div>
