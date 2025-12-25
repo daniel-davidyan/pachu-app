@@ -510,15 +510,30 @@ export default function RestaurantPage() {
                   <Users className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-blue-900 mb-1">
-                    None of your friends have shared their experience here yet
-                  </p>
-                  <p className="text-xs text-blue-700">
-                    {showingGoogleReviews 
-                      ? "We're showing reviews from Google to help you discover this place. Be the first of your friends to share your experience!"
-                      : "We're showing all available reviews to help you discover this place. Be the first of your friends to share your experience!"
-                    }
-                  </p>
+                  {user && friendsWhoReviewed.length === 0 ? (
+                    // User is logged in and has friends but they haven't reviewed
+                    <>
+                      <p className="text-sm font-semibold text-blue-900 mb-1">
+                        None of your friends have shared their experience here yet
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        {showingGoogleReviews 
+                          ? "We're showing reviews from Google to help you discover this place. Be the first of your friends to share your experience!"
+                          : "We're showing all available reviews to help you discover this place. Be the first of your friends to share your experience!"
+                        }
+                      </p>
+                    </>
+                  ) : (
+                    // User not logged in or no friends - general message
+                    <>
+                      <p className="text-sm font-semibold text-blue-900 mb-1">
+                        Showing reviews from Google
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        These reviews are from Google Places. Share your own experience to help others discover this place!
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

@@ -232,61 +232,44 @@ export async function GET(
               }
             }
             
-            // If no friend reviews (or user not logged in), try Google reviews with photos
+            // If no friend reviews (or user not logged in), show Google reviews
+            // Note: Google Places API doesn't provide photos per review, only restaurant-level photos
             if (reviewsToShow.length === 0 && googleData.reviews && googleData.reviews.length > 0) {
-              showingGoogleReviews = true;
-              const googleReviewsWithPhotos = (googleData.reviews || [])
-                .filter((review: any) => {
-                  // Only show Google reviews that have photos
-                  return review.photos && review.photos.length > 0;
-                })
-                .map((review: any) => ({
-                  id: `google-${review.time}`,
-                  rating: review.rating,
-                  title: null,
-                  content: review.text || '',
-                  visitDate: null,
-                  createdAt: new Date(review.time * 1000).toISOString(),
-                  likesCount: 0,
-                  commentsCount: 0,
-                  isLiked: false,
-                  user: {
-                    id: review.author_name,
-                    username: review.author_name,
-                    fullName: review.author_name,
-                    avatarUrl: review.profile_photo_url,
-                  },
-                  // Map Google photos to photo URLs
-                  photos: (review.photos || []).map((photo: any) => 
+              // Get restaurant photos to use for Google reviews (since reviews don't have individual photos)
+              const restaurantPhotos = googleData.photos 
+                ? googleData.photos.slice(0, 3).map((photo: any) => 
                     photo.photo_reference 
                       ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
                       : null
-                  ).filter((url: string | null) => url !== null),
-                }));
+                  ).filter((url: string | null) => url !== null)
+                : [];
+
+              const googleReviews = (googleData.reviews || []).map((review: any, index: number) => ({
+                id: `google-${review.time}`,
+                rating: review.rating,
+                title: null,
+                content: review.text || '',
+                visitDate: null,
+                createdAt: new Date(review.time * 1000).toISOString(),
+                likesCount: 0,
+                commentsCount: 0,
+                isLiked: false,
+                user: {
+                  id: review.author_name,
+                  username: review.author_name,
+                  fullName: review.author_name,
+                  avatarUrl: review.profile_photo_url,
+                },
+                // Use restaurant photos for Google reviews (since Google API doesn't provide per-review photos)
+                // Distribute photos across reviews, or use empty array for gradient placeholders
+                photos: restaurantPhotos.length > 0 && index < restaurantPhotos.length 
+                  ? [restaurantPhotos[index]] 
+                  : [],
+              }));
               
-              if (googleReviewsWithPhotos.length > 0) {
-                reviewsToShow = googleReviewsWithPhotos;
-              } else {
-                // No Google reviews with photos - show all Google reviews with gradient placeholders
-                reviewsToShow = (googleData.reviews || [])
-                  .map((review: any) => ({
-                    id: `google-${review.time}`,
-                    rating: review.rating,
-                    title: null,
-                    content: review.text || '',
-                    visitDate: null,
-                    createdAt: new Date(review.time * 1000).toISOString(),
-                    likesCount: 0,
-                    commentsCount: 0,
-                    isLiked: false,
-                    user: {
-                      id: review.author_name,
-                      username: review.author_name,
-                      fullName: review.author_name,
-                      avatarUrl: review.profile_photo_url,
-                    },
-                    photos: [], // Empty array will trigger gradient placeholders
-                  }));
+              if (googleReviews.length > 0) {
+                showingGoogleReviews = true;
+                reviewsToShow = googleReviews;
               }
             }
             
@@ -320,7 +303,7 @@ export async function GET(
                 longitude: googleData.geometry?.location?.lng || 0,
               },
               reviews: reviewsToShow,
-              showingGoogleReviews: hasFollowing && showingGoogleReviews, // Only show message if user has following but they haven't reviewed
+              showingGoogleReviews: showingGoogleReviews, // Show banner whenever displaying Google reviews
               isWishlisted,
               userHasReviewed,
               friendsWhoReviewed,
