@@ -219,9 +219,12 @@ export async function GET(
             // 2. Google reviews with photos (if friend reviews don't exist)
             // 3. User's own reviews (if nothing else exists)
             let reviewsToShow: any[] = [];
+            let showingGoogleReviews = false;
+            let hasFollowing = false;
             
             // Check for friend reviews first
             if (user && followingIds.length > 0) {
+              hasFollowing = true;
               const friendReviews = ourReviews.filter(review => followingIds.includes(review.user.id));
               if (friendReviews.length > 0) {
                 // Friends have reviewed - show only their reviews
@@ -231,6 +234,7 @@ export async function GET(
             
             // If no friend reviews (or user not logged in), try Google reviews with photos
             if (reviewsToShow.length === 0 && googleData.reviews && googleData.reviews.length > 0) {
+              showingGoogleReviews = true;
               const googleReviewsWithPhotos = (googleData.reviews || [])
                 .filter((review: any) => {
                   // Only show Google reviews that have photos
@@ -316,6 +320,7 @@ export async function GET(
                 longitude: googleData.geometry?.location?.lng || 0,
               },
               reviews: reviewsToShow,
+              showingGoogleReviews: hasFollowing && showingGoogleReviews, // Only show message if user has following but they haven't reviewed
               isWishlisted,
               userHasReviewed,
               friendsWhoReviewed,
@@ -439,6 +444,7 @@ export async function GET(
     // Prioritize friend reviews if user is logged in
     // But if friends haven't reviewed, show all reviews (don't leave empty)
     let reviews = allReviews;
+    let showingNonFriendReviews = false;
     if (user && allReviews.length > 0) {
       const { data: followingData } = await supabase
         .from('follows')
@@ -452,6 +458,9 @@ export async function GET(
         // Only show friend reviews if they exist, otherwise show all reviews
         if (friendReviews.length > 0) {
           reviews = friendReviews;
+        } else {
+          // Friends haven't reviewed, showing all reviews
+          showingNonFriendReviews = true;
         }
         // If friendReviews.length === 0, keep showing all reviews (don't filter)
       }
@@ -543,6 +552,7 @@ export async function GET(
         longitude,
       },
       reviews,
+      showingNonFriendReviews,
       isWishlisted,
       userHasReviewed,
       friendsWhoReviewed,

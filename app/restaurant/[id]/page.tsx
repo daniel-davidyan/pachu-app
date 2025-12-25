@@ -54,6 +54,15 @@ interface Restaurant {
   longitude: number;
 }
 
+interface RestaurantData {
+  restaurant: Restaurant;
+  reviews: Review[];
+  friendsWhoReviewed: Friend[];
+  isWishlisted: boolean;
+  showingGoogleReviews?: boolean;
+  showingNonFriendReviews?: boolean;
+}
+
 interface Friend {
   id: string;
   username: string;
@@ -81,6 +90,8 @@ export default function RestaurantPage() {
   const [loadingOntopo, setLoadingOntopo] = useState(false);
   const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
   const [isIsrael, setIsIsrael] = useState(false);
+  const [showingGoogleReviews, setShowingGoogleReviews] = useState(false);
+  const [showingNonFriendReviews, setShowingNonFriendReviews] = useState(false);
   
   const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -148,7 +159,7 @@ export default function RestaurantPage() {
     try {
       setLoading(true);
       const response = await fetch(`/api/restaurants/${restaurantId}`);
-      const data = await response.json();
+      const data: RestaurantData = await response.json();
 
       if (data.restaurant) {
         setRestaurant(data.restaurant);
@@ -156,6 +167,8 @@ export default function RestaurantPage() {
         setFriendsWhoReviewed(data.friendsWhoReviewed || []);
         setIsWishlisted(data.isWishlisted || false);
         setRestaurantDbId(data.restaurant.id);
+        setShowingGoogleReviews(data.showingGoogleReviews || false);
+        setShowingNonFriendReviews(data.showingNonFriendReviews || false);
       }
     } catch (error) {
       console.error('Error fetching restaurant:', error);
@@ -488,6 +501,28 @@ export default function RestaurantPage() {
           <h2 className="text-lg font-bold text-gray-900 mb-3">
             Experiences ({reviews.length})
           </h2>
+
+          {/* Info banner when showing Google/non-friend reviews */}
+          {(showingGoogleReviews || showingNonFriendReviews) && reviews.length > 0 && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900 mb-1">
+                    None of your friends have shared their experience here yet
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    {showingGoogleReviews 
+                      ? "We're showing reviews from Google to help you discover this place. Be the first of your friends to share your experience!"
+                      : "We're showing all available reviews to help you discover this place. Be the first of your friends to share your experience!"
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {reviews.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-2xl">

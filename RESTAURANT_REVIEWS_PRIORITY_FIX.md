@@ -1,17 +1,31 @@
 # Restaurant Reviews Display Priority Fix
 
 ## Problem
-On the restaurant/place page, users were seeing Google reviews with "No photos yet" placeholder images, even when those reviews had no actual photos. This created a poor user experience.
+On the restaurant/place page, users were seeing:
+1. Google reviews with "No photos yet" placeholder images
+2. "No experiences yet" empty state even when Google reviews existed
+3. No indication when they were seeing reviews from non-friends
 
 ## Requirements
 1. **Priority 1**: Show reviews from users that the current user is following (friends) - BUT ONLY if friends have actually reviewed
 2. **Priority 2**: If friends haven't reviewed, show Google reviews (with photos if available, with gradient placeholders if not)
 3. **Priority 3**: If no Google reviews exist, show user's own reviews
 4. **Never show "No experiences yet"** if Google reviews are available - always prefer showing something over nothing
+5. **Inform users** when they're seeing Google/non-friend reviews because their friends haven't shared experiences yet
 
 ## Solution
 
-### Changes Made to `app/api/restaurants/[id]/route.ts`
+### Changes Made
+
+#### 1. Backend API: `app/api/restaurants/[id]/route.ts`
+- Added smart priority system for review display
+- Added flags `showingGoogleReviews` and `showingNonFriendReviews` to inform frontend
+- Filter logic ensures users always see content when available
+
+#### 2. Frontend Page: `app/restaurant/[id]/page.tsx`
+- Added state management for review display flags
+- Added informational banner to notify users when seeing Google/non-friend reviews
+- Banner includes helpful messaging to encourage sharing their own experience
 
 #### 1. For Google Places (not yet in database)
 - Added logic to prioritize friend reviews over Google reviews
@@ -19,7 +33,40 @@ On the restaurant/place page, users were seeing Google reviews with "No photos y
 - Map Google photo references to proper photo URLs
 - Fall back to all user reviews (including own) if no friend reviews or Google reviews with photos exist
 
-**Key Code Section (lines 217-290):**
+### API Response Structure
+
+The API now returns additional flags:
+```typescript
+{
+  restaurant: Restaurant,
+  reviews: Review[],
+  friendsWhoReviewed: Friend[],
+  isWishlisted: boolean,
+  showingGoogleReviews?: boolean,      // True when user has friends but they haven't reviewed
+  showingNonFriendReviews?: boolean,   // True when showing non-friend reviews from database
+}
+```
+
+### Frontend Info Banner
+
+When `showingGoogleReviews` or `showingNonFriendReviews` is true, the page displays:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 👥  None of your friends have shared their experience   │
+│     here yet                                            │
+│                                                         │
+│     We're showing reviews from Google to help you       │
+│     discover this place. Be the first of your friends   │
+│     to share your experience!                           │
+└─────────────────────────────────────────────────────────┘
+```
+
+The banner:
+- Uses a friendly blue color scheme (blue-50 background, blue-200 border)
+- Shows a Users icon for visual clarity
+- Provides context about why they're seeing these reviews
+- Encourages them to be the first to share their experience
 ```typescript
 // Determine which reviews to show - Priority system:
 // 1. Friend reviews (if they exist)
