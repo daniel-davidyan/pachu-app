@@ -247,6 +247,7 @@ export default function MapPage() {
             restaurants={filteredRestaurants}
             onRestaurantClick={setSelectedRestaurant}
             mapRef={mapRef}
+            userLocationOverride={userLocation}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-500">

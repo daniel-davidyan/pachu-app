@@ -26,6 +26,7 @@ interface MapboxProps {
   onRestaurantClick?: (restaurant: Restaurant) => void;
   getUserLocation?: boolean;
   mapRef?: React.MutableRefObject<mapboxgl.Map | null>;
+  userLocationOverride?: { lat: number; lng: number } | null;
 }
 
 interface Cluster {
@@ -212,7 +213,8 @@ export function Mapbox({
   restaurants,
   onRestaurantClick,
   getUserLocation = true,
-  mapRef: externalMapRef
+  mapRef: externalMapRef,
+  userLocationOverride
 }: MapboxProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const internalMapRef = useRef<mapboxgl.Map | null>(null);
@@ -349,6 +351,15 @@ export function Mapbox({
   useEffect(() => {
     loadRestaurantsRef.current = loadRestaurantsInBounds;
   }, [loadRestaurantsInBounds]);
+
+  // Update user location marker when override changes
+  useEffect(() => {
+    if (userLocationOverride && userLocationMarker.current) {
+      const newLocation: [number, number] = [userLocationOverride.lng, userLocationOverride.lat];
+      userLocationMarker.current.setLngLat(newLocation);
+      setUserLocation(newLocation);
+    }
+  }, [userLocationOverride]);
 
   // Get user's current location (once on load)
   useEffect(() => {
@@ -502,6 +513,11 @@ export function Mapbox({
       })
         .setLngLat(userLocation)
         .addTo(currentMap);
+      
+      // Make the user location marker visible immediately
+      if (userEl.parentElement) {
+        userEl.parentElement.classList.add('marker-visible');
+      }
     }
 
     return () => {
