@@ -169,7 +169,10 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       
       // First, add existing photos that haven't been removed
       // Existing photos are regular URLs (not blob URLs)
-      for (let i = 0; i < photoUrls.length; i++) {
+      const existingPhotosCount = photoUrls.length - photos.length;
+      console.log('[WriteReviewModal] Existing photos count:', existingPhotosCount);
+      
+      for (let i = 0; i < existingPhotosCount; i++) {
         const url = photoUrls[i];
         if (!url.startsWith('blob:')) {
           // This is an existing photo URL (from the database)
