@@ -455,70 +455,75 @@ export function Mapbox({
             loadRestaurantsRef.current(bounds);
           }
         }
+        
+        // Add custom user location marker after map is loaded
+        if (userLocation && !userLocationMarker.current) {
+          const userEl = document.createElement('div');
+          userEl.className = 'user-location-marker';
+          
+          // Modern pulsing location marker
+          userEl.innerHTML = `
+            <div style="position: relative; width: 40px; height: 40px; visibility: visible !important; opacity: 1 !important;">
+              <!-- Pulsing rings -->
+              <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 40px;
+                height: 40px;
+                background: rgba(66, 133, 244, 0.2);
+                border-radius: 50%;
+                animation: pulse 2s ease-out infinite;
+              "></div>
+              
+              <!-- Main blue circle -->
+              <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 20px;
+                height: 20px;
+                background: #4285F4;
+                border-radius: 50%;
+                border: 3px solid white;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+              "></div>
+              
+              <!-- White center dot -->
+              <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 8px;
+                height: 8px;
+                background: white;
+                border-radius: 50%;
+              "></div>
+            </div>
+          `;
+          
+          userLocationMarker.current = new mapboxgl.Marker({ 
+            element: userEl, 
+            anchor: 'center' 
+          })
+            .setLngLat(userLocation)
+            .addTo(currentMap);
+          
+          // Make the user location marker visible immediately with a small delay
+          setTimeout(() => {
+            if (userEl.parentElement) {
+              userEl.parentElement.style.visibility = 'visible';
+              userEl.parentElement.style.opacity = '1';
+              userEl.parentElement.classList.add('marker-visible');
+              userEl.parentElement.style.zIndex = '2000';
+            }
+          }, 50);
+        }
       }, 100);
     });
-
-    // Add custom user location marker with compass direction
-    if (userLocation) {
-      const userEl = document.createElement('div');
-      userEl.className = 'user-location-marker';
-      
-      // Modern pulsing location marker
-      userEl.innerHTML = `
-        <div style="position: relative; width: 40px; height: 40px;">
-          <!-- Pulsing rings -->
-          <div style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            background: rgba(66, 133, 244, 0.2);
-            border-radius: 50%;
-            animation: pulse 2s ease-out infinite;
-          "></div>
-          
-          <!-- Main blue circle -->
-          <div style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            background: #4285F4;
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-          "></div>
-          
-          <!-- White center dot -->
-          <div style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 8px;
-            height: 8px;
-            background: white;
-            border-radius: 50%;
-          "></div>
-        </div>
-      `;
-      
-      userLocationMarker.current = new mapboxgl.Marker({ 
-        element: userEl, 
-        anchor: 'center' 
-      })
-        .setLngLat(userLocation)
-        .addTo(currentMap);
-      
-      // Make the user location marker visible immediately
-      if (userEl.parentElement) {
-        userEl.parentElement.classList.add('marker-visible');
-      }
-    }
 
     return () => {
       if (map.current) {
@@ -845,13 +850,20 @@ export function Mapbox({
           }
         }
         
-        /* Force markers to stay hidden until explicitly shown */
-        .mapboxgl-marker {
+        /* Force restaurant markers to stay hidden until explicitly shown */
+        .mapboxgl-marker:has(.restaurant-marker),
+        .mapboxgl-marker:has(.restaurant-dot) {
           visibility: hidden !important;
         }
         
         .mapboxgl-marker.marker-visible {
           visibility: visible !important;
+        }
+        
+        /* Always show user location marker */
+        .mapboxgl-marker:has(.user-location-marker) {
+          visibility: visible !important;
+          z-index: 2000 !important;
         }
       `}</style>
     </div>
