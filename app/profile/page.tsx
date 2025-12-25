@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, Camera, X, Check, Edit2, Heart, MapPin, Loader2, Trash2, MoreVertical } from 'lucide-react';
+import { Calendar, Camera, X, Edit2, Heart, MapPin, Loader2, Trash2, MoreVertical } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { PostCard, PostCardData } from '@/components/post/post-card';
@@ -86,14 +86,6 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  // Edit mode states
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    username: '',
-    bio: ''
-  });
-  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -122,11 +114,6 @@ export default function ProfilePage() {
 
       if (error) throw error;
       setProfile(data);
-      setEditForm({
-        full_name: data.full_name || '',
-        username: data.username || '',
-        bio: data.bio || ''
-      });
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -355,32 +342,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSaveProfile = async () => {
-    setSavingProfile(true);
-    try {
-      const response = await fetch('/api/profile/update', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        showToast(data.error || 'Failed to update profile', 'error');
-        return;
-      }
-
-      setProfile(data.profile);
-      setIsEditingProfile(false);
-      showToast('Profile updated successfully', 'success');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      showToast('Failed to update profile', 'error');
-    } finally {
-      setSavingProfile(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -410,81 +371,7 @@ export default function ProfilePage() {
       <div className="pb-24 bg-gray-50 min-h-screen">
         {/* Compact Profile Header */}
         <div className="bg-white px-4 py-5">
-          {isEditingProfile ? (
-            <div className="space-y-4">
-              <div className="text-center mb-4">
-                <h3 className="text-lg font-bold text-gray-900">Edit Profile</h3>
-                <p className="text-xs text-gray-500 mt-1">Update your personal information</p>
-              </div>
-              
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Your full name"
-                  value={editForm.full_name}
-                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm bg-gray-50 focus:bg-white transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  placeholder="username"
-                  value={editForm.username}
-                  onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm bg-gray-50 focus:bg-white transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Bio
-                </label>
-                <textarea
-                  placeholder="Tell us about yourself..."
-                  value={editForm.bio}
-                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                  rows={3}
-                  maxLength={160}
-                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm bg-gray-50 focus:bg-white resize-none transition-all"
-                />
-                <p className="text-xs text-gray-400 mt-1 text-right">{editForm.bio.length}/160</p>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={savingProfile}
-                  className="flex-1 bg-primary text-white py-3 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
-                >
-                  {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  Save Changes
-                </button>
-                <button
-                  onClick={() => {
-                    setIsEditingProfile(false);
-                    setEditForm({
-                      full_name: profile.full_name || '',
-                      username: profile.username || '',
-                      bio: profile.bio || ''
-                    });
-                  }}
-                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                >
-                  <X className="w-4 h-4" />
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-5">
+          <div className="flex gap-5">
               {/* Avatar - Left Side */}
               <div className="relative flex-shrink-0">
                 {profile.avatar_url ? (
@@ -555,26 +442,23 @@ export default function ProfilePage() {
 
               {/* Edit Button - Top Right */}
               <button
-                onClick={() => setIsEditingProfile(true)}
+                onClick={() => router.push('/profile/edit')}
                 className="w-7 h-7 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors self-start"
               >
                 <Edit2 className="w-3.5 h-3.5 text-gray-600" />
               </button>
             </div>
-          )}
 
           {/* Bio - Full Width Below */}
-          {!isEditingProfile && (
-            profile.bio ? (
-              <p className="text-xs text-gray-600 mt-3 leading-relaxed">{profile.bio}</p>
-            ) : (
-              <button 
-                onClick={() => setIsEditingProfile(true)}
-                className="text-xs text-primary font-medium mt-2 hover:underline"
-              >
-                + Add bio
-              </button>
-            )
+          {profile.bio ? (
+            <p className="text-xs text-gray-600 mt-3 leading-relaxed">{profile.bio}</p>
+          ) : (
+            <button 
+              onClick={() => router.push('/profile/edit')}
+              className="text-xs text-primary font-medium mt-2 hover:underline"
+            >
+              + Add bio
+            </button>
           )}
         </div>
 

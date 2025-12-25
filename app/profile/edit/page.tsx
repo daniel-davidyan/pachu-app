@@ -1,12 +1,11 @@
 'use client';
 
-import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Camera, User } from 'lucide-react';
-import Link from 'next/link';
+import { X, Check, Camera, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 
 interface Profile {
   id: string;
@@ -19,14 +18,15 @@ interface Profile {
 export default function EditProfilePage() {
   const { user } = useUser();
   const router = useRouter();
+  const { showToast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -51,180 +51,268 @@ export default function EditProfilePage() {
       setBio(data.bio || '');
     } catch (error) {
       console.error('Error fetching profile:', error);
+      showToast('Failed to load profile', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError('');
-    setSuccess(false);
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
 
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be less than 5MB', 'error');
+      return;
+    }
+
+    setUploadingAvatar(true);
     try {
-      const { error } = await supabase
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
         .from('profiles')
-        .update({
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+      showToast('Profile photo updated successfully', 'success');
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      showToast('Failed to upload photo. Please try again.', 'error');
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!username.trim()) {
+      showToast('Username is required', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch('/api/profile/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           full_name: fullName.trim() || null,
           username: username.trim(),
           bio: bio.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user?.id);
+        }),
+      });
 
-      if (error) throw error;
+      const data = await response.json();
 
-      setSuccess(true);
+      if (!response.ok) {
+        showToast(data.error || 'Failed to update profile', 'error');
+        return;
+      }
+
+      showToast('Profile updated successfully', 'success');
       setTimeout(() => {
         router.push('/profile');
-      }, 1500);
+      }, 500);
     } catch (error: any) {
-      setError(error.message || 'Failed to update profile');
+      console.error('Error updating profile:', error);
+      showToast('Failed to update profile', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleCancel = () => {
+    router.push('/profile');
+  };
+
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-pulse text-gray-400">Loading...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 mb-4">Profile not found</p>
+          <button 
+            onClick={() => router.push('/profile')}
+            className="text-primary font-medium"
+          >
+            Go Back
+          </button>
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
   return (
-    <MainLayout>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center gap-3">
-          <Link
-            href="/profile"
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
-          </Link>
-          <h1 className="text-lg font-bold text-gray-900">Edit Profile</h1>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <h1 className="text-xl font-bold text-gray-900 text-center">Edit Profile</h1>
+      </div>
 
-        {/* Form */}
-        <div className="px-4 py-6">
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
-              ✅ Profile updated successfully!
-            </div>
-          )}
-
+      {/* Form Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto pb-24">
+        <div className="px-4 py-6 space-y-6">
           {/* Avatar Section */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 mb-4">
+          <div className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex flex-col items-center">
               <div className="relative mb-4">
-                {profile?.avatar_url ? (
+                {profile.avatar_url ? (
                   <img
                     src={profile.avatar_url}
-                    alt="Avatar"
-                    className="w-24 h-24 rounded-full object-cover"
+                    alt={profile.full_name || profile.username}
+                    className="w-32 h-32 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary-200 to-primary-400 flex items-center justify-center">
-                    <User className="w-12 h-12 text-white" />
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                    <span className="text-4xl font-bold text-white">
+                      {(fullName || username).charAt(0).toUpperCase()}
+                    </span>
                   </div>
                 )}
-                <button
-                  className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg hover:bg-primary-600 transition-colors"
-                  disabled
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute bottom-1 right-1 w-10 h-10 bg-black rounded-full shadow-lg flex items-center justify-center border-2 border-white hover:bg-gray-900 transition-colors disabled:opacity-50"
                 >
-                  <Camera className="w-4 h-4 text-white" />
+                  {uploadingAvatar ? (
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-5 h-5 text-white" />
+                  )}
                 </button>
               </div>
               <p className="text-xs text-gray-500 text-center">
-                Photo upload coming soon
+                Tap the camera icon to change your photo
               </p>
             </div>
           </div>
 
           {/* Form Fields */}
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="bg-white rounded-2xl shadow-sm p-6">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="fullName" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Full Name
-                  </label>
-                  <input
-                    id="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
-                    placeholder="John Doe"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="username" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Username
-                  </label>
-                  <input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
-                    placeholder="johndoe"
-                    required
-                    disabled={saving}
-                    pattern="[a-zA-Z0-9_]{3,30}"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    3-30 characters, letters, numbers, and underscores only
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="bio" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Bio
-                  </label>
-                  <textarea
-                    id="bio"
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white resize-none"
-                    placeholder="Tell us about yourself..."
-                    rows={4}
-                    maxLength={160}
-                    disabled={saving}
-                  />
-                  <p className="text-xs text-gray-500 mt-1 text-right">
-                    {bio.length}/160
-                  </p>
-                </div>
-              </div>
+          <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
+                placeholder="Your full name"
+                disabled={saving}
+              />
             </div>
 
-            {/* Save Button */}
-            <button
-              type="submit"
-              disabled={saving || success}
-              style={{ backgroundColor: '#C5459C', borderColor: '#C5459C' }}
-              className="w-full py-3 rounded-xl font-semibold text-white hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm border-2"
-            >
-              {saving ? 'Saving...' : success ? 'Saved!' : 'Save Changes'}
-            </button>
-          </form>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white"
+                placeholder="username"
+                required
+                disabled={saving}
+              />
+              <p className="text-xs text-gray-500 mt-1.5">
+                Your unique username
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Bio
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm bg-gray-50 focus:bg-white resize-none"
+                placeholder="Tell us about yourself..."
+                rows={4}
+                maxLength={160}
+                disabled={saving}
+              />
+              <p className="text-xs text-gray-500 mt-1.5 text-right">
+                {bio.length}/160
+              </p>
+            </div>
+          </div>
         </div>
       </div>
-    </MainLayout>
+
+      {/* Fixed Bottom Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 shadow-lg">
+        <div className="flex gap-3">
+          <button
+            onClick={handleCancel}
+            disabled={saving}
+            className="flex-1 bg-gray-100 text-gray-700 py-3.5 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <X className="w-4 h-4" />
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 bg-primary text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                Save Changes
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
