@@ -709,47 +709,38 @@ export function Mapbox({
       const markerCircle = el.querySelector('.marker-circle') as HTMLElement;
       const markerWrapper = el.querySelector('.marker-wrapper') as HTMLElement;
       
-      // Disable pointer events by default to allow map gestures
-      if (markerWrapper) {
-        markerWrapper.style.pointerEvents = 'none';
-      }
-      
       // Track touch gestures to differentiate between tap and zoom
       let touchStartTime = 0;
       let touchStartX = 0;
       let touchStartY = 0;
-      let isSingleTouch = false;
+      let isMultiTouch = false;
       
       el.addEventListener('touchstart', (e) => {
-        isSingleTouch = e.touches.length === 1;
-        if (isSingleTouch) {
-          // Enable pointer events only for potential single tap
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
+        isMultiTouch = e.touches.length > 1;
+        
+        if (!isMultiTouch) {
+          // Single touch - could be a tap
           touchStartTime = Date.now();
           touchStartX = e.touches[0].clientX;
           touchStartY = e.touches[0].clientY;
         } else {
-          // Multi-touch (zoom) - disable pointer events completely
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
+          // Multi-touch detected - prevent marker interaction
+          e.preventDefault();
+          e.stopPropagation();
         }
-      }, { passive: true });
+      });
       
       el.addEventListener('touchmove', (e) => {
         if (e.touches.length > 1) {
-          // Multi-touch detected - disable pointer events
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
-          isSingleTouch = false;
+          isMultiTouch = true;
+          e.preventDefault();
+          e.stopPropagation();
         }
-      }, { passive: true });
+      });
       
       el.addEventListener('touchend', (e) => {
-        // Re-disable pointer events after touch ends
-        setTimeout(() => {
-          if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
-        }, 100);
-        
         // Check if this was a tap (quick, no movement, single touch)
-        if (isSingleTouch && e.changedTouches.length === 1) {
+        if (!isMultiTouch && e.changedTouches.length === 1) {
           const touchEndTime = Date.now();
           const touchEndX = e.changedTouches[0].clientX;
           const touchEndY = e.changedTouches[0].clientY;
@@ -759,22 +750,23 @@ export function Mapbox({
             Math.pow(touchEndY - touchStartY, 2)
           );
           
-          // If it was a quick tap with minimal movement
-          if (timeDiff < 300 && distance < 10) {
-            if (onRestaurantClick) {
-              onRestaurantClick(restaurant);
-            }
+          // If it was a quick tap with minimal movement, open the restaurant
+          if (timeDiff < 300 && distance < 10 && onRestaurantClick) {
+            onRestaurantClick(restaurant);
           }
         }
-      }, { passive: true });
+        
+        // Reset multi-touch flag
+        setTimeout(() => {
+          isMultiTouch = false;
+        }, 50);
+      });
       
       el.addEventListener('mouseenter', () => {
         if (markerCircle) {
           markerCircle.style.transform = 'scale(1.1)';
           markerCircle.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
         }
-        // Enable pointer events on hover for desktop
-        if (markerWrapper) markerWrapper.style.pointerEvents = 'auto';
       });
       
       el.addEventListener('mouseleave', () => {
@@ -782,13 +774,11 @@ export function Mapbox({
           markerCircle.style.transform = 'scale(1)';
           markerCircle.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
         }
-        // Disable pointer events when not hovering
-        if (markerWrapper) markerWrapper.style.pointerEvents = 'none';
       });
 
       el.addEventListener('click', (e) => {
-        // For mouse clicks (desktop)
-        if (onRestaurantClick && !('ontouchstart' in window)) {
+        // For mouse clicks (desktop) - don't trigger if it was a multi-touch
+        if (!isMultiTouch && onRestaurantClick) {
           onRestaurantClick(restaurant);
         }
       });
@@ -843,42 +833,35 @@ export function Mapbox({
 
       const dotContent = el.querySelector('.dot-marker') as HTMLElement;
       
-      // Disable pointer events by default for dots too
-      if (dotContent) {
-        dotContent.style.pointerEvents = 'none';
-      }
-      
       // Track touch gestures for dots
       let dotTouchStartTime = 0;
       let dotTouchStartX = 0;
       let dotTouchStartY = 0;
-      let dotIsSingleTouch = false;
+      let dotIsMultiTouch = false;
       
       el.addEventListener('touchstart', (e) => {
-        dotIsSingleTouch = e.touches.length === 1;
-        if (dotIsSingleTouch) {
-          if (dotContent) dotContent.style.pointerEvents = 'auto';
+        dotIsMultiTouch = e.touches.length > 1;
+        
+        if (!dotIsMultiTouch) {
           dotTouchStartTime = Date.now();
           dotTouchStartX = e.touches[0].clientX;
           dotTouchStartY = e.touches[0].clientY;
         } else {
-          if (dotContent) dotContent.style.pointerEvents = 'none';
+          e.preventDefault();
+          e.stopPropagation();
         }
-      }, { passive: true });
+      });
       
       el.addEventListener('touchmove', (e) => {
         if (e.touches.length > 1) {
-          if (dotContent) dotContent.style.pointerEvents = 'none';
-          dotIsSingleTouch = false;
+          dotIsMultiTouch = true;
+          e.preventDefault();
+          e.stopPropagation();
         }
-      }, { passive: true });
+      });
       
       el.addEventListener('touchend', (e) => {
-        setTimeout(() => {
-          if (dotContent) dotContent.style.pointerEvents = 'none';
-        }, 100);
-        
-        if (dotIsSingleTouch && e.changedTouches.length === 1) {
+        if (!dotIsMultiTouch && e.changedTouches.length === 1) {
           const touchEndTime = Date.now();
           const touchEndX = e.changedTouches[0].clientX;
           const touchEndY = e.changedTouches[0].clientY;
@@ -888,19 +871,20 @@ export function Mapbox({
             Math.pow(touchEndY - dotTouchStartY, 2)
           );
           
-          if (timeDiff < 300 && distance < 10) {
-            if (onRestaurantClick) {
-              onRestaurantClick(restaurant);
-            }
+          if (timeDiff < 300 && distance < 10 && onRestaurantClick) {
+            onRestaurantClick(restaurant);
           }
         }
-      }, { passive: true });
+        
+        setTimeout(() => {
+          dotIsMultiTouch = false;
+        }, 50);
+      });
       
       el.addEventListener('mouseenter', () => {
         if (dotContent) {
           dotContent.style.transform = 'scale(1.5)';
           dotContent.style.boxShadow = '0 3px 10px rgba(0,0,0,0.4), 0 0 0 2px white';
-          dotContent.style.pointerEvents = 'auto';
         }
       });
       
@@ -908,13 +892,12 @@ export function Mapbox({
         if (dotContent) {
           dotContent.style.transform = 'scale(1)';
           dotContent.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px white';
-          dotContent.style.pointerEvents = 'none';
         }
       });
 
       el.addEventListener('click', (e) => {
         // For mouse clicks (desktop)
-        if (onRestaurantClick && !('ontouchstart' in window)) {
+        if (!dotIsMultiTouch && onRestaurantClick) {
           onRestaurantClick(restaurant);
         }
       });
@@ -972,10 +955,15 @@ export function Mapbox({
           }
         }
         
-        /* Make all markers completely transparent to pointer events by default */
-        .mapboxgl-marker,
-        .mapboxgl-marker * {
-          pointer-events: none !important;
+        /* Allow markers to receive touch events */
+        .mapboxgl-marker {
+          pointer-events: auto !important;
+        }
+        
+        /* Marker content should be interactive */
+        .mapboxgl-marker .marker-wrapper,
+        .mapboxgl-marker .dot-marker {
+          pointer-events: auto !important;
         }
         
         /* User location marker should be visible but not block gestures */
