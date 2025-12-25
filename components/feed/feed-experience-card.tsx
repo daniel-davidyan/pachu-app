@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, X, Loader2, UserPlus, UserCheck, UtensilsCrossed, ChefHat, Coffee, Soup, Wine, Cake, Pizza, IceCream } from 'lucide-react';
+import { MapPin, ChevronLeft, ChevronRight, Heart, MessageCircle, X, Loader2, UserPlus, UserCheck, UtensilsCrossed, ChefHat, Utensils, Sparkles, Star } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
@@ -51,12 +51,9 @@ interface FeedExperienceCardProps {
 const PLACEHOLDER_CONFIGS = [
   { gradient: 'from-orange-400 to-pink-500', Icon: UtensilsCrossed },
   { gradient: 'from-purple-400 to-indigo-500', Icon: ChefHat },
-  { gradient: 'from-amber-400 to-orange-500', Icon: Coffee },
-  { gradient: 'from-emerald-400 to-teal-500', Icon: Soup },
-  { gradient: 'from-rose-400 to-red-500', Icon: Wine },
-  { gradient: 'from-pink-400 to-purple-500', Icon: Cake },
-  { gradient: 'from-yellow-400 to-orange-500', Icon: Pizza },
-  { gradient: 'from-cyan-400 to-blue-500', Icon: IceCream },
+  { gradient: 'from-blue-400 to-cyan-500', Icon: Utensils },
+  { gradient: 'from-violet-400 to-purple-500', Icon: Sparkles },
+  { gradient: 'from-fuchsia-400 to-pink-500', Icon: Star },
 ];
 
 export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedExperienceCardProps) {
@@ -65,10 +62,15 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  // Pick a random placeholder config once - use function initializer to avoid impure function during render
-  const [placeholderConfig] = useState(() => 
-    PLACEHOLDER_CONFIGS[Math.floor(Math.random() * PLACEHOLDER_CONFIGS.length)]
-  );
+  // Function to get placeholder based on experience ID (ensures different placeholders for multiple posts)
+  const getPlaceholderConfig = (experienceId: string) => {
+    let hash = 0;
+    for (let i = 0; i < experienceId.length; i++) {
+      hash = ((hash << 5) - hash) + experienceId.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return PLACEHOLDER_CONFIGS[Math.abs(hash) % PLACEHOLDER_CONFIGS.length];
+  };
   
   // State for each experience's comments and likes
   const [experienceStates, setExperienceStates] = useState<{
@@ -476,18 +478,18 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
     }
   });
 
-  return (
+        return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Restaurant Header - Large Photo */}
       <Link href={`/restaurant/${restaurant.googlePlaceId || restaurant.id}`}>
         <div className="relative h-48 bg-gray-200">
-          {restaurant.imageUrl ? (
-            <img
-              src={restaurant.imageUrl}
-              alt={restaurant.name}
+                {restaurant.imageUrl ? (
+                  <img
+                    src={restaurant.imageUrl}
+                    alt={restaurant.name}
               className="w-full h-full object-cover"
-            />
-          ) : (
+                  />
+                ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/10">
               <span className="text-6xl">🍽️</span>
             </div>
@@ -504,8 +506,8 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
                 <MapPin className="w-4 h-4" />
                 {restaurant.address}
               </p>
-            )}
-          </div>
+                )}
+              </div>
         </div>
       </Link>
 
@@ -563,8 +565,8 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
                       </span>
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-gray-900 truncate">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-gray-900 truncate">
                       {experience.user.username}
                     </p>
                     <div className="flex items-center gap-1">
@@ -600,11 +602,16 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
                   </div>
                 ) : (
                   /* Modern gradient + icon placeholder for experiences without photos */
-                  <div className="mb-3">
-                    <div className={`w-full h-48 bg-gradient-to-br ${placeholderConfig.gradient} rounded-xl flex items-center justify-center opacity-20`}>
-                      <placeholderConfig.Icon className="w-24 h-24 text-white" strokeWidth={1.5} />
-                    </div>
-                  </div>
+                  (() => {
+                    const config = getPlaceholderConfig(experience.id);
+                    return (
+                      <div className="mb-3">
+                        <div className={`w-full h-48 bg-gradient-to-br ${config.gradient} rounded-xl flex items-center justify-center opacity-20`}>
+                          <config.Icon className="w-24 h-24 text-white" strokeWidth={1.5} />
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
 
                 {/* Experience Content */}
@@ -718,8 +725,8 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate }: FeedE
                               </span>
                             </div>
                           )}
-                        </Link>
-                        
+            </Link>
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
