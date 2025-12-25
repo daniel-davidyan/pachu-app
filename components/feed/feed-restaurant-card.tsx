@@ -624,6 +624,9 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
           searchingFriends: false,
           friendsList: [],
           postingComment: false,
+          editingCommentId: null,
+          editCommentContent: '',
+          commentMenuOpen: null,
         },
       }));
     }
