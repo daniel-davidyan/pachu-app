@@ -398,7 +398,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                 }
               }}
               onFocus={handleActivate}
-              placeholder="Search restaurants..."
+              placeholder="What are you in the mood for?"
               rows={1}
               className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium resize-none overflow-hidden py-0.5"
               style={{
@@ -564,7 +564,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-gray-900 text-sm">AI Restaurant Finder</h2>
+                  <h2 className="font-bold text-gray-900 text-sm">Pachu Taste Model</h2>
                   {matchedCount > 0 && (
                     <p className="text-xs text-gray-500">{matchedCount} places found</p>
                   )}
