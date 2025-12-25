@@ -446,53 +446,51 @@ export default function RestaurantPage() {
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
+            {/* Action Buttons - Modern Grid Layout */}
+            <div className="grid grid-cols-4 gap-2.5">
+              {/* Share Experience */}
               <button
                 onClick={() => setShowWriteReview(true)}
-                className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-primary text-white active:scale-95 transition-all shadow-md"
+                className="flex flex-col items-center justify-center py-3.5 rounded-2xl font-medium text-xs bg-rose-50 text-rose-700 active:scale-95 transition-all border border-rose-100 hover:bg-rose-100"
               >
-                <PenLine className="w-4 h-4 inline-block mr-2 -mt-0.5" />
-                Share experience
+                <PenLine className="w-5 h-5 mb-1.5" strokeWidth={1.5} />
+                <span>Review</span>
               </button>
+
+              {/* Directions */}
               <button
                 onClick={openInMaps}
-                className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-gray-100 text-gray-900 active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="flex flex-col items-center justify-center py-3.5 rounded-2xl font-medium text-xs bg-gray-50 text-gray-700 active:scale-95 transition-all border border-gray-200 hover:bg-gray-100"
               >
-                <Navigation className="w-4 h-4" />
-                Directions
+                <Navigation className="w-5 h-5 mb-1.5" strokeWidth={1.5} />
+                <span>Navigate</span>
               </button>
-            </div>
 
-            {/* Go to Map & Reserve Table Buttons */}
-            <div className="flex gap-3 mt-3">
+              {/* Go to Map */}
               <button
                 onClick={() => {
                   const placeId = restaurant.googlePlaceId || restaurant.id;
                   router.push(`/map?restaurantId=${encodeURIComponent(placeId)}&lat=${restaurant.latitude}&lng=${restaurant.longitude}`);
                 }}
-                className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-blue-50 text-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-blue-200 hover:bg-blue-100"
+                className="flex flex-col items-center justify-center py-3.5 rounded-2xl font-medium text-xs bg-blue-50 text-blue-700 active:scale-95 transition-all border border-blue-100 hover:bg-blue-100"
               >
-                <MapPin className="w-4 h-4" />
-                Go to Map
+                <MapPin className="w-5 h-5 mb-1.5" strokeWidth={1.5} />
+                <span>Map</span>
               </button>
               
-              {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
+              {/* Reserve Table - Only for Israeli restaurants */}
               {isIsrael && (
                 <button
                   onClick={handleOntopo}
                   disabled={loadingOntopo}
-                  className="flex-1 py-3.5 rounded-2xl font-semibold text-sm bg-green-50 text-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                  className="flex flex-col items-center justify-center py-3.5 rounded-2xl font-medium text-xs bg-emerald-50 text-emerald-700 active:scale-95 transition-all border border-emerald-100 hover:bg-emerald-100 disabled:opacity-50"
                 >
                   {loadingOntopo ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading...
-                    </>
+                    <Loader2 className="w-5 h-5 animate-spin" strokeWidth={1.5} />
                   ) : (
                     <>
-                      <Calendar className="w-4 h-4" />
-                      Reserve a table
+                      <Calendar className="w-5 h-5 mb-1.5" strokeWidth={1.5} />
+                      <span>Reserve</span>
                     </>
                   )}
                 </button>
