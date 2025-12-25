@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { BottomNav } from '@/components/layout/bottom-nav';
@@ -32,7 +32,7 @@ const categories = [
   { id: 'car-services', name: 'Car Services', icon: Car, active: false, color: '#10B981' },
 ];
 
-export default function MapPage() {
+function MapPageContent() {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const { showToast } = useToast();
   const searchParams = useSearchParams();
@@ -602,6 +602,21 @@ export default function MapPage() {
       {/* Bottom Navigation - Hide when chat is active or review modal is open */}
       <BottomNav show={!isReviewModalOpen && !chatActive} />
     </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <Suspense fallback={
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+          <p className="text-sm text-gray-500">Loading map...</p>
+        </div>
+      </div>
+    }>
+      <MapPageContent />
+    </Suspense>
   );
 }
 
