@@ -496,14 +496,14 @@ export default function RestaurantPage() {
                       <div className="space-y-1">
                         {/* Today's hours */}
                         <div className="text-xs text-gray-600 font-medium">
-                          {restaurant.openingHours.weekday_text[new Date().getDay()]}
+                          {restaurant.openingHours.weekday_text[(new Date().getDay() + 6) % 7]}
                         </div>
                         
                         {/* All hours - expandable */}
                         {showAllHours && (
                           <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5">
                             {restaurant.openingHours.weekday_text.map((day, index) => {
-                              const isToday = index === new Date().getDay();
+                              const isToday = index === (new Date().getDay() + 6) % 7;
                               return (
                                 <div 
                                   key={index} 
