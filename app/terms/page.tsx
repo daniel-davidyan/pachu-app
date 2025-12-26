@@ -170,8 +170,8 @@ export default function TermsPage() {
             </h2>
             <p className="text-gray-700 ml-8">
               If you have questions about these Terms, please contact us at:{' '}
-              <a href="mailto:danieldadyan@pachu.app" className="text-[#C5459C] font-semibold hover:underline">
-                danieldadyan@pachu.app
+              <a href="mailto:donotreply@pachu.app" className="text-[#C5459C] font-semibold hover:underline">
+                donotreply@pachu.app
               </a>
             </p>
           </section>
