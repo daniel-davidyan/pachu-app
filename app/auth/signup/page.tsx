@@ -43,6 +43,10 @@ export default function SignUpPage() {
         // Email confirmation required
         setSuccess(true);
         setError('');
+        // Redirect to login page after 3 seconds with email pre-filled
+        setTimeout(() => {
+          router.push(`/auth/login?email=${encodeURIComponent(email)}`);
+        }, 3000);
       } else if (data?.session) {
         // No email confirmation needed (auto-confirm is enabled)
         setSuccess(true);
@@ -95,13 +99,20 @@ export default function SignUpPage() {
 
         {/* Success Message */}
         {success && (
-          <div className="mb-3 p-3 bg-white border border-green-200 text-green-600 rounded-lg text-sm">
-            <div className="font-semibold mb-1">✅ Account created successfully!</div>
-            <div className="text-xs">Please check your email to confirm your account. Click the link in the email to complete registration.</div>
+          <div className="p-6 bg-white border border-green-200 text-green-600 rounded-lg text-center">
+            <div className="text-4xl mb-4">✅</div>
+            <div className="font-bold text-lg mb-2">Account created successfully!</div>
+            <div className="text-sm text-gray-600 mb-4">
+              Please check your email to confirm your account. Click the link in the email to complete registration.
+            </div>
+            <div className="text-xs text-gray-500">
+              Redirecting to login page...
+            </div>
           </div>
         )}
 
-        {/* Sign Up Form */}
+        {/* Sign Up Form - Only show if not successful */}
+        {!success && (
         <form onSubmit={handleEmailSignUp} className="space-y-3">
           <input
             id="fullName"
@@ -159,8 +170,11 @@ export default function SignUpPage() {
             {loading ? 'Creating Account...' : 'Sign Up'}
           </button>
         </form>
+        )}
 
-        {/* Divider */}
+        {/* Divider - Only show if not successful */}
+        {!success && (
+        <>
         <div className="my-8 flex items-center">
           <div className="flex-1 border-t border-gray-300"></div>
           <span className="px-4 text-sm text-gray-500 font-medium">OR</span>
@@ -202,6 +216,8 @@ export default function SignUpPage() {
             </Link>
           </p>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
