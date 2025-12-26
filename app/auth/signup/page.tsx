@@ -218,6 +218,17 @@ export default function SignUpPage() {
         </div>
         </>
         )}
+
+        {/* Privacy Policy & Terms */}
+        <div className="mt-6 text-center text-xs text-gray-500">
+          <Link href="/privacy" className="hover:text-[#C5459C] transition-colors underline">
+            Privacy Policy
+          </Link>
+          {' • '}
+          <Link href="/terms" className="hover:text-[#C5459C] transition-colors underline">
+            Terms of Service
+          </Link>
+        </div>
       </div>
     </div>
   );
