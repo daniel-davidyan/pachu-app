@@ -247,7 +247,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
       setMessages([{
         id: '1',
         role: 'assistant',
-        content: "Hi! 🍽️ What type of cuisine are you in the mood for?"
+        content: "Hey! 👋 I'm here to help you find the perfect spot. What are you in the mood for?"
       }]);
     }
   };
@@ -398,7 +398,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                 }
               }}
               onFocus={handleActivate}
-              placeholder="What are you in the mood for?"
+              placeholder="What are you craving? 🍽️"
               rows={1}
               className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium resize-none overflow-hidden py-0.5"
               style={{
@@ -609,8 +609,8 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                   <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
                     <Sparkles className="w-7 h-7 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-1 text-sm">Find your perfect restaurant</h3>
-                  <p className="text-xs text-gray-500">Tell me what you&apos;re craving...</p>
+                  <h3 className="font-semibold text-gray-900 mb-1 text-sm">Your Personal Dining Expert</h3>
+                  <p className="text-xs text-gray-500">Tell me what you're craving, your budget, vibe, or even a specific restaurant name...</p>
                 </div>
               )}
 
