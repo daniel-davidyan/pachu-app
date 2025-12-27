@@ -516,10 +516,16 @@ Format:
               const restaurant = searchData.restaurants[0];
               console.log(`✓ Found: ${restaurant.name}`, {
                 hasPhoto: !!restaurant.photoUrl,
-                photoUrl: restaurant.photoUrl?.substring(0, 100) + '...',
+                photoUrl: restaurant.photoUrl ? restaurant.photoUrl.substring(0, 100) + '...' : 'NO PHOTO',
                 rating: restaurant.rating,
-                address: restaurant.address
+                address: restaurant.address?.substring(0, 50),
+                placeId: restaurant.googlePlaceId
               });
+              
+              if (!restaurant.photoUrl) {
+                console.warn(`⚠️ "${restaurant.name}" has no photo! Place ID: ${restaurant.googlePlaceId}`);
+              }
+              
               restaurants.push({
                 ...restaurant,
                 matchPercentage: 95,

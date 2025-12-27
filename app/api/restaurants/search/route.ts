@@ -48,18 +48,57 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform Google Places data
-    const restaurants = data.results?.slice(0, 10).map((place: any) => ({
-      googlePlaceId: place.place_id,
-      name: place.name,
-      address: place.formatted_address,
-      latitude: place.geometry.location.lat,
-      longitude: place.geometry.location.lng,
-      photoUrl: place.photos?.[0]
-        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photos[0].photo_reference}&key=${apiKey}`
-        : undefined,
-      rating: place.rating || 0,
-    })) || [];
+    // Transform Google Places data and enrich with Place Details
+    const restaurants = await Promise.all(
+      (data.results?.slice(0, 10) || []).map(async (place: any) => {
+        let enrichedData = {
+          googlePlaceId: place.place_id,
+          name: place.name,
+          address: place.formatted_address,
+          latitude: place.geometry.location.lat,
+          longitude: place.geometry.location.lng,
+          photoUrl: place.photos?.[0]
+            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photos[0].photo_reference}&key=${apiKey}`
+            : undefined,
+          rating: place.rating || 0,
+          priceLevel: place.price_level,
+          cuisineTypes: place.types?.filter((t: string) => 
+            !['point_of_interest', 'establishment', 'food'].includes(t)
+          ) || [],
+        };
+
+        // If no photo from Text Search, try to get from Place Details
+        if (!enrichedData.photoUrl && place.place_id) {
+          try {
+            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,photos,formatted_phone_number,opening_hours,website,price_level,types&key=${apiKey}`;
+            const detailsResponse = await fetch(detailsUrl);
+            const detailsData = await detailsResponse.json();
+            
+            if (detailsData.status === 'OK' && detailsData.result) {
+              const details = detailsData.result;
+              
+              // Get photo from details
+              if (details.photos?.[0]) {
+                enrichedData.photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${details.photos[0].photo_reference}&key=${apiKey}`;
+              }
+              
+              // Add additional details
+              if (details.price_level) enrichedData.priceLevel = details.price_level;
+              if (details.types) {
+                enrichedData.cuisineTypes = details.types.filter((t: string) => 
+                  !['point_of_interest', 'establishment', 'food'].includes(t)
+                );
+              }
+            }
+          } catch (detailsError) {
+            console.error('Error fetching place details:', detailsError);
+            // Continue without details if there's an error
+          }
+        }
+
+        return enrichedData;
+      })
+    );
 
     // If user is logged in, get following users who visited these restaurants
     if (user) {
