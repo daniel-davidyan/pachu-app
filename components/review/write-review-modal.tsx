@@ -44,6 +44,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const [experienceText, setExperienceText] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoUrlToFileMap, setPhotoUrlToFileMap] = useState<Map<string, File>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -77,12 +78,14 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       // IMPORTANT: Create a fresh copy of the photos array to avoid reference issues
       setPhotoUrls([...(existingReview.photos || [])]);
       setPhotos([]); // No new files yet
+      setPhotoUrlToFileMap(new Map()); // Clear the map
     } else {
       // Create mode - start fresh
       setRating(0);
       setExperienceText('');
       setPhotoUrls([]);
       setPhotos([]);
+      setPhotoUrlToFileMap(new Map()); // Clear the map
     }
     
     setInitialized(true);
@@ -132,27 +135,38 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     
     // Create preview URLs and add to state
     const newUrls: string[] = [];
+    const newMap = new Map(photoUrlToFileMap);
+    
     files.forEach(file => {
       const url = URL.createObjectURL(file);
       newUrls.push(url);
+      newMap.set(url, file); // Map blob URL to File
     });
     
     setPhotos(prev => [...prev, ...files]);
     setPhotoUrls(prev => [...prev, ...newUrls]);
+    setPhotoUrlToFileMap(newMap);
   };
 
   // Remove photo
   const removePhoto = (index: number) => {
-    // Check if this is an existing photo URL or a new file
-    if (index < photoUrls.length - photos.length) {
-      // It's an existing photo URL
-      setPhotoUrls(prev => prev.filter((_, i) => i !== index));
-    } else {
-      // It's a new file
-      const fileIndex = index - (photoUrls.length - photos.length);
-      setPhotos(prev => prev.filter((_, i) => i !== fileIndex));
-      setPhotoUrls(prev => prev.filter((_, i) => i !== index));
+    const urlToRemove = photoUrls[index];
+    
+    // Remove from map if it's a blob URL
+    if (urlToRemove.startsWith('blob:')) {
+      const newMap = new Map(photoUrlToFileMap);
+      newMap.delete(urlToRemove);
+      setPhotoUrlToFileMap(newMap);
+      
+      // Also remove from photos array
+      const file = photoUrlToFileMap.get(urlToRemove);
+      if (file) {
+        setPhotos(prev => prev.filter(p => p !== file));
+      }
     }
+    
+    // Remove URL from photoUrls
+    setPhotoUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   // Touch-friendly drag and drop handlers (works on mobile and desktop)
@@ -215,22 +229,17 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     }
 
     if (isDragging && draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
-      // Perform the reorder
-      const newPhotos = [...photos];
+      // Perform the reorder - only reorder photoUrls, the map stays the same
       const newPhotoUrls = [...photoUrls];
       
-      const draggedPhoto = newPhotos[draggedIndex];
       const draggedUrl = newPhotoUrls[draggedIndex];
       
       // Remove from old position
-      newPhotos.splice(draggedIndex, 1);
       newPhotoUrls.splice(draggedIndex, 1);
       
       // Insert at new position
-      newPhotos.splice(dragOverIndex, 0, draggedPhoto);
       newPhotoUrls.splice(dragOverIndex, 0, draggedUrl);
       
-      setPhotos(newPhotos);
       setPhotoUrls(newPhotoUrls);
       
       // Haptic feedback on success
@@ -270,22 +279,17 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
   const handleMouseUp = () => {
     if (isDragging && draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
-      // Perform the reorder
-      const newPhotos = [...photos];
+      // Perform the reorder - only reorder photoUrls, the map stays the same
       const newPhotoUrls = [...photoUrls];
       
-      const draggedPhoto = newPhotos[draggedIndex];
       const draggedUrl = newPhotoUrls[draggedIndex];
       
       // Remove from old position
-      newPhotos.splice(draggedIndex, 1);
       newPhotoUrls.splice(draggedIndex, 1);
       
       // Insert at new position
-      newPhotos.splice(dragOverIndex, 0, draggedPhoto);
       newPhotoUrls.splice(dragOverIndex, 0, draggedUrl);
       
-      setPhotos(newPhotos);
       setPhotoUrls(newPhotoUrls);
     }
 
@@ -306,57 +310,55 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     try {
       console.log('[WriteReviewModal] handleSubmit called');
       console.log('[WriteReviewModal] Current photoUrls state:', photoUrls);
-      console.log('[WriteReviewModal] Current photos (files) state:', photos.length, 'files');
+      console.log('[WriteReviewModal] PhotoUrlToFileMap size:', photoUrlToFileMap.size);
       console.log('[WriteReviewModal] existingReview:', existingReview?.id);
       
-      // Build the final photo URLs array using a Set to prevent duplicates
-      const photoUrlSet = new Set<string>();
+      // Build the final photo URLs array preserving the exact order from photoUrls
+      const finalPhotoUrls: string[] = [];
       
-      // First, add existing photos that haven't been removed
-      // Existing photos are regular URLs (not blob URLs)
-      const existingPhotosCount = photoUrls.length - photos.length;
-      console.log('[WriteReviewModal] Existing photos count:', existingPhotosCount);
-      
-      for (let i = 0; i < existingPhotosCount; i++) {
+      // Process each URL in photoUrls array in order
+      for (let i = 0; i < photoUrls.length; i++) {
         const url = photoUrls[i];
-        if (!url.startsWith('blob:')) {
-          // This is an existing photo URL (from the database)
-          console.log('[WriteReviewModal] Adding existing photo:', url.substring(0, 50) + '...');
-          photoUrlSet.add(url);
+        
+        if (url.startsWith('blob:')) {
+          // This is a new photo that needs to be uploaded
+          const photo = photoUrlToFileMap.get(url);
+          
+          if (!photo) {
+            console.error('[WriteReviewModal] No file found for blob URL at position', i);
+            continue;
+          }
+          
+          const fileExt = photo.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          
+          console.log('[WriteReviewModal] Uploading new photo:', fileName, 'at position', i);
+          
+          const { data, error } = await supabase.storage
+            .from('review-photos')
+            .upload(`reviews/${fileName}`, photo);
+          
+          if (error) {
+            console.error('Photo upload error:', error);
+            showToast('Failed to upload photo', 'error');
+            setSubmitting(false);
+            return;
+          }
+          
+          const { data: { publicUrl } } = supabase.storage
+            .from('review-photos')
+            .getPublicUrl(`reviews/${fileName}`);
+          
+          console.log('[WriteReviewModal] Uploaded successfully at position', i);
+          finalPhotoUrls.push(publicUrl);
+        } else {
+          // This is an existing photo URL from the database, keep it in order
+          console.log('[WriteReviewModal] Keeping existing photo at position', i);
+          finalPhotoUrls.push(url);
         }
       }
       
-      console.log('[WriteReviewModal] After existing photos, set size:', photoUrlSet.size);
-      
-      // Then upload only the new photos (files in photos array)
-      // These correspond to blob URLs in photoUrls but we upload the actual files
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i];
-        const fileExt = photo.name.split('.').pop() || 'jpg';
-        const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        
-        console.log('[WriteReviewModal] Uploading new photo:', fileName);
-        
-        const { data, error } = await supabase.storage
-          .from('review-photos')
-          .upload(`reviews/${fileName}`, photo);
-        
-        if (error) {
-          console.error('Photo upload error:', error);
-          continue;
-        }
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('review-photos')
-          .getPublicUrl(`reviews/${fileName}`);
-        
-        console.log('[WriteReviewModal] Uploaded, adding URL:', publicUrl.substring(0, 50) + '...');
-        photoUrlSet.add(publicUrl);
-      }
-      
-      // Convert Set back to array to preserve order and eliminate duplicates
-      const finalPhotoUrls = Array.from(photoUrlSet);
-      console.log('[WriteReviewModal] Final photoUrls to send:', finalPhotoUrls.length, 'photos');
+      console.log('[WriteReviewModal] Final photoUrls to send (in order):', finalPhotoUrls.length, 'photos');
 
       // Submit experience
       const response = await fetch('/api/reviews', {
