@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     // Transform Google Places data and enrich with Place Details
     const restaurants = await Promise.all(
       (data.results?.slice(0, 10) || []).map(async (place: any) => {
-        let enrichedData = {
+        const enrichedData = {
           googlePlaceId: place.place_id,
           name: place.name,
           address: place.formatted_address,

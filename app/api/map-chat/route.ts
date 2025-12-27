@@ -415,7 +415,7 @@ Remember: You're an expert who cares about helping people have amazing dining ex
     }
 
     // If ready to show restaurants, send entire conversation to OpenAI for recommendations
-    let restaurants: any[] = [];
+    const restaurants: any[] = [];
     if (readyToShow && location) {
       try {
         console.log('🤖 Sending full conversation to OpenAI for restaurant recommendations...');
