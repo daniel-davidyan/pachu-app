@@ -382,14 +382,41 @@ Remember: You're an expert who cares about helping people have amazing dining ex
       try {
         const parsed = JSON.parse(dataMatch[1]);
         extractedData = { ...extractedData, ...parsed };
+        console.log('📊 Extracted data:', JSON.stringify(extractedData, null, 2));
       } catch (e) {
         console.error('Error parsing data:', e);
+        console.error('Data block content:', dataMatch[1]);
       }
+    } else {
+      console.warn('⚠️ No <data> block found in AI response');
     }
 
     // Force readyToShow after 4 user responses (increased from 2)
     if (userResponseCount >= 4) {
       extractedData.readyToShow = true;
+    }
+    
+    // Fallback: If AI didn't extract cuisineTypes but user mentioned food in their messages
+    // Extract from conversation history
+    if (extractedData.readyToShow && (!extractedData.cuisineTypes || extractedData.cuisineTypes.length === 0)) {
+      console.warn('⚠️ AI did not extract cuisineTypes, attempting fallback extraction...');
+      
+      // Look through all user messages for food keywords
+      const allUserText = [...userMessages.map((m: any) => m.content), message].join(' ');
+      
+      // Common Hebrew food terms
+      const hebrewFoodTerms = ['סושי', 'פיצה', 'המבורגר', 'סיני', 'איטלקי', 'יפני', 'מקסיקני', 'תאילנדי', 'הודי', 'ים תיכוני', 'עוף', 'בשר', 'טבעוני', 'צמחוני', 'שווארמה', 'פלאפל', 'מלוואח', 'סביח', 'שקשוקה'];
+      const englishFoodTerms = ['sushi', 'pizza', 'burger', 'hamburger', 'chinese', 'italian', 'japanese', 'mexican', 'thai', 'indian', 'mediterranean', 'chicken', 'meat', 'vegan', 'vegetarian', 'seafood'];
+      
+      const foodTerms = detectedLanguage === 'he' ? hebrewFoodTerms : englishFoodTerms;
+      
+      for (const term of foodTerms) {
+        if (allUserText.includes(term)) {
+          extractedData.cuisineTypes = [term];
+          console.log(`✅ Fallback extracted cuisine: "${term}"`);
+          break;
+        }
+      }
     }
 
     // Remove the data JSON from the visible message
@@ -596,15 +623,29 @@ Remember: You're an expert who cares about helping people have amazing dining ex
           
           // Filter out completely irrelevant results when we have a specific cuisine search
           let relevantRestaurants = scoredRestaurants;
-          if (searchQuery && filters.cuisineTypes && filters.cuisineTypes.length > 0) {
-            // Only keep restaurants with positive scores (matching cuisine)
-            relevantRestaurants = scoredRestaurants.filter((r: any) => r.matchScore > 50);
-            console.log(`Filtered to ${relevantRestaurants.length} relevant restaurants (score > 50)`);
+          if (filters.cuisineTypes && filters.cuisineTypes.length > 0) {
+            // Be VERY strict - only keep restaurants that actually match the cuisine
+            // A match means they got cuisine bonus points (score > base rating score)
+            const baseRatingScore = 90; // Max from rating alone (5.0 * 18)
+            relevantRestaurants = scoredRestaurants.filter((r: any) => {
+              // If restaurant has cuisine match reasons, keep it
+              if (r.matchReasons && r.matchReasons.length > 0) {
+                return true;
+              }
+              // If score is significantly higher than what rating alone would give, keep it
+              const expectedBaseScore = r.rating * 18;
+              if (r.matchScore > expectedBaseScore + 20) { // Got significant bonus points
+                return true;
+              }
+              return false;
+            });
             
-            // If we filtered too aggressively and have less than 3, be more lenient
-            if (relevantRestaurants.length < 3) {
-              relevantRestaurants = scoredRestaurants.filter((r: any) => r.matchScore > 20);
-              console.log(`Expanded to ${relevantRestaurants.length} restaurants (score > 20)`);
+            console.log(`Filtered from ${scoredRestaurants.length} to ${relevantRestaurants.length} cuisine-matched restaurants`);
+            
+            // If we filtered out everything, something went wrong - keep top 3 by rating
+            if (relevantRestaurants.length === 0) {
+              console.warn('⚠️ No cuisine matches found! Keeping top-rated restaurants as fallback.');
+              relevantRestaurants = scoredRestaurants.slice(0, 3);
             }
           }
           
