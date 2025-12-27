@@ -499,7 +499,7 @@ Remember: You're an expert who cares about helping people have amazing dining ex
           // Advanced scoring algorithm
           const scoredRestaurants = allRestaurants.map((r: any) => {
             let score = r.rating * 18; // Base score from rating (0-90)
-            let matchReasons: string[] = [];
+            const matchReasons: string[] = [];
             
             // Cuisine matching (VERY IMPORTANT - increased weight)
             if (filters.cuisineTypes && filters.cuisineTypes.length > 0) {
