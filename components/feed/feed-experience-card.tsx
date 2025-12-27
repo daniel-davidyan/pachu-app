@@ -658,14 +658,26 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate, onSheet
                       src={experience.user.avatarUrl}
                       alt={experience.user.fullName}
                       className="w-9 h-9 rounded-full object-cover"
+                      onError={(e) => {
+                        // If image fails to load (common with Google profile photos), hide it
+                        // The fallback div will be shown instead
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling;
+                        if (fallback) {
+                          (fallback as HTMLElement).style.display = 'flex';
+                        }
+                      }}
                     />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                      <span className="text-sm font-bold text-white">
-                        {(experience.user.fullName || experience.user.username).charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
+                  ) : null}
+                  {/* Fallback avatar - always render but initially hidden if avatarUrl exists */}
+                  <div 
+                    className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center"
+                    style={{ display: experience.user.avatarUrl ? 'none' : 'flex' }}
+                  >
+                    <span className="text-sm font-bold text-white">
+                      {(experience.user.fullName || experience.user.username).charAt(0).toUpperCase()}
+                    </span>
+                  </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-900 truncate">
                       {experience.user.fullName || experience.user.username}

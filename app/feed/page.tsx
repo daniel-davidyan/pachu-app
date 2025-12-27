@@ -287,16 +287,21 @@ export default function FeedPage() {
                     }
                   }
                   
+                  // NOTE: Google review profile photos (profile_photo_url) often don't load due to CORS/authentication issues
+                  // We set it here as a fallback, but the UI will show initials if the image fails to load
+                  // This is a limitation of Google Places API - profile photos are not reliably accessible
                   return {
-                    id: `${restaurant.id}-${googleReview.author_name}`,
+                    id: `google-${restaurant.id}-${googleReview.author_name}-${index}`,
                     rating: googleReview.rating,
                     content: googleReview.text,
                     createdAt: new Date(googleReview.time * 1000).toISOString(),
                     user: {
-                      id: googleReview.author_name,
+                      id: `google-user-${googleReview.author_name}`,
                       username: googleReview.author_name,
                       fullName: googleReview.author_name,
-                      avatarUrl: googleReview.profile_photo_url,
+                      // Google profile photos are often blocked by CORS, so they may not display
+                      // The UI fallback will show user initials instead
+                      avatarUrl: googleReview.profile_photo_url || undefined,
                     },
                     photos: reviewPhotos,
                   };
