@@ -210,10 +210,10 @@ function MapPageContent() {
               photoUrl: data.restaurant.imageUrl,
               priceLevel: data.restaurant.priceLevel,
               cuisineTypes: data.restaurant.cuisineTypes || [],
-              source: 'google',
+              source: 'google' as const,
               googlePlaceId: data.restaurant.googlePlaceId || data.restaurant.id,
               website: data.restaurant.website,
-            };
+            } satisfies Restaurant;
             
             // Fetch nearby restaurants around this location
             try {
