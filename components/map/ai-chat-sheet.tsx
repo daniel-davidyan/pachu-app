@@ -649,7 +649,12 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-gray-900 text-sm">Pachu Taste Model</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-gray-900 text-sm">Pachu Taste Model</h2>
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-primary/80 to-pink-500/80 text-white rounded shadow-sm">
+                      Beta
+                    </span>
+                  </div>
                   {matchedCount > 0 && (
                     <p className="text-xs text-gray-500">{matchedCount} places found</p>
                   )}

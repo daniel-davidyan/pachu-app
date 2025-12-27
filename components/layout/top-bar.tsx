@@ -28,8 +28,11 @@ export function TopBar() {
         </Link>
 
         {/* Logo - Center */}
-        <Link href="/feed" className="absolute left-1/2 -translate-x-1/2">
+        <Link href="/feed" className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
           <h1 className="text-3xl text-primary" style={{ fontFamily: 'Pacifico, cursive' }}>Pachu</h1>
+          <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-gradient-to-r from-primary/80 to-pink-500/80 text-white rounded shadow-sm translate-y-[-2px]">
+            Beta
+          </span>
         </Link>
 
         {/* Notifications - Right side */}
