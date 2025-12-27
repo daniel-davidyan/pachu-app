@@ -133,24 +133,29 @@ export async function POST(request: NextRequest) {
     
     // Language-specific instructions
     const languageInstructions = detectedLanguage === 'he' 
-      ? `**CRITICAL - Hebrew Language Mode:**
-- User is speaking HEBREW
-- Conduct ALL conversation in Hebrew (questions, responses)
-- Extract ALL information in HEBREW (cuisine types, preferences, etc.)
-- Use HEBREW search terms for Google Places API (e.g., "עוף סיני", "מלוואח", "המבורגר")
-- Keep everything in Hebrew for maximum search accuracy
-- Examples: "המבורגר" stays "המבורגר", "עוף סיני" stays "עוף סיני", "מלוואח" stays "מלוואח"`
-      : `**CRITICAL - English Language Mode:**
-- User is speaking ENGLISH
-- Conduct ALL conversation in English
-- Extract ALL information in ENGLISH
-- Use ENGLISH search terms for Google Places API
-- Keep everything in English for maximum search accuracy`;
+      ? `**קריטי - מצב עברית בלבד:**
+- המשתמש מדבר עברית
+- עליך לנהל את כל השיחה בעברית בלבד - כל שאלה, כל תשובה, כל הודעה
+- אסור לעבור לאנגלית! תמיד עברית!
+- אם אתה מוכן להציג מסעדות, פשוט השאר את ההודעה ריקה`
+      : `**CRITICAL - English Mode Only:**
+- User is speaking English
+- Conduct the ENTIRE conversation in English only - every question, every response, every message
+- Do NOT switch to other languages! Always English!
+- If ready to show restaurants, just leave message empty`;
     
     // System prompt for conversational restaurant finding
     const systemPrompt = `You are Pachu, a world-class restaurant expert and personal dining concierge. You have deep knowledge about restaurants, cuisines, and dining experiences. Your mission is to understand exactly what the user needs through natural, expert-level conversation, then deliver the 3 perfect restaurant recommendations.
 
 ${languageInstructions}
+
+## ⚠️ CRITICAL - NEVER SWITCH LANGUAGES:
+**You detected the user speaks ${detectedLanguage === 'he' ? 'HEBREW (עברית)' : 'ENGLISH'}.**
+- Every single word you write must be in ${detectedLanguage === 'he' ? 'HEBREW' : 'ENGLISH'}
+- Do NOT write ANY words in ${detectedLanguage === 'he' ? 'English' : 'Hebrew'}
+- Do NOT mix languages
+- Stay ${detectedLanguage === 'he' ? 'עברית' : 'English'} from start to finish!
+- When ready to show restaurants, leave message EMPTY (no text at all)
 
 ## Your Expertise:
 You're like a trusted local friend who knows every restaurant. You ask thoughtful questions and really listen. You understand that dining is about the whole experience - the food, the vibe, the company, the occasion, and the budget.
@@ -167,10 +172,14 @@ You're like a trusted local friend who knows every restaurant. You ask thoughtfu
 
 **Essential Info:**
 1. **Mood & Cuisine** - What are they craving? What vibe?
-2. **Budget** - How much they want to spend per person?
-3. **Occasion** - Solo? Date? Friends? Family? Business?
-4. **Timing** - Now? Tonight? Weekend? Special time?
-5. **Distance** - How far willing to go? Walking? Quick ride? Drive?
+2. **Occasion** - Solo? Date? Friends? Family? Business?
+3. **Timing** - Now? Tonight? Weekend? Special time?
+4. **Location** - Which city? Nearby?
+
+**Budget - OPTIONAL:**
+- DO NOT ask about budget/price unless user mentions it first
+- If user says "cheap", "expensive", "budget", etc. → note it and use it
+- Otherwise, skip budget completely
 
 ## Conversation Flow:
 
@@ -306,6 +315,17 @@ ${detectedLanguage === 'he' ? `
 - "willing to drive", "don't care about distance"
 `}
 
+**city** (string) - VERY IMPORTANT:
+${detectedLanguage === 'he' ? `
+- חלץ את שם העיר אם המשתמש מזכיר אותה!
+- דוגמאות: "תל אביב", "ירושלים", "חיפה", "הרצליה", "באר שבע", "אילת", "נתניה", "רעננה", "כפר סבא", "פתח תקווה"
+- אם המשתמש לא מזכיר עיר, השאר ריק
+` : `
+- Extract the city name if user mentions it!
+- Examples: "Tel Aviv", "Jerusalem", "Haifa", "Herzliya", "Beer Sheva", "Eilat", "Netanya"
+- If user doesn't mention a city, leave empty
+`}
+
 **specialPreferences** (array) - IN USER'S LANGUAGE:
 ${detectedLanguage === 'he' ? `
 - "רומנטי", "שקט", "אינטימי"
@@ -362,321 +382,174 @@ Remember: You're an expert who cares about helping people have amazing dining ex
     });
 
     const fullResponse = completion.choices[0].message.content || '';
+    console.log('🤖 AI Response:', fullResponse.substring(0, 200) + (fullResponse.length > 200 ? '...' : ''));
     
-    // Extract data from response
-    let extractedData: any = {
-      cuisineTypes: [],
-      searchQuery: '',
-      priceLevel: null,
-      budget: '',
-      occasion: '',
-      timing: '',
-      distance: '',
-      specialPreferences: [],
-      searchMode: 'general',
-      readyToShow: false,
-    };
-    
+    // Simple extraction - just check if AI says it's ready to show restaurants
+    let readyToShow = false;
     const dataMatch = fullResponse.match(/<data>([\s\S]*?)<\/data>/);
     if (dataMatch) {
       try {
         const parsed = JSON.parse(dataMatch[1]);
-        extractedData = { ...extractedData, ...parsed };
-        console.log('📊 Extracted data:', JSON.stringify(extractedData, null, 2));
+        readyToShow = parsed.readyToShow || false;
+        console.log('📊 Extracted readyToShow:', readyToShow);
       } catch (e) {
-        console.error('Error parsing data:', e);
-        console.error('Data block content:', dataMatch[1]);
+        console.error('Error parsing readyToShow:', e);
       }
     } else {
       console.warn('⚠️ No <data> block found in AI response');
     }
 
-    // Force readyToShow after 4 user responses (increased from 2)
+    // Force readyToShow after 4 user responses
     if (userResponseCount >= 4) {
-      extractedData.readyToShow = true;
-    }
-    
-    // Fallback: If AI didn't extract cuisineTypes but user mentioned food in their messages
-    // Extract from conversation history
-    if (extractedData.readyToShow && (!extractedData.cuisineTypes || extractedData.cuisineTypes.length === 0)) {
-      console.warn('⚠️ AI did not extract cuisineTypes, attempting fallback extraction...');
-      
-      // Look through all user messages for food keywords
-      const allUserText = [...userMessages.map((m: any) => m.content), message].join(' ');
-      
-      // Common Hebrew food terms
-      const hebrewFoodTerms = ['סושי', 'פיצה', 'המבורגר', 'סיני', 'איטלקי', 'יפני', 'מקסיקני', 'תאילנדי', 'הודי', 'ים תיכוני', 'עוף', 'בשר', 'טבעוני', 'צמחוני', 'שווארמה', 'פלאפל', 'מלוואח', 'סביח', 'שקשוקה'];
-      const englishFoodTerms = ['sushi', 'pizza', 'burger', 'hamburger', 'chinese', 'italian', 'japanese', 'mexican', 'thai', 'indian', 'mediterranean', 'chicken', 'meat', 'vegan', 'vegetarian', 'seafood'];
-      
-      const foodTerms = detectedLanguage === 'he' ? hebrewFoodTerms : englishFoodTerms;
-      
-      for (const term of foodTerms) {
-        if (allUserText.includes(term)) {
-          extractedData.cuisineTypes = [term];
-          console.log(`✅ Fallback extracted cuisine: "${term}"`);
-          break;
-        }
-      }
+      console.log('⚡ Forcing readyToShow=true (4+ responses)');
+      readyToShow = true;
     }
 
     // Remove the data JSON from the visible message
     let visibleMessage = fullResponse.replace(/<data>[\s\S]*?<\/data>/, '').trim();
     
     // If showing restaurants, remove the message text entirely
-    if (extractedData.readyToShow) {
+    if (readyToShow) {
       visibleMessage = '';
+      console.log('✅ readyToShow=true, clearing message');
     }
 
-    // Build filters from extracted data
-    const filters: any = {
-      query: extractedData.searchQuery || message,
-      cuisineTypes: extractedData.cuisineTypes || [],
-      priceLevel: extractedData.priceLevel ? [extractedData.priceLevel] : undefined,
-    };
-
-    // Add special preferences as boolean flags
-    if (extractedData.specialPreferences && extractedData.specialPreferences.length > 0) {
-      for (const pref of extractedData.specialPreferences) {
-        const lowerPref = pref.toLowerCase();
-        if (lowerPref.includes('romantic')) filters.romantic = true;
-        if (lowerPref.includes('family')) filters.familyFriendly = true;
-        if (lowerPref.includes('outdoor') || lowerPref.includes('patio')) filters.outdoor = true;
-        if (lowerPref.includes('pet')) filters.petFriendly = true;
-      }
-    }
-
-    // If ready to show restaurants, fetch and return exactly 3 best matches
+    // If ready to show restaurants, send entire conversation to OpenAI for recommendations
     let restaurants: any[] = [];
-    if (extractedData.readyToShow && location) {
+    if (readyToShow && location) {
       try {
-        // Determine search strategy based on searchMode
-        if (extractedData.searchMode === 'specific' && extractedData.searchQuery) {
-          // Focused search for specific restaurant
-          const searchResponse = await fetch(
-            `${request.nextUrl.origin}/api/restaurants/search?query=${encodeURIComponent(extractedData.searchQuery)}&latitude=${location.lat}&longitude=${location.lng}`,
-            { headers: request.headers }
-          );
-          const searchData = await searchResponse.json();
-          restaurants = (searchData.restaurants || []).slice(0, 3).map((r: any) => ({
-            ...r,
-            matchPercentage: 95, // High match since it's what they asked for
-            source: r.source || 'google'
-          }));
-        } else {
-          // General search with preferences
-          // Determine radius based on distance preference
-          let radius = 3000; // Default 3km
-          const distanceLower = (extractedData.distance || '').toLowerCase();
-          if (distanceLower.includes('walk') || distanceLower.includes('nearby') || distanceLower.includes('close')) {
-            radius = 1000; // 1km for walking distance
-          } else if (distanceLower.includes('scooter') || distanceLower.includes('short') || distanceLower.includes('quick')) {
-            radius = 2000; // 2km for short ride
-          } else if (distanceLower.includes('anywhere') || distanceLower.includes('drive') || distanceLower.includes("don't care")) {
-            radius = 10000; // 10km for willing to drive
-          }
-          
-          // Build search query with cuisine preferences
-          let searchQuery = extractedData.searchQuery || '';
-          
-          // If no specific searchQuery but we have cuisine types, build one
-          if (!searchQuery && extractedData.cuisineTypes && extractedData.cuisineTypes.length > 0) {
-            // Use the first (most specific) cuisine term as-is in user's language
-            searchQuery = extractedData.cuisineTypes[0];
-            
-            // Add "מסעדת" (restaurant) for Hebrew or "restaurant" for English if needed
-            const restaurantWord = detectedLanguage === 'he' ? 'מסעדת' : 'restaurant';
-            
-            // Don't add "restaurant" if the term already implies it or is very specific
-            const specificTerms = ['pizza', 'פיצה', 'burger', 'המבורגר', 'sushi', 'סושי'];
-            const isSpecificTerm = specificTerms.some(term => 
-              searchQuery.toLowerCase().includes(term.toLowerCase())
-            );
-            
-            if (!isSpecificTerm && !searchQuery.includes('מסעדת') && !searchQuery.includes('restaurant')) {
-              // Put restaurant word before the cuisine for Hebrew, after for English
-              if (detectedLanguage === 'he') {
-                searchQuery = `${restaurantWord} ${searchQuery}`;
-              } else {
-                searchQuery = `${searchQuery} ${restaurantWord}`;
-              }
+        console.log('🤖 Sending full conversation to OpenAI for restaurant recommendations...');
+        
+        // Build the recommendation request - send ENTIRE conversation as-is
+        const locationContext = detectedLanguage === 'he'
+          ? `מיקום נוכחי של המשתמש (GPS): ${location.lat}, ${location.lng}`
+          : `User's current location (GPS): ${location.lat}, ${location.lng}`;
+        
+        const recommendationPrompt = detectedLanguage === 'he'
+          ? `הנה השיחה המלאה שלי עם הלקוח:
+
+${conversationHistory.map((m: any) => `${m.role === 'user' ? 'לקוח' : 'אני'}: ${m.content}`).join('\n')}
+לקוח: ${message}
+
+${locationContext}
+
+בהתבסס על השיחה המלאה הזו ומיקום המשתמש, אנא המלץ על בדיוק 3 מסעדות ספציפיות שמתאימות בול למה שהלקוח רוצה.
+אם הלקוח הזכיר עיר ספציפית (כמו "ירושלים", "תל אביב", "הרצליה"), המלץ על מסעדות בעיר הזו.
+אם הלקוח אמר "קרוב" או "במרחק הליכה", המלץ על מסעדות קרובות למיקום ה-GPS שצוין.
+
+חשוב: תן רק את השמות המדויקים של המסעדות כפי שהן מופיעות בגוגל/במפות גוגל.
+
+פורמט:
+1. [שם מסעדה מדויק]
+2. [שם מסעדה מדויק]
+3. [שם מסעדה מדויק]`
+          : `Here is my full conversation with the client:
+
+${conversationHistory.map((m: any) => `${m.role === 'user' ? 'Client' : 'Me'}: ${m.content}`).join('\n')}
+Client: ${message}
+
+${locationContext}
+
+Based on this entire conversation and the user's location, please recommend exactly 3 specific restaurants that perfectly match what the client wants.
+If the client mentioned a specific city (like "Jerusalem", "Tel Aviv", "Herzliya"), recommend restaurants in that city.
+If the client said "nearby" or "walking distance", recommend restaurants close to the GPS location provided.
+
+Important: Provide only the exact restaurant names as they appear on Google/Google Maps.
+
+Format:
+1. [Exact restaurant name]
+2. [Exact restaurant name]
+3. [Exact restaurant name]`;
+
+        console.log('📝 Sending to OpenAI:\n', recommendationPrompt);
+
+        // Ask OpenAI for recommendations based on FULL conversation
+        const recommendationCompletion = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            { 
+              role: 'system', 
+              content: detectedLanguage === 'he'
+                ? `אתה מומחה מסעדות מקומי שמכיר מסעדות בישראל מצוין. קרא את כל השיחה בקפידה והבן מה הלקוח באמת רוצה - סוג האוכל, תקציב, עיר, מרחק, אווירה, וכו'. המלץ על 3 מסעדות אמיתיות שמתאימות בול.`
+                : `You are a local restaurant expert who knows restaurants extremely well. Read the entire conversation carefully and understand what the client really wants - food type, budget, city, distance, atmosphere, etc. Recommend 3 real restaurants that are a perfect match.`
+            },
+            { role: 'user', content: recommendationPrompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 400,
+        });
+
+        const recommendationText = recommendationCompletion.choices[0].message.content || '';
+        console.log('🎯 OpenAI recommendations:\n', recommendationText);
+
+        // Parse restaurant names from the response
+        const restaurantNames: string[] = [];
+        const lines = recommendationText.split('\n');
+        
+        for (const line of lines) {
+          // Match patterns like "1. Restaurant Name" or "- Restaurant Name"
+          const match = line.match(/^[\d\-\*•]\s*[\.\):]?\s*(.+)$/);
+          if (match && match[1]) {
+            let name = match[1].trim();
+            // Remove quotes if present
+            name = name.replace(/^["']|["']$/g, '');
+            if (name && name.length > 2) {
+              restaurantNames.push(name);
             }
           }
-          
-          // Use search API if we have specific cuisine types for better results
-          let allRestaurants: any[] = [];
-          if (searchQuery) {
-            console.log(`🔍 Searching for (${detectedLanguage}):`, searchQuery);
+        }
+
+        console.log(`✅ Parsed ${restaurantNames.length} restaurant names:`, restaurantNames);
+
+        // Search for each recommended restaurant on Google Places
+        for (const restaurantName of restaurantNames.slice(0, 3)) {
+          try {
+            console.log(`🔍 Searching Google Places for: "${restaurantName}"`);
             const searchResponse = await fetch(
-              `${request.nextUrl.origin}/api/restaurants/search?query=${encodeURIComponent(searchQuery)}&latitude=${location.lat}&longitude=${location.lng}`,
+              `${request.nextUrl.origin}/api/restaurants/search?query=${encodeURIComponent(restaurantName)}&latitude=${location.lat}&longitude=${location.lng}`,
               { headers: request.headers }
             );
             const searchData = await searchResponse.json();
-            allRestaurants = searchData.restaurants || [];
-            console.log(`Found ${allRestaurants.length} restaurants for "${searchQuery}"`);
-          } else {
-            // Fall back to nearby search
-            const nearbyResponse = await fetch(
-              `${request.nextUrl.origin}/api/restaurants/nearby?latitude=${location.lat}&longitude=${location.lng}&radius=${radius}`,
-              { headers: request.headers }
-            );
-            const nearbyData = await nearbyResponse.json();
-            allRestaurants = nearbyData.restaurants || [];
+            
+            if (searchData.restaurants && searchData.restaurants.length > 0) {
+              // Take the first (best) match
+              const restaurant = searchData.restaurants[0];
+              console.log(`✓ Found: ${restaurant.name}`, {
+                hasPhoto: !!restaurant.photoUrl,
+                photoUrl: restaurant.photoUrl?.substring(0, 100) + '...',
+                rating: restaurant.rating,
+                address: restaurant.address
+              });
+              restaurants.push({
+                ...restaurant,
+                matchPercentage: 95,
+                source: restaurant.source || 'google',
+                recommendedBy: 'ai'
+              });
+            } else {
+              console.warn(`✗ Could not find restaurant: "${restaurantName}"`);
+            }
+          } catch (error) {
+            console.error(`Error searching for ${restaurantName}:`, error);
           }
-          
-          // Advanced scoring algorithm
-          const scoredRestaurants = allRestaurants.map((r: any) => {
-            let score = r.rating * 18; // Base score from rating (0-90)
-            const matchReasons: string[] = [];
-            
-            // Cuisine matching (VERY IMPORTANT - increased weight)
-            if (filters.cuisineTypes && filters.cuisineTypes.length > 0) {
-              let cuisineMatchScore = 0;
-              
-              // Check restaurant name for cuisine keywords (case-insensitive, flexible)
-              const nameLower = r.name.toLowerCase();
-              const nameOriginal = r.name;
-              
-              for (const cuisine of filters.cuisineTypes) {
-                const cuisineLower = cuisine.toLowerCase();
-                
-                // Direct match in name (any case)
-                if (nameLower.includes(cuisineLower) || nameOriginal.includes(cuisine)) {
-                  cuisineMatchScore += 40; // Strong match if in name
-                  matchReasons.push('cuisine-in-name');
-                }
-              }
-              
-              // Check restaurant cuisineTypes (if available from Google)
-              if (r.cuisineTypes) {
-                for (const rCuisine of r.cuisineTypes) {
-                  for (const userCuisine of filters.cuisineTypes) {
-                    const rCuisineLower = rCuisine.toLowerCase();
-                    const userCuisineLower = userCuisine.toLowerCase();
-                    
-                    // Flexible matching - any partial match counts
-                    if (rCuisineLower.includes(userCuisineLower) || 
-                        userCuisineLower.includes(rCuisineLower)) {
-                      cuisineMatchScore += 30;
-                      matchReasons.push('cuisine-type-match');
-                      break; // Don't double-count same restaurant cuisine
-                    }
-                  }
-                }
-              }
-              
-              // If we searched for a specific cuisine and this restaurant doesn't match at all, heavily penalize
-              if (searchQuery && cuisineMatchScore === 0) {
-                score -= 50; // Heavy penalty for non-matching results
-              } else {
-                score += cuisineMatchScore;
-              }
-            }
-            
-            // Price level matching
-            if (filters.priceLevel && filters.priceLevel.length > 0 && r.priceLevel) {
-              if (filters.priceLevel.includes(r.priceLevel)) {
-                score += 15;
-                matchReasons.push('budget');
-              } else {
-                // Penalize if price is way off
-                const priceDiff = Math.abs(r.priceLevel - filters.priceLevel[0]);
-                score -= priceDiff * 5;
-              }
-            }
-            
-            // Special preferences matching
-            if (filters.romantic && r.specialPreferences?.includes('romantic')) {
-              score += 12;
-              matchReasons.push('vibe');
-            }
-            if (filters.outdoor && r.specialPreferences?.includes('outdoor')) {
-              score += 12;
-              matchReasons.push('atmosphere');
-            }
-            if (filters.familyFriendly && r.specialPreferences?.includes('family-friendly')) {
-              score += 12;
-              matchReasons.push('family-friendly');
-            }
-            if (filters.petFriendly && r.specialPreferences?.includes('pet-friendly')) {
-              score += 12;
-              matchReasons.push('pet-friendly');
-            }
-            
-            // High quality bonus
-            if (r.rating >= 4.5) score += 10;
-            if (r.rating >= 4.7) score += 5;
-            if (r.totalReviews > 100) score += 8;
-            if (r.totalReviews > 500) score += 5;
-            
-            // Popularity from friends
-            if (r.visitedByFollowing && r.visitedByFollowing.length > 0) {
-              score += Math.min(r.visitedByFollowing.length * 3, 15);
-              matchReasons.push('friends');
-            }
-            
-            return { 
-              ...r, 
-              matchScore: Math.max(0, score),
-              matchReasons 
-            };
-          });
-          
-          // Filter out completely irrelevant results when we have a specific cuisine search
-          let relevantRestaurants = scoredRestaurants;
-          if (filters.cuisineTypes && filters.cuisineTypes.length > 0) {
-            // Be VERY strict - only keep restaurants that actually match the cuisine
-            // A match means they got cuisine bonus points (score > base rating score)
-            const baseRatingScore = 90; // Max from rating alone (5.0 * 18)
-            relevantRestaurants = scoredRestaurants.filter((r: any) => {
-              // If restaurant has cuisine match reasons, keep it
-              if (r.matchReasons && r.matchReasons.length > 0) {
-                return true;
-              }
-              // If score is significantly higher than what rating alone would give, keep it
-              const expectedBaseScore = r.rating * 18;
-              if (r.matchScore > expectedBaseScore + 20) { // Got significant bonus points
-                return true;
-              }
-              return false;
-            });
-            
-            console.log(`Filtered from ${scoredRestaurants.length} to ${relevantRestaurants.length} cuisine-matched restaurants`);
-            
-            // If we filtered out everything, something went wrong - keep top 3 by rating
-            if (relevantRestaurants.length === 0) {
-              console.warn('⚠️ No cuisine matches found! Keeping top-rated restaurants as fallback.');
-              relevantRestaurants = scoredRestaurants.slice(0, 3);
-            }
-          }
-          
-          // Sort by score and take top 3
-          relevantRestaurants.sort((a: any, b: any) => b.matchScore - a.matchScore);
-          restaurants = relevantRestaurants.slice(0, 3).map((r: any, index: any) => {
-            // Calculate match percentage (60-100) based on relative ranking
-            const maxScore = relevantRestaurants[0].matchScore;
-            const percentage = maxScore > 0 
-              ? Math.min(100, Math.max(70, Math.round((r.matchScore / maxScore) * 100)))
-              : 75;
-            
-            console.log(`Restaurant: ${r.name}, Score: ${r.matchScore}, Match: ${percentage}%, Reasons: ${r.matchReasons.join(', ')}`);
-            
-            return {
-              ...r,
-              matchPercentage: index === 0 ? Math.max(percentage, 85) : percentage, // Boost top result
-              source: r.source || 'google'
-            };
-          });
         }
+
+        console.log(`📍 Final: ${restaurants.length} restaurants found`);
+        
       } catch (error) {
-        console.error('Error fetching restaurants:', error);
+        console.error('Error getting AI recommendations:', error);
       }
+    }
+
+    // Final check: if we have restaurants, make sure message is empty
+    if (restaurants.length > 0) {
+      visibleMessage = '';
+      console.log('🎯 Have restaurants, ensuring message is empty');
     }
 
     return NextResponse.json({
       message: visibleMessage,
-      filters,
       restaurants: restaurants.length > 0 ? restaurants : undefined,
-      extractedData: extractedData, // Send back for debugging/analytics
       success: true,
     });
   } catch (error: any) {

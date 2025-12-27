@@ -93,6 +93,91 @@ const getMatchColor = (percentage: number): string => {
   return '#6B7280'; // Gray
 };
 
+// Restaurant card component with image error handling
+function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: { 
+  restaurant: Restaurant; 
+  messageId: string; 
+  index: number;
+  onRestaurantClick?: (restaurant: Restaurant) => void;
+}) {
+  const [imageError, setImageError] = useState(false);
+  const matchPercentage = restaurant.matchPercentage || 75;
+
+  return (
+    <div
+      key={`${messageId}-${restaurant.id || index}`}
+      onClick={() => {
+        if (onRestaurantClick) {
+          onRestaurantClick(restaurant);
+        }
+      }}
+      className="group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] active:scale-[0.97]"
+      style={{
+        animation: `slideIn 0.5s ease-out ${index * 0.1}s both`,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
+      }}
+    >
+      {/* Match percentage badge */}
+      <div 
+        className="absolute top-2 right-2 z-10 backdrop-blur-sm rounded-full px-2 py-0.5 font-bold text-[10px] shadow-md"
+        style={{
+          background: 'rgba(255, 255, 255, 0.9)',
+          color: '#6B7280'
+        }}
+      >
+        {matchPercentage}%
+      </div>
+      
+      {/* Restaurant Photo */}
+      <div className="relative w-full h-20 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+        {restaurant.photoUrl && !imageError ? (
+          <img
+            src={restaurant.photoUrl}
+            alt={restaurant.name}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            onError={() => {
+              console.warn(`Image failed for ${restaurant.name}, showing fallback icon`);
+              setImageError(true);
+            }}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-pink-100 to-orange-50 flex items-center justify-center">
+            <span className="text-3xl opacity-60">{getRestaurantIcon(restaurant)}</span>
+          </div>
+        )}
+      </div>
+      
+      {/* Restaurant Info */}
+      <div className="p-2">
+        <h3 className="font-bold text-gray-900 text-[11px] leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2">
+          {restaurant.name}
+        </h3>
+        
+        {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
+          <div className="mb-1">
+            <span className="text-[8px] bg-gradient-to-r from-primary/10 to-pink-50 text-primary font-semibold px-1.5 py-0.5 rounded-full border border-primary/20">
+              {restaurant.cuisineTypes[0].replace(/_/g, ' ').toLowerCase()}
+            </span>
+          </div>
+        )}
+        
+        {restaurant.priceLevel && (
+          <div className="text-left">
+            <span className="font-bold text-emerald-600 text-[11px]">
+              {getPriceLevel(restaurant.priceLevel)}
+            </span>
+          </div>
+        )}
+      </div>
+      
+      {/* Hover indicator bar */}
+      <div 
+        className="h-0.5 bg-gradient-to-r from-primary via-pink-500 to-orange-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
+      />
+    </div>
+  );
+}
+
 export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantClick, matchedCount = 0, userLocation, onChatStateChange }: AIChatSheetProps) {
   const [isActive, setIsActive] = useState(false); // Whether pane is visible
   const [sheetHeight, setSheetHeight] = useState(200); // Height when active
@@ -636,82 +721,15 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                   {message.restaurants && message.restaurants.length > 0 && (
                     <div className="w-full max-w-full">
                       <div className={`grid gap-2.5 px-2 pb-2 pt-1 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                        {message.restaurants.map((restaurant, index) => {
-                          const matchPercentage = restaurant.matchPercentage || 75;
-                          
-                          return (
-                            <div
-                              key={`${message.id}-${restaurant.id || index}`}
-                              onClick={() => {
-                                if (onRestaurantClick) {
-                                  onRestaurantClick(restaurant);
-                                }
-                              }}
-                              className="group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] active:scale-[0.97]"
-                              style={{
-                                animation: `slideIn 0.5s ease-out ${index * 0.1}s both`,
-                                boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
-                              }}
-                            >
-                              {/* Match percentage badge - top right */}
-                              <div 
-                                className="absolute top-2 right-2 z-10 backdrop-blur-sm rounded-full px-2 py-0.5 font-bold text-[10px] shadow-md"
-                                style={{
-                                  background: 'rgba(255, 255, 255, 0.9)',
-                                  color: '#6B7280'
-                                }}
-                              >
-                                {matchPercentage}%
-                              </div>
-                              
-                              {/* Restaurant Photo */}
-                              <div className="relative w-full h-20 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-                                {restaurant.photoUrl ? (
-                                  <img
-                                    src={restaurant.photoUrl}
-                                    alt={restaurant.name}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-gradient-to-br from-primary/20 via-pink-100 to-orange-50 flex items-center justify-center">
-                                    <span className="text-3xl opacity-60">{getRestaurantIcon(restaurant)}</span>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {/* Restaurant Info */}
-                              <div className="p-2">
-                                {/* Name */}
-                                <h3 className="font-bold text-gray-900 text-[11px] leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2">
-                                  {restaurant.name}
-                                </h3>
-                                
-                                {/* Cuisine Type - show only first one */}
-                                {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
-                                  <div className="mb-1">
-                                    <span className="text-[8px] bg-gradient-to-r from-primary/10 to-pink-50 text-primary font-semibold px-1.5 py-0.5 rounded-full border border-primary/20">
-                                      {restaurant.cuisineTypes[0].replace(/_/g, ' ').toLowerCase()}
-                                    </span>
-                                  </div>
-                                )}
-                                
-                                {/* Price Level */}
-                                {restaurant.priceLevel && (
-                                  <div className="text-left">
-                                    <span className="font-bold text-emerald-600 text-[11px]">
-                                      {getPriceLevel(restaurant.priceLevel)}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {/* Hover indicator bar at bottom */}
-                              <div 
-                                className="h-0.5 bg-gradient-to-r from-primary via-pink-500 to-orange-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
-                              />
-                            </div>
-                          );
-                        })}
+                        {message.restaurants.map((restaurant, index) => (
+                          <RestaurantCard
+                            key={`${message.id}-${restaurant.id || index}`}
+                            restaurant={restaurant}
+                            messageId={message.id}
+                            index={index}
+                            onRestaurantClick={onRestaurantClick}
+                          />
+                        ))}
                       </div>
                     </div>
                   )}
