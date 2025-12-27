@@ -97,16 +97,16 @@ export async function GET(request: NextRequest) {
     );
 
     // Merge all results and deduplicate by place_id
-    // Filter strategy: Include places that have at least ONE food-related type
-    // Only exclude if they have NONE of the food types (to avoid showing pure hotels, stores, etc.)
+    // Filter strategy: Include ONLY food & drink establishments, EXCLUDE lodging even if they have restaurants
     const foodRelatedTypes = [
       'restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery', 
-      'night_club', 'food', 'meal_delivery', 'liquor_store'
+      'night_club', 'food', 'liquor_store'
     ];
     
-    // These are NON-food types that should be excluded ONLY if the place has NO food types
-    const purelyNonFoodTypes = [
-      'lodging', 'hotel', 'motel', 'campground', 'rv_park',
+    // ALWAYS exclude these types (lodging, accommodations, non-food services)
+    // Even if they have a restaurant (e.g., hotel restaurants)
+    const excludedTypes = [
+      'lodging', 'hotel', 'motel', 'campground', 'rv_park', 'guest_house',
       'moving_company', 'parking', 'car_rental', 'car_repair', 'car_dealer',
       'car_wash', 'gas_station', 'school', 'primary_school', 'secondary_school',
       'university', 'library', 'hospital', 'doctor', 'dentist', 'pharmacy',
@@ -114,31 +114,31 @@ export async function GET(request: NextRequest) {
       'synagogue', 'hindu_temple', 'bank', 'atm', 'post_office', 'courthouse',
       'city_hall', 'police', 'fire_station', 'laundry', 'hardware_store',
       'real_estate_agency', 'insurance_agency', 'lawyer', 'accounting',
-      'locksmith', 'electrician', 'plumber', 'roofing_contractor', 'painter'
+      'locksmith', 'electrician', 'plumber', 'roofing_contractor', 'painter',
+      'storage', 'funeral_home', 'cemetery'
     ];
     
     const allResultsMap = new Map();
     resultsArrays.forEach(results => {
       results.forEach((place: any) => {
-        // Check if place has at least one food-related type
+        // FIRST: Check if this is a lodging/excluded type - if so, skip it immediately
+        const isExcludedType = place.types?.some((type: string) => 
+          excludedTypes.includes(type)
+        );
+        
+        if (isExcludedType) {
+          // Skip hotels, motels, and other excluded types completely
+          return;
+        }
+        
+        // SECOND: Check if place has at least one food-related type
         const hasFoodType = place.types?.some((type: string) => 
           foodRelatedTypes.includes(type)
         );
         
-        // If it has a food type, include it (even if it also has tourist_attraction, shopping_mall, etc.)
-        // This ensures we don't miss famous restaurants, bars in malls, etc.
+        // Only include if it has a food type AND is not an excluded type
         if (hasFoodType && !allResultsMap.has(place.place_id)) {
           allResultsMap.set(place.place_id, place);
-        }
-        // If it doesn't have a food type but somehow got returned, check if it's purely non-food
-        else if (!hasFoodType) {
-          const isPurelyNonFood = place.types?.some((type: string) => 
-            purelyNonFoodTypes.includes(type)
-          );
-          // Only exclude if it's clearly a non-food establishment
-          if (!isPurelyNonFood && !allResultsMap.has(place.place_id)) {
-            allResultsMap.set(place.place_id, place);
-          }
         }
       });
     });
