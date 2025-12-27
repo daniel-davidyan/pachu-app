@@ -118,10 +118,23 @@ export async function POST(request: NextRequest) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // Detect language from first user message if this is the start of conversation
+    // Detect language from first user message, or from conversation history
     const userMessages = conversationHistory.filter((m: any) => m.role === 'user');
     const isFirstMessage = userMessages.length === 0;
-    const detectedLanguage = isFirstMessage ? detectLanguage(message) : 'en'; // Default to en for subsequent messages
+    
+    let detectedLanguage = 'en';
+    if (isFirstMessage) {
+      // First message - detect from current message
+      detectedLanguage = detectLanguage(message);
+    } else {
+      // Not first message - detect from first user message in history
+      if (userMessages.length > 0) {
+        detectedLanguage = detectLanguage(userMessages[0].content);
+      } else {
+        // Fallback - detect from current message
+        detectedLanguage = detectLanguage(message);
+      }
+    }
     
     // Detect if this is a focused search for a specific restaurant
     const focusedSearch = detectFocusedSearch(message, detectedLanguage);

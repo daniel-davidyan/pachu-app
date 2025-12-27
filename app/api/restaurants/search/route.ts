@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     // Transform Google Places data and enrich with Place Details
     const restaurants = await Promise.all(
       (data.results?.slice(0, 10) || []).map(async (place: any) => {
-        const enrichedData = {
+        let enrichedData: any = {
           googlePlaceId: place.place_id,
           name: place.name,
           address: place.formatted_address,
@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
         // If no photo from Text Search, try to get from Place Details
         if (!enrichedData.photoUrl && place.place_id) {
           try {
+            console.log(`📸 No photo for "${place.name}", trying Place Details API...`);
             const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,photos,formatted_phone_number,opening_hours,website,price_level,types&key=${apiKey}`;
             const detailsResponse = await fetch(detailsUrl);
             const detailsData = await detailsResponse.json();
@@ -80,6 +81,9 @@ export async function GET(request: NextRequest) {
               // Get photo from details
               if (details.photos?.[0]) {
                 enrichedData.photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${details.photos[0].photo_reference}&key=${apiKey}`;
+                console.log(`✅ Found photo for "${place.name}" from Place Details`);
+              } else {
+                console.warn(`⚠️ Place Details for "${place.name}" has no photos`);
               }
               
               // Add additional details
@@ -89,9 +93,11 @@ export async function GET(request: NextRequest) {
                   !['point_of_interest', 'establishment', 'food'].includes(t)
                 );
               }
+            } else {
+              console.warn(`⚠️ Place Details API returned status: ${detailsData.status} for "${place.name}"`);
             }
           } catch (detailsError) {
-            console.error('Error fetching place details:', detailsError);
+            console.error(`❌ Error fetching place details for "${place.name}":`, detailsError);
             // Continue without details if there's an error
           }
         }
