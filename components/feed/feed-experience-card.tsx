@@ -649,47 +649,50 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate, onSheet
                 className="experience-card flex-shrink-0 w-80 snap-start"
               >
                 {/* User Info */}
-                <Link
-                  href={user && experience.user.id === user.id ? '/profile' : `/profile/${experience.user.id}`}
-                  className="flex items-center gap-2 mb-3"
-                >
-                  {experience.user.avatarUrl ? (
-                    <img
-                      src={experience.user.avatarUrl}
-                      alt={experience.user.fullName}
-                      className="w-9 h-9 rounded-full object-cover"
-                      onError={(e) => {
-                        // If image fails to load (common with Google profile photos), hide it
-                        // The fallback div will be shown instead
-                        e.currentTarget.style.display = 'none';
-                        const fallback = e.currentTarget.nextElementSibling;
-                        if (fallback) {
-                          (fallback as HTMLElement).style.display = 'flex';
-                        }
-                      }}
-                    />
-                  ) : null}
-                  {/* Fallback avatar - always render but initially hidden if avatarUrl exists */}
-                  <div 
-                    className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center"
-                    style={{ display: experience.user.avatarUrl ? 'none' : 'flex' }}
+                <div className="flex items-start gap-2 mb-3">
+                  <Link
+                    href={user && experience.user.id === user.id ? '/profile' : `/profile/${experience.user.id}`}
+                    className="flex items-center gap-2 flex-1 min-w-0"
                   >
-                    <span className="text-sm font-bold text-white">
-                      {(experience.user.fullName || experience.user.username).charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-gray-900 truncate">
-                      {experience.user.fullName || experience.user.username}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <CompactRating rating={experience.rating} />
-                      <span className="text-xs text-gray-500 ml-1">
+                    {experience.user.avatarUrl ? (
+                      <img
+                        src={experience.user.avatarUrl}
+                        alt={experience.user.fullName}
+                        className="w-9 h-9 rounded-full object-cover"
+                        onError={(e) => {
+                          // If image fails to load (common with Google profile photos), hide it
+                          // The fallback div will be shown instead
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling;
+                          if (fallback) {
+                            (fallback as HTMLElement).style.display = 'flex';
+                          }
+                        }}
+                      />
+                    ) : null}
+                    {/* Fallback avatar - always render but initially hidden if avatarUrl exists */}
+                    <div 
+                      className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center"
+                      style={{ display: experience.user.avatarUrl ? 'none' : 'flex' }}
+                    >
+                      <span className="text-sm font-bold text-white">
+                        {(experience.user.fullName || experience.user.username).charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-gray-900 truncate">
+                        {experience.user.fullName || experience.user.username}
+                      </p>
+                      <span className="text-xs text-gray-500">
                         {formatDistanceToNow(new Date(experience.createdAt), { addSuffix: true })}
                       </span>
                     </div>
+                  </Link>
+                  {/* Rating on the right */}
+                  <div className="flex-shrink-0">
+                    <CompactRating rating={experience.rating} />
                   </div>
-                </Link>
+                </div>
 
                 {/* Photos Carousel OR Placeholder Shimmer */}
                 {experience.photos && experience.photos.length > 0 ? (
