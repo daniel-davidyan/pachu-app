@@ -15,6 +15,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
+import { formatAddress } from '@/lib/address-utils';
 
 interface Review {
   id: string;
@@ -451,7 +452,7 @@ export default function RestaurantPage() {
             {restaurant.address && (
               <div className="flex items-start gap-2 text-sm mb-4">
                 <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-600">{restaurant.address}</span>
+                <span className="text-gray-600">{formatAddress(restaurant.address)}</span>
               </div>
             )}
 

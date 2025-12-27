@@ -8,6 +8,7 @@ import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
+import { formatAddress } from '@/lib/address-utils';
 
 interface Review {
   id: string;
@@ -658,7 +659,7 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
             {restaurant.address && (
               <p className="text-sm opacity-90 flex items-center gap-1">
                 <MapPin className="w-4 h-4" />
-                {restaurant.address}
+                {formatAddress(restaurant.address)}
               </p>
             )}
           </div>
@@ -747,13 +748,6 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                   </div>
                 </div>
 
-                {/* Experience Content */}
-                {experience.content && (
-                  <p className="text-sm text-gray-700 leading-relaxed mb-3 line-clamp-3">
-                    {experience.content}
-                  </p>
-                )}
-
                 {/* Photos Carousel OR Placeholder Shimmer */}
                 {experience.photos && experience.photos.length > 0 ? (
                   <div className="mb-3">
@@ -785,6 +779,13 @@ export function FeedRestaurantCard({ restaurant, onUpdate, showInteractions = tr
                       </span>
                     </div>
                   </div>
+                )}
+
+                {/* Experience Content - After Photos */}
+                {experience.content && (
+                  <p className="text-sm text-gray-700 leading-relaxed mb-3 line-clamp-3">
+                    {experience.content}
+                  </p>
                 )}
 
                 {/* Instagram-style Like/Comment Bar - Always at Bottom */}

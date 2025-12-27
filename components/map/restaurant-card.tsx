@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2, Calendar } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
+import { formatAddress, extractCityFromAddress } from '@/lib/address-utils';
 
 interface RestaurantCardProps {
   restaurant: Restaurant | null;
@@ -101,13 +102,6 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
 
     checkDetailsAndFetchData();
   }, [restaurant]);
-
-  const extractCityFromAddress = (address?: string) => {
-    if (!address) return '';
-    // Try to extract city from address (e.g., "Street 123, Tel Aviv" -> "Tel Aviv")
-    const parts = address.split(',');
-    return parts.length > 1 ? parts[parts.length - 1].trim() : '';
-  };
 
   const handleWishlist = async () => {
     if (loadingWishlist) return;
@@ -442,7 +436,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                 {/* Address */}
                 <div className="flex items-center gap-1 mt-1.5">
                   <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                  <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
+                  <p className="text-xs text-gray-500 truncate">{formatAddress(restaurant.address)}</p>
                 </div>
               </div>
             </div>

@@ -7,6 +7,7 @@ import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { useUser } from '@/hooks/use-user';
+import { formatAddress } from '@/lib/address-utils';
 
 interface MutualFriend {
   id: string;
@@ -258,7 +259,7 @@ export function RestaurantFeedCard({ restaurant, userLocation }: RestaurantFeedC
                 {restaurant.address && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                    <p className="text-xs text-gray-500 truncate">{restaurant.address}</p>
+                    <p className="text-xs text-gray-500 truncate">{formatAddress(restaurant.address)}</p>
                   </div>
                 )}
               </div>

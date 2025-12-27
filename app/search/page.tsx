@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Search, MapPin, User, Star, Loader2, UserPlus, UserCheck } from 'lucide-react';
+import { formatAddress } from '@/lib/address-utils';
 
 type SearchTab = 'places' | 'users';
 
@@ -308,7 +309,7 @@ export default function SearchPage() {
                           </div>
                           <div className="flex-1 min-w-0 overflow-hidden">
                             <h3 className="font-semibold text-sm text-gray-900 truncate">{place.name}</h3>
-                            <p className="text-xs text-gray-500 truncate">{place.address}</p>
+                            <p className="text-xs text-gray-500 truncate">{formatAddress(place.address)}</p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               {place.rating > 0 && (
                                 <div className="bg-white border border-gray-200 rounded-full px-2 py-0.5 shadow-sm">
@@ -391,7 +392,7 @@ export default function SearchPage() {
                             </div>
                             <div className="flex-1 min-w-0 overflow-hidden">
                               <h3 className="font-semibold text-sm text-gray-900 truncate">{place.name}</h3>
-                              <p className="text-xs text-gray-500 truncate">{place.address}</p>
+                              <p className="text-xs text-gray-500 truncate">{formatAddress(place.address)}</p>
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 {place.rating > 0 && (
                                   <div className="bg-white border border-gray-200 rounded-full px-2 py-0.5 shadow-sm">

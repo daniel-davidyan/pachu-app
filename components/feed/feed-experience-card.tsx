@@ -8,6 +8,7 @@ import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
+import { formatAddress } from '@/lib/address-utils';
 
 interface Review {
   id: string;
@@ -604,7 +605,7 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate, onSheet
             {restaurant.address && (
               <p className="text-sm opacity-90 flex items-center gap-1">
                 <MapPin className="w-4 h-4" />
-                {restaurant.address}
+                {formatAddress(restaurant.address)}
               </p>
                 )}
               </div>
@@ -730,7 +731,7 @@ export function FeedExperienceCard({ restaurant, userLocation, onUpdate, onSheet
                   })()
                 )}
 
-                {/* Experience Content */}
+                {/* Experience Content - After Photos */}
                 {experience.content && (
                   <p className="text-sm text-gray-700 leading-relaxed mb-3 line-clamp-3">
                     {experience.content}
