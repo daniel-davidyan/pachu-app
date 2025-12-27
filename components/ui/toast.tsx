@@ -41,12 +41,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       
       {/* Toast Container */}
-      <div className="fixed top-4 left-0 right-0 z-[9999] pointer-events-none px-4">
+      <div className="fixed bottom-4 left-0 right-0 z-[9999] pointer-events-none px-4">
         <div className="flex flex-col gap-2 items-center">
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className="pointer-events-auto bg-white rounded-xl shadow-lg border border-gray-200 p-4 max-w-sm w-full animate-slide-down"
+              className="pointer-events-auto bg-white rounded-xl shadow-lg border border-gray-200 p-4 max-w-sm w-full animate-slide-up"
             >
               <div className="flex items-start gap-3">
                 {toast.type === 'success' && (
