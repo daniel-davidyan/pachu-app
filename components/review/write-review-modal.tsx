@@ -48,6 +48,9 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const [initialized, setInitialized] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
@@ -152,60 +155,142 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     }
   };
 
-  // Drag and drop handlers for reordering photos
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    // Add a slight delay to allow the drag preview to be set
-    setTimeout(() => {
-      (e.target as HTMLElement).style.opacity = '0.5';
-    }, 0);
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    (e.target as HTMLElement).style.opacity = '1';
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+  // Touch-friendly drag and drop handlers (works on mobile and desktop)
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    const touch = e.touches[0];
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY });
     
-    if (draggedIndex !== null && draggedIndex !== index) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
+    // Start long press timer (500ms)
+    const timer = setTimeout(() => {
+      setIsDragging(true);
+      setDraggedIndex(index);
+      // Haptic feedback on supported devices
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500);
     
-    if (draggedIndex === null || draggedIndex === dropIndex) {
-      setDragOverIndex(null);
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, index: number) => {
+    if (!isDragging || draggedIndex === null) {
+      // Check if moved too much before long press completed
+      if (touchStartPos && longPressTimer) {
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+        const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+        
+        if (deltaX > 10 || deltaY > 10) {
+          // Cancel long press if user scrolls
+          clearTimeout(longPressTimer);
+          setLongPressTimer(null);
+        }
+      }
       return;
     }
 
-    // Reorder photos
-    const newPhotos = [...photos];
-    const newPhotoUrls = [...photoUrls];
+    e.preventDefault(); // Prevent scrolling while dragging
     
-    const draggedPhoto = newPhotos[draggedIndex];
-    const draggedUrl = newPhotoUrls[draggedIndex];
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
     
-    // Remove from old position
-    newPhotos.splice(draggedIndex, 1);
-    newPhotoUrls.splice(draggedIndex, 1);
-    
-    // Insert at new position
-    newPhotos.splice(dropIndex, 0, draggedPhoto);
-    newPhotoUrls.splice(dropIndex, 0, draggedUrl);
-    
-    setPhotos(newPhotos);
-    setPhotoUrls(newPhotoUrls);
+    // Find which photo we're over
+    if (element) {
+      const photoElement = element.closest('[data-photo-index]');
+      if (photoElement) {
+        const overIndex = parseInt(photoElement.getAttribute('data-photo-index') || '-1');
+        if (overIndex !== -1 && overIndex !== draggedIndex) {
+          setDragOverIndex(overIndex);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Clear long press timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+
+    if (isDragging && draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+      // Perform the reorder
+      const newPhotos = [...photos];
+      const newPhotoUrls = [...photoUrls];
+      
+      const draggedPhoto = newPhotos[draggedIndex];
+      const draggedUrl = newPhotoUrls[draggedIndex];
+      
+      // Remove from old position
+      newPhotos.splice(draggedIndex, 1);
+      newPhotoUrls.splice(draggedIndex, 1);
+      
+      // Insert at new position
+      newPhotos.splice(dragOverIndex, 0, draggedPhoto);
+      newPhotoUrls.splice(dragOverIndex, 0, draggedUrl);
+      
+      setPhotos(newPhotos);
+      setPhotoUrls(newPhotoUrls);
+      
+      // Haptic feedback on success
+      if (navigator.vibrate) {
+        navigator.vibrate(30);
+      }
+    }
+
+    // Reset states
+    setIsDragging(false);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setTouchStartPos(null);
+  };
+
+  // Mouse drag handlers for desktop
+  const handleMouseDown = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDraggedIndex(index);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || draggedIndex === null) return;
+
+    const element = document.elementFromPoint(e.clientX, e.clientY);
+    if (element) {
+      const photoElement = element.closest('[data-photo-index]');
+      if (photoElement) {
+        const overIndex = parseInt(photoElement.getAttribute('data-photo-index') || '-1');
+        if (overIndex !== -1 && overIndex !== draggedIndex) {
+          setDragOverIndex(overIndex);
+        }
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (isDragging && draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+      // Perform the reorder
+      const newPhotos = [...photos];
+      const newPhotoUrls = [...photoUrls];
+      
+      const draggedPhoto = newPhotos[draggedIndex];
+      const draggedUrl = newPhotoUrls[draggedIndex];
+      
+      // Remove from old position
+      newPhotos.splice(draggedIndex, 1);
+      newPhotoUrls.splice(draggedIndex, 1);
+      
+      // Insert at new position
+      newPhotos.splice(dragOverIndex, 0, draggedPhoto);
+      newPhotoUrls.splice(dragOverIndex, 0, draggedUrl);
+      
+      setPhotos(newPhotos);
+      setPhotoUrls(newPhotoUrls);
+    }
+
+    // Reset states
+    setIsDragging(false);
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
@@ -507,48 +592,69 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                     </div>
                   </button>
                 ) : (
-                  /* Photo grid when photos exist - with drag and drop */
-                  <div className="grid grid-cols-3 gap-1.5">
+                  /* Photo grid when photos exist - with touch-friendly drag and drop */
+                  <div 
+                    className="grid grid-cols-3 gap-1.5"
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                  >
                     {photoUrls.map((url, index) => (
                       <div
                         key={index}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, index)}
+                        data-photo-index={index}
+                        onTouchStart={(e) => handleTouchStart(e, index)}
+                        onTouchMove={(e) => handleTouchMove(e, index)}
+                        onTouchEnd={handleTouchEnd}
+                        onMouseDown={(e) => handleMouseDown(e, index)}
                         className={`
-                          relative aspect-square cursor-move group
+                          relative aspect-square select-none
                           transition-all duration-200 ease-out
-                          ${draggedIndex === index ? 'scale-95 opacity-50' : ''}
-                          ${dragOverIndex === index ? 'scale-105 ring-2 ring-primary ring-offset-2' : ''}
+                          ${draggedIndex === index ? 'scale-90 opacity-40 z-50' : ''}
+                          ${dragOverIndex === index ? 'scale-110 ring-4 ring-primary/50 ring-offset-2 z-40' : 'scale-100'}
+                          ${isDragging && draggedIndex === index ? 'cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}
                         `}
                       >
                         <img 
                           src={url} 
                           alt="" 
-                          className="w-full h-full object-cover rounded-lg border border-gray-200 transition-transform pointer-events-none select-none" 
+                          className="w-full h-full object-cover rounded-lg border border-gray-200 pointer-events-none" 
+                          draggable={false}
                         />
-                        {/* Drag indicator - shows on hover */}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition-all flex items-center justify-center pointer-events-none">
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-1.5 shadow-lg">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="4" cy="4" r="1.5" fill="#FF69B4"/>
-                              <circle cx="12" cy="4" r="1.5" fill="#FF69B4"/>
-                              <circle cx="4" cy="8" r="1.5" fill="#FF69B4"/>
-                              <circle cx="12" cy="8" r="1.5" fill="#FF69B4"/>
-                              <circle cx="4" cy="12" r="1.5" fill="#FF69B4"/>
-                              <circle cx="12" cy="12" r="1.5" fill="#FF69B4"/>
-                            </svg>
+                        
+                        {/* Visual feedback during drag */}
+                        {isDragging && draggedIndex === index && (
+                          <div className="absolute inset-0 bg-primary/20 rounded-lg flex items-center justify-center">
+                            <div className="bg-white rounded-full p-3 shadow-xl">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7 10L12 5L17 10M7 14L12 19L17 14" stroke="#FF69B4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </div>
                           </div>
-                        </div>
+                        )}
+                        
+                        {/* Drop zone indicator */}
+                        {isDragging && dragOverIndex === index && draggedIndex !== index && (
+                          <div className="absolute inset-0 bg-primary/10 rounded-lg border-2 border-dashed border-primary animate-pulse" />
+                        )}
+                        
+                        {/* Long press hint (shows briefly on first photo) */}
+                        {!isDragging && index === 0 && photoUrls.length > 1 && (
+                          <div className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[8px] text-center py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            Press & hold to reorder
+                          </div>
+                        )}
+                        
                         {/* Remove button */}
                         <button
                           onClick={() => removePhoto(index)}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 hover:scale-110 transition-all z-10"
+                          onTouchEnd={(e) => {
+                            e.stopPropagation();
+                            removePhoto(index);
+                          }}
+                          className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 hover:scale-110 transition-all z-50 active:scale-95"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
@@ -556,7 +662,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                     {photoUrls.length < 6 && (
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+                        className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors active:scale-95"
                       >
                         <Camera className="w-5 h-5" />
                         <span className="text-[9px] mt-0.5 font-medium">Add</span>
