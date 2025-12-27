@@ -198,6 +198,23 @@ function MapPageContent() {
           const data = await response.json();
           
           if (data.restaurant) {
+            // Create the target restaurant object
+            const targetRestaurant = {
+              id: data.restaurant.googlePlaceId || data.restaurant.id,
+              name: data.restaurant.name,
+              address: data.restaurant.address || '',
+              latitude: data.restaurant.latitude,
+              longitude: data.restaurant.longitude,
+              rating: data.restaurant.averageRating,
+              totalReviews: data.restaurant.totalReviews,
+              photoUrl: data.restaurant.imageUrl,
+              priceLevel: data.restaurant.priceLevel,
+              cuisineTypes: data.restaurant.cuisineTypes || [],
+              source: 'google',
+              googlePlaceId: data.restaurant.googlePlaceId || data.restaurant.id,
+              website: data.restaurant.website,
+            };
+            
             // Fetch nearby restaurants around this location
             try {
               const nearbyResponse = await fetch(
@@ -206,12 +223,23 @@ function MapPageContent() {
               const nearbyData = await nearbyResponse.json();
               const nearbyRestaurants = nearbyData.restaurants || [];
               
-              // Update the restaurants list with nearby restaurants
-              if (nearbyRestaurants.length > 0) {
-                setAllRestaurants(nearbyRestaurants);
-              }
+              // Check if the target restaurant is already in nearby results
+              const targetPlaceId = data.restaurant.googlePlaceId || data.restaurant.id;
+              const isInNearby = nearbyRestaurants.some(
+                (r: any) => r.googlePlaceId === targetPlaceId || r.id === targetPlaceId
+              );
+              
+              // Always include the target restaurant, even if not in nearby results
+              const allRestaurantsList = isInNearby 
+                ? nearbyRestaurants 
+                : [targetRestaurant, ...nearbyRestaurants];
+              
+              // Update the restaurants list
+              setAllRestaurants(allRestaurantsList);
             } catch (nearbyError) {
               console.error('Error fetching nearby restaurants:', nearbyError);
+              // Even if nearby fetch fails, show at least the target restaurant
+              setAllRestaurants([targetRestaurant]);
             }
             
             // Hide the chat
@@ -229,21 +257,7 @@ function MapPageContent() {
 
             // After a short delay, open the restaurant popup
             setTimeout(() => {
-              setSelectedRestaurant({
-                id: data.restaurant.id,
-                name: data.restaurant.name,
-                address: data.restaurant.address || '',
-                latitude: data.restaurant.latitude,
-                longitude: data.restaurant.longitude,
-                rating: data.restaurant.averageRating,
-                totalReviews: data.restaurant.totalReviews,
-                photoUrl: data.restaurant.imageUrl,
-                priceLevel: data.restaurant.priceLevel,
-                cuisineTypes: data.restaurant.cuisineTypes || [],
-                source: 'google',
-                googlePlaceId: data.restaurant.googlePlaceId,
-                website: data.restaurant.website,
-              });
+              setSelectedRestaurant(targetRestaurant);
             }, 1000);
 
             setHasHandledUrlParams(true);

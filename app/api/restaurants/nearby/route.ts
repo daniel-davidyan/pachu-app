@@ -89,96 +89,56 @@ export async function GET(request: NextRequest) {
     };
 
     // Fetch all types of food establishments in parallel for maximum coverage
-    const types = ['restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery'];
+    // Including all Google Places API food-related types to match Google Maps
+    const types = ['restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery', 'night_club', 'food'];
     
     const resultsArrays = await Promise.all(
       types.map(type => fetchPlacesByType(type))
     );
 
     // Merge all results and deduplicate by place_id
-    // Also filter out non-food establishments
-    const excludedTypes = [
-      'lodging', 
-      'hotel', 
-      'motel', 
-      'campground', 
-      'rv_park',
-      'moving_company',
-      'parking',
-      'car_rental',
-      'car_repair',
-      'car_dealer',
-      'car_wash',
-      'gas_station',
-      'travel_agency',
-      'tourist_attraction',
-      'museum',
-      'art_gallery',
-      'spa',
-      'hair_care',
-      'beauty_salon',
-      'gym',
-      'store',
-      'shopping_mall',
-      'department_store',
-      'supermarket',
-      'convenience_store',
-      'school',
-      'primary_school',
-      'secondary_school',
-      'university',
-      'library',
-      'hospital',
-      'doctor',
-      'dentist',
-      'pharmacy',
-      'physiotherapist',
-      'veterinary_care',
-      'pet_store',
-      'church',
-      'mosque',
-      'synagogue',
-      'hindu_temple',
-      'place_of_worship',
-      'bank',
-      'atm',
-      'post_office',
-      'courthouse',
-      'city_hall',
-      'police',
-      'fire_station',
-      'laundry',
-      'electronics_store',
-      'furniture_store',
-      'home_goods_store',
-      'clothing_store',
-      'book_store',
-      'jewelry_store',
-      'shoe_store',
-      'hardware_store',
-      'florist',
-      'real_estate_agency',
-      'insurance_agency',
-      'lawyer',
-      'accounting',
-      'locksmith',
-      'electrician',
-      'plumber',
-      'roofing_contractor',
-      'painter'
+    // Filter strategy: Include places that have at least ONE food-related type
+    // Only exclude if they have NONE of the food types (to avoid showing pure hotels, stores, etc.)
+    const foodRelatedTypes = [
+      'restaurant', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'meal_delivery', 
+      'night_club', 'food', 'meal_delivery', 'liquor_store'
+    ];
+    
+    // These are NON-food types that should be excluded ONLY if the place has NO food types
+    const purelyNonFoodTypes = [
+      'lodging', 'hotel', 'motel', 'campground', 'rv_park',
+      'moving_company', 'parking', 'car_rental', 'car_repair', 'car_dealer',
+      'car_wash', 'gas_station', 'school', 'primary_school', 'secondary_school',
+      'university', 'library', 'hospital', 'doctor', 'dentist', 'pharmacy',
+      'physiotherapist', 'veterinary_care', 'pet_store', 'church', 'mosque',
+      'synagogue', 'hindu_temple', 'bank', 'atm', 'post_office', 'courthouse',
+      'city_hall', 'police', 'fire_station', 'laundry', 'hardware_store',
+      'real_estate_agency', 'insurance_agency', 'lawyer', 'accounting',
+      'locksmith', 'electrician', 'plumber', 'roofing_contractor', 'painter'
     ];
     
     const allResultsMap = new Map();
     resultsArrays.forEach(results => {
       results.forEach((place: any) => {
-        // Check if place has any excluded types
-        const hasExcludedType = place.types?.some((type: string) => 
-          excludedTypes.includes(type)
+        // Check if place has at least one food-related type
+        const hasFoodType = place.types?.some((type: string) => 
+          foodRelatedTypes.includes(type)
         );
         
-        // Only add if it doesn't have excluded types and not already in map
-        if (!hasExcludedType && !allResultsMap.has(place.place_id)) {
+        // If it has a food type, include it (even if it also has tourist_attraction, shopping_mall, etc.)
+        // This ensures we don't miss famous restaurants, bars in malls, etc.
+        if (hasFoodType && !allResultsMap.has(place.place_id)) {
           allResultsMap.set(place.place_id, place);
+        }
+        // If it doesn't have a food type but somehow got returned, check if it's purely non-food
+        else if (!hasFoodType) {
+          const isPurelyNonFood = place.types?.some((type: string) => 
+            purelyNonFoodTypes.includes(type)
+          );
+          // Only exclude if it's clearly a non-food establishment
+          if (!isPurelyNonFood && !allResultsMap.has(place.place_id)) {
+            allResultsMap.set(place.place_id, place);
+          }
         }
       });
     });
