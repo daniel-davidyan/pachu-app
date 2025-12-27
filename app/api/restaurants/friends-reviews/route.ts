@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .in('user_id', friendIds)
+      .eq('is_published', true) // Only show published reviews
       .order('created_at', { ascending: false });
 
     if (reviewsError) {

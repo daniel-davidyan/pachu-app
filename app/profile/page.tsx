@@ -79,6 +79,7 @@ export default function ProfilePage() {
   const [loadingTab, setLoadingTab] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('experiences');
+  const [publishedFilter, setPublishedFilter] = useState<'all' | 'published' | 'unpublished'>('all');
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -103,7 +104,7 @@ export default function ProfilePage() {
         fetchWishlist();
       }
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, publishedFilter]);
 
   const fetchProfile = async () => {
     try {
@@ -195,7 +196,16 @@ export default function ProfilePage() {
     
     setLoadingTab(true);
     try {
-      const response = await fetch(`/api/reviews?userId=${user.id}`);
+      // Build URL with published filter
+      let url = `/api/reviews?userId=${user.id}`;
+      if (publishedFilter === 'published') {
+        url += '&published=true';
+      } else if (publishedFilter === 'unpublished') {
+        url += '&published=false';
+      }
+      // For 'all', don't add published parameter
+      
+      const response = await fetch(url);
       const data = await response.json();
       
       if (data.error) {
@@ -509,6 +519,44 @@ export default function ProfilePage() {
               />
             </div>
           </div>
+
+          {/* Published Filter - Only show for Experiences tab */}
+          {activeTab === 'experiences' && (
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+              <div className="flex gap-2 p-1 bg-white rounded-xl shadow-sm border border-gray-200">
+                <button
+                  onClick={() => setPublishedFilter('all')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    publishedFilter === 'all'
+                      ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md transform scale-[1.02]'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setPublishedFilter('published')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    publishedFilter === 'published'
+                      ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md transform scale-[1.02]'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  Published
+                </button>
+                <button
+                  onClick={() => setPublishedFilter('unpublished')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    publishedFilter === 'unpublished'
+                      ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md transform scale-[1.02]'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  Saved
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tab Content */}
@@ -564,18 +612,33 @@ export default function ProfilePage() {
                 })}
               </div>
             ) : (
+              // Empty state - different message based on filter
               <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <span className="text-3xl">✨</span>
+                  <span className="text-3xl">
+                    {publishedFilter === 'unpublished' ? '📝' : '✨'}
+                  </span>
                 </div>
-                <p className="text-gray-900 font-bold text-lg">No experiences yet</p>
-                <p className="text-sm text-gray-600 mt-2 mb-4">Start sharing your restaurant experiences!</p>
-                <Link 
-                  href="/map" 
-                  className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
-                >
-                  ✍️ Write Your First Review
-                </Link>
+                <p className="text-gray-900 font-bold text-lg">
+                  {publishedFilter === 'unpublished' 
+                    ? 'No saved experiences yet'
+                    : publishedFilter === 'published'
+                    ? 'No published experiences yet'
+                    : 'No experiences yet'}
+                </p>
+                <p className="text-sm text-gray-600 mt-2 mb-4 max-w-sm mx-auto">
+                  {publishedFilter === 'unpublished'
+                    ? 'Save your dining experiences privately to help us learn your preferences and provide better recommendations'
+                    : 'Start sharing your restaurant experiences with the community!'}
+                </p>
+                {publishedFilter !== 'unpublished' && (
+                  <Link 
+                    href="/map" 
+                    className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+                  >
+                    ✍️ Write Your First Review
+                  </Link>
+                )}
               </div>
             )
           ) : (

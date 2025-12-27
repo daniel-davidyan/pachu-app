@@ -46,6 +46,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [photoUrlToFileMap, setPhotoUrlToFileMap] = useState<Map<string, File>>(new Map());
   const [submitting, setSubmitting] = useState(false);
+  const [submitType, setSubmitType] = useState<'publish' | 'save' | null>(null); // Track which button was clicked
   const [initialized, setInitialized] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -300,15 +301,16 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   };
 
   // Submit review
-  const handleSubmit = async () => {
+  const handleSubmit = async (publish: boolean = true) => {
     if (!selectedRestaurant || rating === 0) {
       showToast('Please select a rating', 'error');
       return;
     }
 
     setSubmitting(true);
+    setSubmitType(publish ? 'publish' : 'save'); // Track which button was clicked
     try {
-      console.log('[WriteReviewModal] handleSubmit called');
+      console.log('[WriteReviewModal] handleSubmit called with publish:', publish);
       console.log('[WriteReviewModal] Current photoUrls state:', photoUrls);
       console.log('[WriteReviewModal] PhotoUrlToFileMap size:', photoUrlToFileMap.size);
       console.log('[WriteReviewModal] existingReview:', existingReview?.id);
@@ -370,6 +372,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           content: experienceText,
           photoUrls: finalPhotoUrls,
           reviewId: existingReview?.id, // Include reviewId when editing
+          isPublished: publish,
         }),
       });
 
@@ -387,7 +390,11 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
 
       // Success
       showToast(
-        existingReview ? 'Experience updated successfully!' : 'Experience posted successfully!',
+        existingReview 
+          ? 'Experience updated successfully!' 
+          : publish 
+            ? 'Experience posted successfully!' 
+            : 'Experience saved successfully!',
         'success'
       );
       onSuccess?.();
@@ -405,6 +412,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       showToast('Failed to submit experience', 'error');
     } finally {
       setSubmitting(false);
+      setSubmitType(null); // Reset submit type
     }
   };
 
@@ -686,30 +694,57 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 />
               </div>
 
-              {/* Submit Button - Compact & Modern */}
+              {/* Submit Buttons - Two Options */}
               <div className="pt-2 pb-4 sticky bottom-0 bg-white">
-                <button
-                  onClick={handleSubmit}
-                  disabled={rating === 0 || submitting}
-                  className="w-full py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
-                  style={{ 
-                    backgroundColor: '#C5459C',
-                    color: '#FFFFFF',
-                    boxShadow: '0 2px 8px rgba(197, 69, 156, 0.25)'
-                  }}
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span style={{ color: '#FFFFFF' }}>Posting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" style={{ color: '#FFFFFF' }} />
-                      <span style={{ color: '#FFFFFF' }}>Post Experience</span>
-                    </>
-                  )}
-                </button>
+                <div className="space-y-3">
+                  {/* Post Experience Button */}
+                  <button
+                    onClick={() => handleSubmit(true)}
+                    disabled={rating === 0 || submitting}
+                    className="w-full py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                    style={{ 
+                      backgroundColor: '#C5459C',
+                      color: '#FFFFFF',
+                      boxShadow: '0 2px 8px rgba(197, 69, 156, 0.25)'
+                    }}
+                  >
+                    {submitting && submitType === 'publish' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span style={{ color: '#FFFFFF' }}>Posting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" style={{ color: '#FFFFFF' }} />
+                        <span style={{ color: '#FFFFFF' }}>Post Experience</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Save Without Publishing Button */}
+                  <button
+                    onClick={() => handleSubmit(false)}
+                    disabled={rating === 0 || submitting}
+                    className="w-full py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 bg-gray-100 text-gray-700 border border-gray-300"
+                  >
+                    {submitting && submitType === 'save' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Save Without Publishing</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Helper Text */}
+                  <p className="text-xs text-gray-500 text-center px-2 leading-relaxed">
+                    Saving helps us learn your preferences and taste so we can suggest more accurate recommendations for you
+                  </p>
+                </div>
               </div>
             </div>
           )}

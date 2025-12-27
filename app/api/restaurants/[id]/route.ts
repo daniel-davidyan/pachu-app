@@ -85,7 +85,8 @@ export async function GET(
                     )
                   `)
                   .eq('restaurant_id', dbRestaurantId)
-                  .in('user_id', followingIds);
+                  .in('user_id', followingIds)
+                  .eq('is_published', true); // Only count published reviews
 
                 const uniqueFriends = new Map();
                 friendReviewsData?.forEach((review: any) => {
@@ -142,6 +143,7 @@ export async function GET(
                   )
                 `)
                 .eq('restaurant_id', dbRestaurantId)
+                .eq('is_published', true) // Only show published reviews
                 .order('created_at', { ascending: false });
 
               // Get photos for reviews
@@ -339,6 +341,7 @@ export async function GET(
         user_id
       `)
       .eq('restaurant_id', dbRestaurantId)
+      .eq('is_published', true) // Only show published reviews
       .order('created_at', { ascending: false });
 
     // Get user profiles for reviews
@@ -510,7 +513,8 @@ export async function GET(
           .from('reviews')
           .select('user_id')
           .eq('restaurant_id', dbRestaurantId)
-          .in('user_id', followingIds);
+          .in('user_id', followingIds)
+          .eq('is_published', true); // Only count published reviews
 
         const friendIds = [...new Set(friendReviewsData?.map(r => r.user_id) || [])];
         

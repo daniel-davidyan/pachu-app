@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       .from('reviews')
       .select('restaurant_id, restaurants(*)')
       .in('user_id', followingIds)
+      .eq('is_published', true) // Only show published reviews in feed
       .order('created_at', { ascending: false });
 
     // Group by restaurant to get unique restaurants
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
           `)
           .eq('restaurant_id', restaurant.id)
           .in('user_id', followingIds)
+          .eq('is_published', true) // Only show published reviews in feed
           .order('created_at', { ascending: false })
           .limit(10);
 

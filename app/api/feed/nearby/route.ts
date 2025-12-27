@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
           user_id
         )
       `)
+      .eq('is_published', true) // Only show published reviews in feed
       .order('created_at', { ascending: false });
 
     // If location is provided, filter by nearby restaurants

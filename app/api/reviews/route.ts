@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { restaurant, rating, content, photoUrls, reviewId } = await request.json();
+    const { restaurant, rating, content, photoUrls, reviewId, isPublished = true } = await request.json();
 
     if (!restaurant || !rating) {
       return NextResponse.json(
@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
         .update({
           rating,
           content,
+          is_published: isPublished,
           updated_at: new Date().toISOString(),
         })
         .eq('id', reviewId);
@@ -195,6 +196,7 @@ export async function POST(request: NextRequest) {
         restaurant_id: restaurantId,
         rating,
         content,
+        is_published: isPublished,
       })
       .select('id')
       .single();
@@ -249,6 +251,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const restaurantId = searchParams.get('restaurantId');
     const userId = searchParams.get('userId');
+    const publishedFilter = searchParams.get('published'); // 'true', 'false', or null for all
 
     // Get current user to check for likes
     const { data: { user } } = await supabase.auth.getUser();
@@ -263,6 +266,7 @@ export async function GET(request: NextRequest) {
         created_at,
         user_id,
         restaurant_id,
+        is_published,
         restaurants (
           id,
           name,
@@ -284,6 +288,14 @@ export async function GET(request: NextRequest) {
     if (userId) {
       query = query.eq('user_id', userId);
     }
+
+    // Filter by published status if specified
+    if (publishedFilter === 'true') {
+      query = query.eq('is_published', true);
+    } else if (publishedFilter === 'false') {
+      query = query.eq('is_published', false);
+    }
+    // If publishedFilter is null, return all reviews (for user's own profile)
 
     const { data: reviews, error } = await query.limit(50);
 
@@ -357,6 +369,7 @@ export async function GET(request: NextRequest) {
         likesCount: likesCounts[review.id] || 0,
         commentsCount: commentsCounts[review.id] || 0,
         isLiked: userLikes.includes(review.id),
+        isPublished: review.is_published,
         user: profile ? {
           id: profile.id,
           username: profile.username,
