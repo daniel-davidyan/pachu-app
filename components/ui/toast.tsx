@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       
       {/* Toast Container */}
-      <div className="fixed bottom-20 left-0 right-0 z-[9999] pointer-events-none px-4">
+      <div className="fixed bottom-26 left-0 right-0 z-[9999] pointer-events-none px-4">
         <div className="flex flex-col gap-2 items-center">
           {toasts.map((toast) => (
             <div
