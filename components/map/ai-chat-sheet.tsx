@@ -641,7 +641,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                           
                           return (
                             <div
-                              key={restaurant.id}
+                              key={`${message.id}-${restaurant.id || index}`}
                               onClick={() => {
                                 if (onRestaurantClick) {
                                   onRestaurantClick(restaurant);
