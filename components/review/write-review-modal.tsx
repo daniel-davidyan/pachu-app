@@ -46,6 +46,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
@@ -148,6 +150,64 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       setPhotos(prev => prev.filter((_, i) => i !== fileIndex));
       setPhotoUrls(prev => prev.filter((_, i) => i !== index));
     }
+  };
+
+  // Drag and drop handlers for reordering photos
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Add a slight delay to allow the drag preview to be set
+    setTimeout(() => {
+      (e.target as HTMLElement).style.opacity = '0.5';
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.target as HTMLElement).style.opacity = '1';
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDragOverIndex(null);
+      return;
+    }
+
+    // Reorder photos
+    const newPhotos = [...photos];
+    const newPhotoUrls = [...photoUrls];
+    
+    const draggedPhoto = newPhotos[draggedIndex];
+    const draggedUrl = newPhotoUrls[draggedIndex];
+    
+    // Remove from old position
+    newPhotos.splice(draggedIndex, 1);
+    newPhotoUrls.splice(draggedIndex, 1);
+    
+    // Insert at new position
+    newPhotos.splice(dropIndex, 0, draggedPhoto);
+    newPhotoUrls.splice(dropIndex, 0, draggedUrl);
+    
+    setPhotos(newPhotos);
+    setPhotoUrls(newPhotoUrls);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   // Submit review
@@ -421,26 +481,72 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 />
                 
                 {photoUrls.length === 0 ? (
-                  /* Compact upload placeholder */
+                  /* Clean modern upload placeholder matching design */
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-28 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all group"
+                    className="relative w-full h-36 rounded-2xl overflow-hidden transition-all hover:opacity-90 active:scale-[0.98]"
+                    style={{
+                      background: 'linear-gradient(135deg, #FFF5F7 0%, #FFF0F5 50%, #F8F4FF 100%)'
+                    }}
                   >
-                    <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:shadow-md transition-shadow">
-                      <Camera className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors" />
+                    {/* Content */}
+                    <div className="relative flex flex-col items-center justify-center h-full">
+                      {/* Pink Camera Icon with Plus */}
+                      <div className="relative w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FFE6F0' }}>
+                        <svg width="40" height="36" viewBox="0 0 40 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M36 8H30L27 4H13L10 8H4C1.8 8 0 9.8 0 12V32C0 34.2 1.8 36 4 36H36C38.2 36 40 34.2 40 32V12C40 9.8 38.2 8 36 8ZM20 30C15.6 30 12 26.4 12 22C12 17.6 15.6 14 20 14C24.4 14 28 17.6 28 22C28 26.4 24.4 30 20 30Z" fill="#FF69B4"/>
+                          <circle cx="20" cy="22" r="5" fill="#FF69B4"/>
+                        </svg>
+                        {/* Plus icon */}
+                        <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FF69B4' }}>
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 1V9M1 5H9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs font-semibold text-gray-600 group-hover:text-primary">Add Photos</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Tap to upload</p>
                   </button>
                 ) : (
-                  /* Photo grid when photos exist */
+                  /* Photo grid when photos exist - with drag and drop */
                   <div className="grid grid-cols-3 gap-1.5">
                     {photoUrls.map((url, index) => (
-                      <div key={index} className="relative aspect-square">
-                        <img src={url} alt="" className="w-full h-full object-cover rounded-lg border border-gray-200" />
+                      <div
+                        key={index}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, index)}
+                        className={`
+                          relative aspect-square cursor-move group
+                          transition-all duration-200 ease-out
+                          ${draggedIndex === index ? 'scale-95 opacity-50' : ''}
+                          ${dragOverIndex === index ? 'scale-105 ring-2 ring-primary ring-offset-2' : ''}
+                        `}
+                      >
+                        <img 
+                          src={url} 
+                          alt="" 
+                          className="w-full h-full object-cover rounded-lg border border-gray-200 transition-transform pointer-events-none select-none" 
+                        />
+                        {/* Drag indicator - shows on hover */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition-all flex items-center justify-center pointer-events-none">
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-1.5 shadow-lg">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="4" cy="4" r="1.5" fill="#FF69B4"/>
+                              <circle cx="12" cy="4" r="1.5" fill="#FF69B4"/>
+                              <circle cx="4" cy="8" r="1.5" fill="#FF69B4"/>
+                              <circle cx="12" cy="8" r="1.5" fill="#FF69B4"/>
+                              <circle cx="4" cy="12" r="1.5" fill="#FF69B4"/>
+                              <circle cx="12" cy="12" r="1.5" fill="#FF69B4"/>
+                            </svg>
+                          </div>
+                        </div>
+                        {/* Remove button */}
                         <button
                           onClick={() => removePhoto(index)}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 hover:scale-110 transition-all z-10"
                         >
                           <X className="w-3 h-3" />
                         </button>
