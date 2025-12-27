@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
-  ArrowLeft, Star, MapPin, Users, Calendar, UserPlus, UserCheck, 
-  Loader2, Settings, Share2 
+  ArrowLeft, Star, MapPin, Calendar, UserPlus, UserCheck, 
+  Loader2, Settings, Share2, Edit2, Heart 
 } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import { PostCard, PostCardData } from '@/components/post/post-card';
 
 interface Review {
   id: string;
@@ -176,13 +177,13 @@ export default function ProfilePage() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="pb-24 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="bg-white border-b border-gray-200">
           <div className="px-4 py-4 flex items-center justify-between">
             <button
               onClick={() => router.back()}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"
+              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-700" />
             </button>
@@ -192,13 +193,13 @@ export default function ProfilePage() {
             <div className="flex gap-2">
               <button
                 onClick={handleShare}
-                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"
+                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
               >
                 <Share2 className="w-5 h-5 text-gray-700" />
               </button>
               {isOwnProfile && (
                 <Link href="/settings">
-                  <button className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                  <button className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
                     <Settings className="w-5 h-5 text-gray-700" />
                   </button>
                 </Link>
@@ -207,78 +208,93 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Profile Info */}
-        <div className="bg-white px-4 py-6 border-b border-gray-200">
-          <div className="flex items-start gap-4 mb-4">
-            {/* Avatar */}
-            <div className="relative">
+        {/* Compact Profile Header */}
+        <div className="bg-white px-4 py-5">
+          <div className="flex gap-5">
+            {/* Avatar - Left Side */}
+            <div className="relative flex-shrink-0">
               {profile.avatarUrl ? (
                 <img
                   src={profile.avatarUrl}
                   alt={profile.fullName}
-                  className="w-20 h-20 rounded-full object-cover border-4 border-gray-100"
+                  className="w-32 h-32 rounded-full object-cover"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-pink-500 flex items-center justify-center text-white font-bold text-2xl border-4 border-gray-100">
-                  {profile.fullName.charAt(0).toUpperCase()}
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                  <span className="text-4xl font-bold text-white">
+                    {profile.fullName.charAt(0).toUpperCase()}
+                  </span>
                 </div>
               )}
             </div>
 
-            {/* Name and Bio */}
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900">{profile.fullName}</h2>
-              <p className="text-gray-500 text-sm mb-2">@{profile.username}</p>
-              {profile.bio && (
-                <p className="text-gray-600 text-sm leading-relaxed">{profile.bio}</p>
-              )}
+            {/* Info - Right Side */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              {/* Name and Username - Left Aligned */}
+              <div className="text-left mb-3">
+                <h2 className="text-lg font-bold text-gray-900">
+                  {profile.fullName}
+                </h2>
+                <p className="text-sm text-gray-500">@{profile.username}</p>
+              </div>
+
+              {/* Stats Row - Aligned to Left */}
+              <div className="flex gap-5 items-center">
+                <div className="text-left">
+                  <p className="text-base font-bold text-gray-900 leading-none">{stats.reviewsCount}</p>
+                  <p className="text-xs text-gray-600 mt-1">experiences</p>
+                </div>
+                <button
+                  onClick={() => router.push(`/profile/${profileId}/connections?tab=followers`)}
+                  className="text-left hover:opacity-70 transition-opacity"
+                >
+                  <p className="text-base font-bold text-gray-900 leading-none">{stats.followersCount}</p>
+                  <p className="text-xs text-gray-600 mt-1">followers</p>
+                </button>
+                <button
+                  onClick={() => router.push(`/profile/${profileId}/connections?tab=following`)}
+                  className="text-left hover:opacity-70 transition-opacity"
+                >
+                  <p className="text-base font-bold text-gray-900 leading-none">{stats.followingCount}</p>
+                  <p className="text-xs text-gray-600 mt-1">following</p>
+                </button>
+              </div>
             </div>
+
+            {/* Follow/Edit Button - Top Right */}
+            {isOwnProfile ? (
+              <button
+                onClick={() => router.push('/profile/edit')}
+                className="w-7 h-7 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors self-start"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-gray-600" />
+              </button>
+            ) : null}
           </div>
 
-          {/* Stats */}
-          <div className="flex gap-4 mb-4">
-            <div className="flex-1 text-center py-3 bg-gray-50 rounded-xl">
-              <p className="text-2xl font-bold text-gray-900">{stats.reviewsCount}</p>
-              <p className="text-xs text-gray-500">Reviews</p>
-            </div>
-            <div className="flex-1 text-center py-3 bg-gray-50 rounded-xl">
-              <p className="text-2xl font-bold text-gray-900">{stats.followersCount}</p>
-              <p className="text-xs text-gray-500">Followers</p>
-            </div>
-            <div className="flex-1 text-center py-3 bg-gray-50 rounded-xl">
-              <p className="text-2xl font-bold text-gray-900">{stats.followingCount}</p>
-              <p className="text-xs text-gray-500">Following</p>
-            </div>
-          </div>
-
-          {/* Average Rating */}
-          {stats.reviewsCount > 0 && (
-            <div className="flex items-center justify-center gap-2 mb-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl">
-              <CompactRating rating={stats.averageRating} />
-              <span className="font-bold text-sm text-gray-600">
-                avg rating
-              </span>
-            </div>
+          {/* Bio - Full Width Below */}
+          {profile.bio && (
+            <p className="text-xs text-gray-600 mt-3 leading-relaxed">{profile.bio}</p>
           )}
 
-          {/* Follow Button */}
+          {/* Follow Button - Full Width if not own profile */}
           {!isOwnProfile && (
             <button
               onClick={handleFollow}
-              className={`w-full py-3 rounded-xl font-bold text-base transition-all shadow-md hover:shadow-lg ${
+              className={`w-full mt-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
                 isFollowing
-                  ? 'bg-white border-2 border-gray-300 text-gray-800 hover:bg-gray-50 active:scale-95'
-                  : 'bg-gradient-to-r from-primary to-pink-600 text-white hover:from-primary/90 hover:to-pink-600/90 active:scale-95'
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gradient-to-r from-primary to-pink-600 text-white hover:from-primary/90 hover:to-pink-600/90'
               }`}
             >
               {isFollowing ? (
                 <>
-                  <UserCheck className="w-5 h-5 inline-block mr-2 -mt-0.5" />
+                  <UserCheck className="w-4 h-4 inline-block mr-2 -mt-0.5" />
                   Following
                 </>
               ) : (
                 <>
-                  <UserPlus className="w-5 h-5 inline-block mr-2 -mt-0.5" />
+                  <UserPlus className="w-4 h-4 inline-block mr-2 -mt-0.5" />
                   Follow
                 </>
               )}
@@ -293,7 +309,7 @@ export default function ProfilePage() {
 
           {/* Mutual Friends */}
           {mutualFriends.length > 0 && (
-            <div className="mt-4 bg-primary/5 rounded-xl p-3">
+            <div className="mt-3 bg-primary/5 rounded-xl p-3">
               <div className="flex items-center gap-2">
                 <div className="flex -space-x-2">
                   {mutualFriends.slice(0, 3).map((friend) => (
@@ -348,93 +364,63 @@ export default function ProfilePage() {
         {/* Reviews Section */}
         <div className="px-4 py-4">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
-            Reviews ({reviews.length})
+            {isOwnProfile ? 'My Experiences' : 'Experiences'} ({reviews.length})
           </h2>
 
           {reviews.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-2xl">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="w-8 h-8 text-gray-400" />
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <span className="text-3xl">✨</span>
               </div>
-              <p className="text-gray-500 font-medium">No reviews yet</p>
-              <p className="text-sm text-gray-400 mt-1">
-                {isOwnProfile ? 'Start reviewing restaurants!' : 'This user hasn\'t reviewed any restaurants yet'}
+              <p className="text-gray-900 font-bold text-lg">No experiences yet</p>
+              <p className="text-sm text-gray-600 mt-2">
+                {isOwnProfile ? 'Start sharing your restaurant experiences!' : 'This user hasn\'t shared any experiences yet'}
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {reviews.map((review) => (
-                <Link key={review.id} href={`/review/${review.id}`}>
-                  <div className="bg-white rounded-2xl overflow-hidden border border-gray-100">
-                    {/* Restaurant Info */}
-                    {review.restaurant && (
-                      <div className="flex items-center gap-3 p-3 border-b border-gray-100">
-                        {review.restaurant.imageUrl ? (
-                          <img
-                            src={review.restaurant.imageUrl}
-                            alt={review.restaurant.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                            <span className="text-2xl">🍽️</span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">
-                            {review.restaurant.name}
-                          </p>
-                          {review.restaurant.address && (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                              <p className="text-xs text-gray-500 truncate">
-                                {review.restaurant.address}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-0.5">
-                          <CompactRating rating={review.rating} />
-                        </div>
-                      </div>
-                    )}
+            <div className="space-y-4">
+              {reviews.map((review) => {
+                const postData: PostCardData = {
+                  id: review.id,
+                  rating: review.rating,
+                  content: review.content,
+                  createdAt: review.createdAt,
+                  likesCount: review.likesCount || 0,
+                  commentsCount: 0,
+                  isLiked: false,
+                  user: {
+                    id: profile.id,
+                    username: profile.username,
+                    fullName: profile.fullName,
+                    avatarUrl: profile.avatarUrl,
+                  },
+                  photos: review.photos || [],
+                  restaurant: review.restaurant ? {
+                    id: review.restaurant.id,
+                    name: review.restaurant.name,
+                    address: review.restaurant.address || '',
+                    imageUrl: review.restaurant.imageUrl,
+                    googlePlaceId: undefined,
+                  } : {
+                    id: '',
+                    name: 'Restaurant',
+                    address: '',
+                    imageUrl: undefined,
+                    googlePlaceId: undefined,
+                  },
+                };
 
-                    {/* Review Photos */}
-                    {review.photos && review.photos.length > 0 && (
-                      <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-                        {review.photos.slice(0, 3).map((photo, index) => (
-                          <img
-                            key={index}
-                            src={photo}
-                            alt={`Review photo ${index + 1}`}
-                            className="w-32 h-32 object-cover flex-shrink-0"
-                          />
-                        ))}
-                        {review.photos.length > 3 && (
-                          <div className="w-32 h-32 bg-gray-900/80 flex items-center justify-center text-white font-bold">
-                            +{review.photos.length - 3}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Review Content */}
-                    <div className="p-3">
-                      {review.title && (
-                        <h3 className="font-semibold text-gray-900 mb-1">{review.title}</h3>
-                      )}
-                      {review.content && (
-                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-3 mb-2">
-                          {review.content}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-400">
-                        {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                return (
+                  <PostCard
+                    key={review.id}
+                    post={postData}
+                    showRestaurantInfo={true}
+                    onUpdate={() => {
+                      fetchProfile();
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
