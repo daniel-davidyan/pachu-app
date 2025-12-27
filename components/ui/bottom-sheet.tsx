@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 interface BottomSheetProps {
@@ -14,7 +14,6 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-  const [scrollTop, setScrollTop] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -54,10 +53,6 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
   }, [isOpen]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    const content = contentRef.current;
-    if (content) {
-      setScrollTop(content.scrollTop);
-    }
     setIsDragging(true);
     setStartY(e.touches[0].clientY);
     setCurrentY(e.touches[0].clientY);
@@ -96,16 +91,12 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    const content = contentRef.current;
-    if (content) {
-      setScrollTop(content.scrollTop);
-    }
     setIsDragging(true);
     setStartY(e.clientY);
     setCurrentY(e.clientY);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     
     const content = contentRef.current;
@@ -117,9 +108,9 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
     } else if (content && content.scrollTop > 0) {
       setIsDragging(false);
     }
-  };
+  }, [isDragging, startY]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (!isDragging) return;
     setIsDragging(false);
     
@@ -129,7 +120,7 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
     }
     setCurrentY(0);
     setStartY(0);
-  };
+  }, [isDragging, currentY, startY, onClose]);
 
   useEffect(() => {
     if (isDragging) {
@@ -140,7 +131,7 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, currentY, startY]);
+  }, [isDragging, currentY, startY, handleMouseMove, handleMouseUp]);
 
   if (!isOpen) return null;
 

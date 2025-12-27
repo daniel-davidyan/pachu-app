@@ -9,7 +9,7 @@ export function formatAddress(address?: string): string {
   if (!address) return '';
   
   // Remove postal codes (5-6 digit numbers like 65468, 12345)
-  let cleaned = address.replace(/\b\d{5,6}\b/g, '').trim();
+  const cleaned = address.replace(/\b\d{5,6}\b/g, '').trim();
   
   // Split by commas
   const parts = cleaned.split(',').map(p => p.trim()).filter(p => p);
@@ -38,7 +38,7 @@ export function extractCityFromAddress(address?: string): string {
   if (!address) return '';
   
   // Remove postal codes first
-  let cleaned = address.replace(/\b\d{5,6}\b/g, '').trim();
+  const cleaned = address.replace(/\b\d{5,6}\b/g, '').trim();
   
   // Split by commas
   const parts = cleaned.split(',').map(p => p.trim()).filter(p => p);
