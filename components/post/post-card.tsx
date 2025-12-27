@@ -8,6 +8,7 @@ import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
+import { formatAddress } from '@/lib/address-utils';
 
 interface Comment {
   id: string;
@@ -530,7 +531,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                 </h3>
                 <p className="text-xs text-gray-500 truncate flex items-center gap-1 mt-0.5">
                   <MapPin className="w-3 h-3" />
-                  {post.restaurant.address}
+                  {formatAddress(post.restaurant.address)}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
                   {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}

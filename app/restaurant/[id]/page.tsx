@@ -534,15 +534,16 @@ export default function RestaurantPage() {
             )}
 
             {/* Action Buttons - Modern Grid Layout */}
-            <div className="grid grid-cols-4 gap-2.5">
+            <div className={`grid gap-2.5 ${isIsrael ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {/* Share Experience */}
               <button
                 onClick={() => setShowWriteReview(true)}
                 className="flex flex-col items-center justify-center py-3.5 rounded-2xl font-medium text-xs bg-rose-50 text-rose-700 active:scale-95 transition-all border border-rose-100 hover:bg-rose-100"
               >
                 <PenLine className="w-5 h-5 mb-1.5" strokeWidth={1.5} />
-                <span>Review</span>
+                <span>Experience</span>
               </button>
+
 
               {/* Directions */}
               <button

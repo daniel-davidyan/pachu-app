@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { useToast } from '@/components/ui/toast';
+import { formatAddress } from '@/lib/address-utils';
 
 interface Profile {
   id: string;
@@ -603,7 +604,7 @@ export default function ProfilePage() {
                         </h3>
                         <p className="text-xs text-gray-500 truncate flex items-center gap-1">
                           <MapPin className="w-3 h-3" />
-                          {item.restaurants?.address || 'Address not available'}
+                          {formatAddress(item.restaurants?.address) || 'Address not available'}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
                           Added {formatDate(item.created_at)}
