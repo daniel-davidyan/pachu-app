@@ -29,6 +29,7 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   const [friendsWhoVisited, setFriendsWhoVisited] = useState<Friend[]>([]);
   const [loadingWebsite, setLoadingWebsite] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState<string | undefined>(restaurant?.website);
+  const [hasNoWebsite, setHasNoWebsite] = useState(false);
   const [loadingOntopo, setLoadingOntopo] = useState(false);
   const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
   const [isIsrael, setIsIsrael] = useState(false);
@@ -41,22 +42,32 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   // Update website URL when restaurant changes
   useEffect(() => {
     setWebsiteUrl(restaurant?.website);
+    setHasNoWebsite(false); // Reset when restaurant changes
   }, [restaurant]);
 
-  // Check if restaurant is in Israel and fetch ONTOPO link
+  // Check if restaurant is in Israel and fetch ONTOPO link, and check for website
   useEffect(() => {
     // Reset state when restaurant changes
     setOntopoUrl(null);
     setIsIsrael(false);
+    setHasNoWebsite(false);
     
     if (!restaurant) return;
 
-    const checkIsraelAndFetchOntopo = async () => {
-      // Check if restaurant is in Israel by fetching place details
+    const checkDetailsAndFetchData = async () => {
+      // Check if restaurant is in Israel and has website by fetching place details
       try {
         const placeId = restaurant.googlePlaceId || restaurant.id;
         const response = await fetch(`/api/restaurants/details?placeId=${placeId}`);
         const data = await response.json();
+        
+        // Check if website exists
+        if (data.website) {
+          setWebsiteUrl(data.website);
+          setHasNoWebsite(false);
+        } else {
+          setHasNoWebsite(true);
+        }
         
         // Check if country is Israel
         const country = data.country || restaurant.address?.toLowerCase();
@@ -82,13 +93,13 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
           }
         }
       } catch (error) {
-        console.error('Error checking Israel/ONTOPO:', error);
+        console.error('Error checking restaurant details:', error);
         // On error, hide the button
         setOntopoUrl(null);
       }
     };
 
-    checkIsraelAndFetchOntopo();
+    checkDetailsAndFetchData();
   }, [restaurant]);
 
   const extractCityFromAddress = (address?: string) => {
@@ -313,7 +324,8 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
         setWebsiteUrl(data.website);
         window.open(data.website, '_blank');
       } else {
-        // No website available - could show a toast or message
+        // No website available - mark it so we can hide the button
+        setHasNoWebsite(true);
         console.log('No website available for this restaurant');
       }
     } catch (error) {
@@ -538,17 +550,20 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                   <Heart className={`w-5 h-5 transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
                 )}
               </button>
-              <button 
-                onClick={handleWebsite}
-                disabled={loadingWebsite}
-                className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors active:scale-95 disabled:opacity-50"
-              >
-                {loadingWebsite ? (
-                  <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
-                ) : (
-                  <Globe className="w-5 h-5 text-gray-600" />
-                )}
-              </button>
+              {/* Website button - Only show if not confirmed to have no website */}
+              {!hasNoWebsite && (
+                <button 
+                  onClick={handleWebsite}
+                  disabled={loadingWebsite}
+                  className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-colors active:scale-95 disabled:opacity-50"
+                >
+                  {loadingWebsite ? (
+                    <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+                  ) : (
+                    <Globe className="w-5 h-5 text-gray-600" />
+                  )}
+                </button>
+              )}
               {/* ONTOPO Reservation Button - Only for Israeli restaurants */}
               {isIsrael && (
                 <button 
