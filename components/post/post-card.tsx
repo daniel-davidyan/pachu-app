@@ -672,7 +672,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
           </Link>
         )}
 
-        {/* Photos - Carousel with 20% peek OR Placeholder Shimmer */}
+        {/* Photos - Carousel with 20% peek OR Placeholder */}
         {post.photos && post.photos.length > 0 ? (
           <div className="relative">
             {post.photos.length === 1 ? (
@@ -699,18 +699,28 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
             )}
           </div>
         ) : (
-          /* Modern upload placeholder for posts without photos */
-          <div className="relative bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 border-2 border-dashed border-gray-300">
-            <div className="w-full h-48 flex flex-col items-center justify-center gap-3 py-8">
-              <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center">
-                <Camera className="w-8 h-8 text-gray-400" />
-              </div>
-              <div className="text-center px-4">
-                <p className="text-sm font-semibold text-gray-600">No photos yet</p>
-                <p className="text-xs text-gray-400 mt-1">Add photos to share your experience</p>
+          /* Placeholder when no photos - Different for Google reviews vs user posts */
+          isGoogleReview ? (
+            /* Restaurant gradient placeholder for Google reviews */
+            <div className="relative bg-gradient-to-br from-primary/20 to-primary/10">
+              <div className="w-full h-48 flex items-center justify-center">
+                <span className="text-7xl">🍽️</span>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Upload placeholder for user posts without photos (profile/my experiences) */
+            <div className="relative bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 border-2 border-dashed border-gray-300">
+              <div className="w-full h-48 flex flex-col items-center justify-center gap-3 py-8">
+                <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center">
+                  <Camera className="w-8 h-8 text-gray-400" />
+                </div>
+                <div className="text-center px-4">
+                  <p className="text-sm font-semibold text-gray-600">No photos yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Add photos to share your experience</p>
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {/* Content section after photos */}
