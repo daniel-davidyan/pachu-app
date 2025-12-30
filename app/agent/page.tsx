@@ -370,7 +370,7 @@ export default function AgentPage() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col overflow-hidden" style={{ height: '100dvh', width: '100%', maxWidth: '100vw' }}>
+    <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', touchAction: 'pan-y' }}>
       {/* Global styles for animations and iOS keyboard handling */}
       <style jsx global>{`
         @keyframes slideIn {
@@ -391,6 +391,17 @@ export default function AgentPage() {
         .hide-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        
+        /* Lock horizontal scroll completely */
+        * {
+          overscroll-behavior-x: none !important;
+        }
+        
+        body, html {
+          overflow-x: hidden !important;
+          max-width: 100vw !important;
+          position: relative !important;
         }
         
         /* Prevent iOS zoom on input focus */
@@ -467,11 +478,18 @@ export default function AgentPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ maxWidth: '100%' }}>
         {showHistory ? (
           <>
             {/* History List */}
-            <div className="flex-1 overflow-y-auto py-4 px-4 space-y-2 hide-scrollbar">
+            <div 
+              className="flex-1 overflow-y-auto py-4 px-4 space-y-2 hide-scrollbar"
+              style={{ 
+                overflowX: 'hidden',
+                maxWidth: '100%',
+                touchAction: 'pan-y'
+              }}
+            >
               {chatHistory.length === 0 ? (
                 <div className="text-center py-12">
                   <Clock className="w-16 h-16 text-gray-300 mx-auto mb-3" strokeWidth={1.5} />
@@ -529,7 +547,10 @@ export default function AgentPage() {
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
-                maxWidth: '100%'
+                overscrollBehaviorX: 'none',
+                overflowX: 'hidden',
+                maxWidth: '100%',
+                touchAction: 'pan-y'
               }}
             >
               {messages.length === 0 && (
@@ -546,6 +567,7 @@ export default function AgentPage() {
                 <div
                   key={message.id}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  style={{ maxWidth: '100%', overflow: 'hidden' }}
                 >
                   {/* Only show message bubble if there's content or no restaurants */}
                   {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
@@ -555,6 +577,7 @@ export default function AgentPage() {
                           ? 'bg-primary text-white rounded-br-md'
                           : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
                       }`}
+                      style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     </div>
@@ -562,8 +585,8 @@ export default function AgentPage() {
                   
                   {/* Show restaurants if available */}
                   {message.restaurants && message.restaurants.length > 0 && (
-                    <div className="w-full overflow-hidden">
-                      <div className={`grid gap-3 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    <div className="w-full" style={{ overflow: 'hidden', maxWidth: '100%' }}>
+                      <div className={`grid gap-2 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`} style={{ width: '100%' }}>
                         {message.restaurants.map((restaurant, index) => (
                           <RestaurantCard
                             key={`${message.id}-${restaurant.id || index}`}
@@ -590,18 +613,25 @@ export default function AgentPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area - Fixed at bottom like ChatGPT */}
+            {/* Input Area - Fixed at bottom with NO GAP when keyboard is open */}
             <div 
               className="flex-shrink-0 bg-white border-t border-gray-200 px-4"
               style={{
-                paddingTop: '12px',
+                paddingTop: '8px',
                 paddingBottom: isInputFocused 
-                  ? 'calc(12px + env(safe-area-inset-bottom))' 
-                  : 'calc(12px + env(safe-area-inset-bottom) + 3.5rem)',
-                transition: 'padding-bottom 0.2s ease-out'
+                  ? 'env(safe-area-inset-bottom, 0px)' 
+                  : 'calc(8px + 3.5rem + env(safe-area-inset-bottom))',
+                transition: 'padding-bottom 0.2s ease-out',
+                marginBottom: isInputFocused ? '0' : undefined
               }}
             >
-              <div className="flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-primary/50 focus-within:bg-white transition-all">
+              <div 
+                className="flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-primary/50 focus-within:bg-white transition-all"
+                style={{ 
+                  marginBottom: isInputFocused ? '8px' : '8px',
+                  maxWidth: '100%'
+                }}
+              >
                 <textarea
                   ref={inputRef}
                   value={inputValue}
