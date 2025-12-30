@@ -16,7 +16,6 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: '#C5459C',
-  interactiveWidget: 'resizes-content', // Makes keyboard behavior better on iOS
 };
 
 export const metadata: Metadata = {
