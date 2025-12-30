@@ -296,8 +296,10 @@ export default function AgentPage() {
   };
 
   const handleRestaurantClick = (restaurant: Restaurant) => {
+    // Store restaurant data in sessionStorage for instant loading on map page
+    sessionStorage.setItem('selectedRestaurant', JSON.stringify(restaurant));
     // Navigate to map with the selected restaurant
-    router.push(`/map?restaurantId=${restaurant.id}&lat=${restaurant.latitude}&lng=${restaurant.longitude}`);
+    router.push(`/map?restaurantId=${restaurant.id}&lat=${restaurant.latitude}&lng=${restaurant.longitude}&fromAgent=true`);
   };
 
   const handleSend = async () => {
@@ -626,18 +628,21 @@ export default function AgentPage() {
               </div>
             )}
 
+            {/* Subtle divider line */}
+            <div className="h-px bg-gray-200 mx-2" />
+
             {/* Input Area */}
             <div 
               className="flex-shrink-0"
               style={{
-                paddingTop: '0.5rem',
+                paddingTop: '0.75rem',
                 paddingBottom: isInputFocused 
                   ? '0.25rem' // Minimal padding when keyboard is open (almost zero gap)
                   : 'calc(env(safe-area-inset-bottom) + 5rem)', // Account for bottom nav when keyboard closed
                 transition: 'padding-bottom 0.15s ease-out'
               }}
             >
-              <div className="flex items-end gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-3 focus-within:border-primary transition-colors shadow-md">
+              <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-2.5 focus-within:border-primary transition-colors shadow-md">
                 <textarea
                   ref={inputRef}
                   value={inputValue}
@@ -655,10 +660,11 @@ export default function AgentPage() {
                   }}
                   placeholder="What are you craving?"
                   rows={1}
-                  className="flex-1 bg-transparent outline-none text-base text-gray-900 placeholder-gray-400 resize-none overflow-hidden py-0.5 max-h-32"
+                  className="flex-1 bg-transparent outline-none text-base text-gray-900 placeholder-gray-400 resize-none overflow-hidden max-h-32 leading-6"
                   style={{
                     minHeight: '24px',
-                    fontSize: '16px' // Prevent iOS zoom
+                    fontSize: '16px', // Prevent iOS zoom
+                    lineHeight: '24px'
                   }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;

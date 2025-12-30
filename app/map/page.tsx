@@ -154,17 +154,91 @@ function MapPageContent() {
 
   // Handle URL parameters for navigating to specific restaurant
   useEffect(() => {
-    if (hasHandledUrlParams || !mapRef.current || loading) return;
+    if (hasHandledUrlParams || !mapRef.current) return;
 
     const restaurantId = searchParams.get('restaurantId');
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
+    const fromAgent = searchParams.get('fromAgent');
 
     if (restaurantId && lat && lng) {
       const latitude = parseFloat(lat);
       const longitude = parseFloat(lng);
 
-      // First, fetch restaurant details to show in popup
+      // Check if we have restaurant data from Agent page (fast path)
+      const storedRestaurant = sessionStorage.getItem('selectedRestaurant');
+      
+      if (fromAgent && storedRestaurant) {
+        // FAST PATH: Use cached restaurant data from Agent
+        try {
+          const restaurant = JSON.parse(storedRestaurant);
+          sessionStorage.removeItem('selectedRestaurant'); // Clean up
+          
+          // Create the target restaurant object
+          const targetRestaurant: Restaurant = {
+            id: restaurant.id || restaurant.googlePlaceId,
+            name: restaurant.name,
+            address: restaurant.address || '',
+            latitude: restaurant.latitude,
+            longitude: restaurant.longitude,
+            rating: restaurant.rating || 0,
+            totalReviews: restaurant.totalReviews || 0,
+            photoUrl: restaurant.photoUrl,
+            priceLevel: restaurant.priceLevel,
+            cuisineTypes: restaurant.cuisineTypes || [],
+            source: restaurant.source || 'google',
+            googlePlaceId: restaurant.googlePlaceId || restaurant.id,
+            website: restaurant.website,
+          };
+          
+          // Add restaurant to list immediately
+          setAllRestaurants(prev => {
+            const exists = prev.some(r => r.id === targetRestaurant.id || r.googlePlaceId === targetRestaurant.googlePlaceId);
+            return exists ? prev : [targetRestaurant, ...prev];
+          });
+          
+          // FAST fly animation - 800ms instead of 2000ms
+          mapRef.current?.flyTo({
+            center: [longitude, latitude],
+            zoom: 16,
+            duration: 800,
+            essential: true
+          });
+
+          // Show popup immediately after short delay
+          setTimeout(() => {
+            setSelectedRestaurant(targetRestaurant);
+          }, 400);
+
+          setHasHandledUrlParams(true);
+          
+          // Fetch nearby restaurants in background (non-blocking)
+          fetch(`/api/restaurants/nearby?latitude=${latitude}&longitude=${longitude}&radius=5000`)
+            .then(res => res.json())
+            .then(data => {
+              const nearbyRestaurants = data.restaurants || [];
+              setAllRestaurants(prev => {
+                const merged = [...prev];
+                nearbyRestaurants.forEach((r: Restaurant) => {
+                  if (!merged.some(existing => existing.id === r.id || existing.googlePlaceId === r.googlePlaceId)) {
+                    merged.push(r);
+                  }
+                });
+                return merged;
+              });
+            })
+            .catch(err => console.error('Background fetch error:', err));
+          
+          return;
+        } catch (e) {
+          console.error('Error parsing stored restaurant:', e);
+          // Fall through to slow path
+        }
+      }
+
+      // SLOW PATH: Need to fetch restaurant details (for direct URL access)
+      if (loading) return; // Wait for initial load
+      
       const fetchAndShowRestaurant = async () => {
         try {
           // Fetch the specific restaurant details
@@ -216,22 +290,18 @@ function MapPageContent() {
               setAllRestaurants([targetRestaurant]);
             }
             
-            // Hide the Agent sheet (if coming from Agent page)
-            
             // Center map on the restaurant
             mapRef.current?.flyTo({
               center: [longitude, latitude],
               zoom: 16,
-              duration: 2000,
-              essential: true,
-              curve: 1.5,
-              easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+              duration: 1200,
+              essential: true
             });
 
             // After a short delay, open the restaurant popup
             setTimeout(() => {
               setSelectedRestaurant(targetRestaurant);
-            }, 1000);
+            }, 600);
 
             setHasHandledUrlParams(true);
           }
