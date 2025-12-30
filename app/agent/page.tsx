@@ -370,7 +370,14 @@ export default function AgentPage() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col" style={{ height: '100dvh' }}>
+    <div 
+      className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col overflow-hidden" 
+      style={{ 
+        height: '100dvh',
+        touchAction: 'pan-y', // Only allow vertical panning
+        overscrollBehavior: 'none' // Prevent pull-to-refresh and bounce effects
+      }}
+    >
       {/* Global styles for animations and iOS keyboard handling */}
       <style jsx global>{`
         @keyframes slideIn {
@@ -404,6 +411,13 @@ export default function AgentPage() {
         /* Smooth scrolling */
         html {
           scroll-behavior: smooth;
+          overflow-x: hidden;
+        }
+        
+        /* Prevent horizontal overflow on body */
+        body {
+          overflow-x: hidden;
+          overscroll-behavior-x: none;
         }
       `}</style>
 
@@ -467,7 +481,13 @@ export default function AgentPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col overflow-hidden px-4">
+      <div 
+        className="flex-1 flex flex-col min-h-0 px-4"
+        style={{ 
+          overflowX: 'hidden',
+          touchAction: 'pan-y'
+        }}
+      >
         {showHistory ? (
           <>
             {/* History List */}
@@ -527,81 +547,94 @@ export default function AgentPage() {
           </>
         ) : (
           <>
-            {/* Messages */}
-            <div 
-              ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto py-4 space-y-4 hide-scrollbar"
-              style={{
-                WebkitOverflowScrolling: 'touch',
-                overscrollBehavior: 'contain'
-              }}
-            >
-              {messages.length === 0 && (
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            {/* Messages / Empty State */}
+            {messages.length === 0 ? (
+              /* Empty state - centered in available space using grid */
+              <div 
+                className="flex-1 min-h-0 grid place-items-center text-center px-4"
+                style={{
+                  touchAction: 'pan-y'
+                }}
+              >
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                     <Sparkles className="w-10 h-10 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-2 text-lg">Your Personal Dining Expert</h3>
-                  <p className="text-sm text-gray-500 max-w-md mx-auto">Tell me what you're craving, your budget, vibe, or even a specific restaurant name...</p>
+                  <h3 className="font-semibold text-gray-900 mb-2 text-lg">What are you craving?</h3>
+                  <p className="text-sm text-gray-500 max-w-xs text-center">Tell me your mood, budget, or cuisine preferences and I&apos;ll find the perfect spot for you</p>
                 </div>
-              )}
+              </div>
+            ) : (
+              /* Messages list - scrollable */
+              <div 
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-4 hide-scrollbar"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehavior: 'contain',
+                  overscrollBehaviorX: 'none',
+                  touchAction: 'pan-y'
+                }}
+              >
 
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {/* Only show message bubble if there's content or no restaurants */}
-                  {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
-                    <div
-                      className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                        message.role === 'user'
-                          ? 'bg-primary text-white rounded-br-md'
-                          : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    </div>
-                  )}
-                  
-                  {/* Show restaurants if available */}
-                  {message.restaurants && message.restaurants.length > 0 && (
-                    <div className="w-full max-w-full">
-                      <div className={`grid gap-3 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                        {message.restaurants.map((restaurant, index) => (
-                          <RestaurantCard
-                            key={`${message.id}-${restaurant.id || index}`}
-                            restaurant={restaurant}
-                            messageId={message.id}
-                            index={index}
-                            onRestaurantClick={handleRestaurantClick}
-                          />
-                        ))}
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {/* Only show message bubble if there's content or no restaurants */}
+                    {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
+                      <div
+                        className={`max-w-[80%] px-4 py-3 rounded-2xl ${
+                          message.role === 'user'
+                            ? 'bg-primary text-white rounded-br-md'
+                            : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-white shadow-sm border border-gray-100 px-4 py-3 rounded-2xl rounded-bl-md">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    )}
+                    
+                    {/* Show restaurants if available */}
+                    {message.restaurants && message.restaurants.length > 0 && (
+                      <div className="w-full overflow-hidden">
+                        <div className={`grid gap-3 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                          {message.restaurants.map((restaurant, index) => (
+                            <RestaurantCard
+                              key={`${message.id}-${restaurant.id || index}`}
+                              restaurant={restaurant}
+                              messageId={message.id}
+                              index={index}
+                              onRestaurantClick={handleRestaurantClick}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                ))}
 
-              <div ref={messagesEndRef} />
-            </div>
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-white shadow-sm border border-gray-100 px-4 py-3 rounded-2xl rounded-bl-md">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            )}
 
             {/* Input Area */}
             <div 
-              className="flex-shrink-0 py-3 pb-safe"
+              className="flex-shrink-0"
               style={{
+                paddingTop: '0.5rem',
                 paddingBottom: isInputFocused 
-                  ? 'calc(0.75rem + env(safe-area-inset-bottom))' 
-                  : 'calc(1rem + env(safe-area-inset-bottom) + 4rem)',
-                transition: 'padding-bottom 0.3s ease'
+                  ? '0.25rem' // Minimal padding when keyboard is open (almost zero gap)
+                  : 'calc(env(safe-area-inset-bottom) + 5rem)', // Account for bottom nav when keyboard closed
+                transition: 'padding-bottom 0.15s ease-out'
               }}
             >
               <div className="flex items-end gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-3 focus-within:border-primary transition-colors shadow-md">
