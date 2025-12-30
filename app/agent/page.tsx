@@ -370,7 +370,7 @@ export default function AgentPage() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', touchAction: 'pan-y' }}>
+    <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col" style={{ height: '100dvh' }}>
       {/* Global styles for animations and iOS keyboard handling */}
       <style jsx global>{`
         @keyframes slideIn {
@@ -391,17 +391,6 @@ export default function AgentPage() {
         .hide-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
-        }
-        
-        /* Lock horizontal scroll completely */
-        * {
-          overscroll-behavior-x: none !important;
-        }
-        
-        body, html {
-          overflow-x: hidden !important;
-          max-width: 100vw !important;
-          position: relative !important;
         }
         
         /* Prevent iOS zoom on input focus */
@@ -478,18 +467,11 @@ export default function AgentPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ maxWidth: '100%' }}>
+      <div className="flex-1 flex flex-col overflow-hidden px-4">
         {showHistory ? (
           <>
             {/* History List */}
-            <div 
-              className="flex-1 overflow-y-auto py-4 px-4 space-y-2 hide-scrollbar"
-              style={{ 
-                overflowX: 'hidden',
-                maxWidth: '100%',
-                touchAction: 'pan-y'
-              }}
-            >
+            <div className="flex-1 overflow-y-auto py-4 space-y-2 hide-scrollbar">
               {chatHistory.length === 0 ? (
                 <div className="text-center py-12">
                   <Clock className="w-16 h-16 text-gray-300 mx-auto mb-3" strokeWidth={1.5} />
@@ -528,7 +510,12 @@ export default function AgentPage() {
             </div>
 
             {/* New Chat Button */}
-            <div className="flex-shrink-0 py-4 px-4 pb-safe">
+            <div 
+              className="flex-shrink-0 py-4"
+              style={{
+                paddingBottom: 'calc(1rem + env(safe-area-inset-bottom) + 4rem)',
+              }}
+            >
               <button
                 onClick={handleNewChat}
                 className="w-full py-3 px-4 bg-gradient-to-r from-primary to-primary/80 text-white rounded-full font-semibold text-base shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -543,14 +530,10 @@ export default function AgentPage() {
             {/* Messages */}
             <div 
               ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto py-4 px-4 space-y-4 hide-scrollbar"
+              className="flex-1 overflow-y-auto py-4 space-y-4 hide-scrollbar"
               style={{
                 WebkitOverflowScrolling: 'touch',
-                overscrollBehavior: 'contain',
-                overscrollBehaviorX: 'none',
-                overflowX: 'hidden',
-                maxWidth: '100%',
-                touchAction: 'pan-y'
+                overscrollBehavior: 'contain'
               }}
             >
               {messages.length === 0 && (
@@ -567,7 +550,6 @@ export default function AgentPage() {
                 <div
                   key={message.id}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  style={{ maxWidth: '100%', overflow: 'hidden' }}
                 >
                   {/* Only show message bubble if there's content or no restaurants */}
                   {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
@@ -577,7 +559,6 @@ export default function AgentPage() {
                           ? 'bg-primary text-white rounded-br-md'
                           : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
                       }`}
-                      style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     </div>
@@ -585,8 +566,8 @@ export default function AgentPage() {
                   
                   {/* Show restaurants if available */}
                   {message.restaurants && message.restaurants.length > 0 && (
-                    <div className="w-full" style={{ overflow: 'hidden', maxWidth: '100%' }}>
-                      <div className={`grid gap-2 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`} style={{ width: '100%' }}>
+                    <div className="w-full max-w-full">
+                      <div className={`grid gap-3 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                         {message.restaurants.map((restaurant, index) => (
                           <RestaurantCard
                             key={`${message.id}-${restaurant.id || index}`}
@@ -613,25 +594,17 @@ export default function AgentPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area - Fixed at bottom with NO GAP when keyboard is open */}
+            {/* Input Area */}
             <div 
-              className="flex-shrink-0 bg-white border-t border-gray-200 px-4"
+              className="flex-shrink-0 py-3 pb-safe"
               style={{
-                paddingTop: '8px',
                 paddingBottom: isInputFocused 
-                  ? 'env(safe-area-inset-bottom, 0px)' 
-                  : 'calc(8px + 3.5rem + env(safe-area-inset-bottom))',
-                transition: 'padding-bottom 0.2s ease-out',
-                marginBottom: isInputFocused ? '0' : undefined
+                  ? 'calc(0.75rem + env(safe-area-inset-bottom))' 
+                  : 'calc(1rem + env(safe-area-inset-bottom) + 4rem)',
+                transition: 'padding-bottom 0.3s ease'
               }}
             >
-              <div 
-                className="flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-primary/50 focus-within:bg-white transition-all"
-                style={{ 
-                  marginBottom: isInputFocused ? '8px' : '8px',
-                  maxWidth: '100%'
-                }}
-              >
+              <div className="flex items-end gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-3 focus-within:border-primary transition-colors shadow-md">
                 <textarea
                   ref={inputRef}
                   value={inputValue}
@@ -649,33 +622,33 @@ export default function AgentPage() {
                   }}
                   placeholder="What are you craving?"
                   rows={1}
-                  className="flex-1 bg-transparent outline-none text-base text-gray-900 placeholder-gray-500 resize-none overflow-hidden py-1.5"
+                  className="flex-1 bg-transparent outline-none text-base text-gray-900 placeholder-gray-400 resize-none overflow-hidden py-0.5 max-h-32"
                   style={{
                     minHeight: '24px',
-                    maxHeight: '120px',
                     fontSize: '16px' // Prevent iOS zoom
                   }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;
                     target.style.height = 'auto';
-                    target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                    target.style.height = Math.min(target.scrollHeight, 128) + 'px';
                   }}
                 />
                 <button
                   onClick={handleSend}
-                  disabled={isLoading || !inputValue.trim()}
-                  className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full transition-all ${
-                    inputValue.trim() && !isLoading
-                      ? 'bg-primary hover:bg-primary/90 active:scale-95' 
-                      : 'bg-gray-300 cursor-not-allowed'
-                  }`}
+                  disabled={isLoading}
+                  style={{
+                    background: inputValue.trim() 
+                      ? 'linear-gradient(to right, #C5459C, rgba(197, 69, 156, 0.9))' 
+                      : '#E5E7EB'
+                  }}
+                  className="w-10 h-10 flex items-center justify-center rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all active:scale-95 flex-shrink-0"
                 >
                   {isLoading ? (
-                    <Loader2 className="w-4.5 h-4.5 animate-spin text-white" />
+                    <Loader2 className="w-5 h-5 animate-spin text-white" />
                   ) : (
                     <Send 
-                      className="w-4.5 h-4.5 text-white"
-                      strokeWidth={2}
+                      className="w-5 h-5 stroke-[2.5]"
+                      style={{ color: inputValue.trim() ? '#FFFFFF' : '#6B7280' }}
                     />
                   )}
                 </button>
