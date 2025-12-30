@@ -161,9 +161,11 @@ export default function AgentPage() {
   const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Get user location
   useEffect(() => {
@@ -229,15 +231,30 @@ export default function AgentPage() {
     });
   }, [messages, currentChatId]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive or when keyboard appears
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (messagesEndRef.current && messagesContainerRef.current) {
+      // Use a slight delay to ensure DOM has updated
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
+    }
+  }, [messages, isInputFocused]);
 
-  // Auto-focus input on mount
+  // Handle iOS keyboard behavior
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    const handleResize = () => {
+      // When keyboard opens, scroll to bottom
+      if (isInputFocused && messagesEndRef.current) {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 300);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isInputFocused]);
 
   const generateChatTitle = (messages: Message[]): string => {
     // Find first user message
@@ -298,6 +315,11 @@ export default function AgentPage() {
     setInputValue('');
     setIsLoading(true);
 
+    // Scroll to bottom after adding message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 100);
+
     try {
       const conversationHistory = messages.map(m => ({
         role: m.role,
@@ -329,6 +351,11 @@ export default function AgentPage() {
 
       setMessages(prev => [...prev, assistantMessage]);
 
+      // Scroll to bottom after assistant response
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
+
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
@@ -343,8 +370,8 @@ export default function AgentPage() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col">
-      {/* Global styles for animations */}
+    <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col" style={{ height: '100dvh' }}>
+      {/* Global styles for animations and iOS keyboard handling */}
       <style jsx global>{`
         @keyframes slideIn {
           from {
@@ -364,6 +391,19 @@ export default function AgentPage() {
         .hide-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        
+        /* Prevent iOS zoom on input focus */
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        textarea {
+          font-size: 16px !important;
+        }
+        
+        /* Smooth scrolling */
+        html {
+          scroll-behavior: smooth;
         }
       `}</style>
 
@@ -488,7 +528,14 @@ export default function AgentPage() {
         ) : (
           <>
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto py-4 space-y-4 hide-scrollbar">
+            <div 
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto py-4 space-y-4 hide-scrollbar"
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain'
+              }}
+            >
               {messages.length === 0 && (
                 <div className="text-center py-12">
                   <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -549,9 +596,12 @@ export default function AgentPage() {
 
             {/* Input Area */}
             <div 
-              className="flex-shrink-0 py-4"
+              className="flex-shrink-0 py-3 pb-safe"
               style={{
-                paddingBottom: 'calc(1rem + env(safe-area-inset-bottom) + 4rem)',
+                paddingBottom: isInputFocused 
+                  ? 'calc(0.75rem + env(safe-area-inset-bottom))' 
+                  : 'calc(1rem + env(safe-area-inset-bottom) + 4rem)',
+                transition: 'padding-bottom 0.3s ease'
               }}
             >
               <div className="flex items-end gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-3 focus-within:border-primary transition-colors shadow-md">
@@ -559,6 +609,11 @@ export default function AgentPage() {
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => {
+                    // Delay blur to allow button clicks to register
+                    setTimeout(() => setIsInputFocused(false), 100);
+                  }}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -569,7 +624,8 @@ export default function AgentPage() {
                   rows={1}
                   className="flex-1 bg-transparent outline-none text-base text-gray-900 placeholder-gray-400 resize-none overflow-hidden py-0.5 max-h-32"
                   style={{
-                    minHeight: '24px'
+                    minHeight: '24px',
+                    fontSize: '16px' // Prevent iOS zoom
                   }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;
@@ -602,8 +658,8 @@ export default function AgentPage() {
         )}
       </div>
 
-      {/* Bottom Navigation */}
-      <BottomNav />
+      {/* Bottom Navigation - Hide when input is focused */}
+      <BottomNav show={!isInputFocused} />
     </div>
   );
 }
