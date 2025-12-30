@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
-import { AIChatSheet, RestaurantFilters } from '@/components/map/ai-chat-sheet';
 import { Loader2, UtensilsCrossed, Hotel, Home, Landmark, Car, MapPin } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 import type mapboxgl from 'mapbox-gl';
@@ -40,14 +39,9 @@ function MapPageContent() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [filters, setFilters] = useState<RestaurantFilters>({ query: '' });
   const [activeCategory, setActiveCategory] = useState('food-drinks');
-  const [showChat, setShowChat] = useState(true);
-  const [highlightedRestaurants, setHighlightedRestaurants] = useState<string[]>([]);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isRecentering, setIsRecentering] = useState(false);
-  const [chatActive, setChatActive] = useState(false);
-  const [chatHeight, setChatHeight] = useState(200);
   const [openNow, setOpenNow] = useState(false);
   const [viewMode, setViewMode] = useState<'following' | 'all'>('all');
   const [isTogglingView, setIsTogglingView] = useState(false);
@@ -101,30 +95,10 @@ function MapPageContent() {
     }
   };
 
-  // Filter restaurants based on AI chat filters
+  // Filter restaurants (can be extended later)
   const filteredRestaurants = useMemo(() => {
-    let result = [...allRestaurants];
-    
-    if (filters.priceLevel && filters.priceLevel.length > 0) {
-      result = result.filter(r => 
-        r.priceLevel !== undefined && filters.priceLevel!.includes(r.priceLevel)
-      );
-    }
-    
-    if (filters.rating) {
-      result = result.filter(r => r.rating >= filters.rating!);
-    }
-    
-    if (filters.cuisineTypes && filters.cuisineTypes.length > 0) {
-      result = result.filter(r => 
-        r.cuisineTypes?.some(c => 
-          filters.cuisineTypes!.some(fc => c.toLowerCase().includes(fc.toLowerCase()))
-        )
-      );
-    }
-    
-    return result.slice(0, 15);
-  }, [allRestaurants, filters]);
+    return allRestaurants.slice(0, 15);
+  }, [allRestaurants]);
 
   // Get user location
   useEffect(() => {
@@ -242,8 +216,7 @@ function MapPageContent() {
               setAllRestaurants([targetRestaurant]);
             }
             
-            // Hide the chat
-            setShowChat(false);
+            // Hide the Agent sheet (if coming from Agent page)
             
             // Center map on the restaurant
             mapRef.current?.flyTo({
@@ -271,51 +244,6 @@ function MapPageContent() {
       fetchAndShowRestaurant();
     }
   }, [searchParams, hasHandledUrlParams, loading, showToast]);
-
-  const handleFilterChange = (newFilters: RestaurantFilters) => {
-    setFilters(newFilters);
-  };
-
-  const handleRestaurantsFound = (restaurants: any[]) => {
-    // Add AI-suggested restaurants to the map
-    setAllRestaurants(restaurants);
-    setHighlightedRestaurants(restaurants.map(r => r.id));
-  };
-
-  const handleRestaurantClickFromChat = (restaurant: Restaurant) => {
-    // Close the chat
-    setShowChat(false);
-    
-    // Set the selected restaurant (this will open the popup)
-    setSelectedRestaurant(restaurant);
-    
-    // Center the map on the selected restaurant with smooth animation
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: [restaurant.longitude, restaurant.latitude],
-        zoom: 16,
-        duration: 2000, // 2 second smooth animation
-        essential: true,
-        curve: 1.5, // More dramatic curve
-        easing: (t) => {
-          // Custom easing function for smooth deceleration
-          return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-        }
-      });
-    }
-  };
-
-  const handleChatStateChange = (isActive: boolean, height: number) => {
-    setChatActive(isActive);
-    setChatHeight(height);
-  };
-
-  // Hide chat when restaurant is selected
-  useEffect(() => {
-    if (selectedRestaurant) {
-      setShowChat(false);
-    }
-  }, [selectedRestaurant]);
 
   // Close dropup when clicking outside
   useEffect(() => {
@@ -463,7 +391,7 @@ function MapPageContent() {
         </div>
       )}
 
-      {/* Custom Location Button - Above chat, right side */}
+      {/* Custom Location Button - Bottom right, above bottom nav */}
       <button
         onClick={handleRecenterMap}
         disabled={isRecentering}
@@ -474,9 +402,7 @@ function MapPageContent() {
         }`}
         style={{
           right: 'max(1rem, env(safe-area-inset-right))',
-          bottom: chatActive 
-            ? `calc(${chatHeight + 28}px + env(safe-area-inset-bottom))` 
-            : 'calc(8.25rem + env(safe-area-inset-bottom))',
+          bottom: 'calc(5rem + env(safe-area-inset-bottom))',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
         }}
         aria-label="Center map on my location"
@@ -488,133 +414,115 @@ function MapPageContent() {
         )}
       </button>
 
-      {/* Filter Controls - Above Search */}
-      {showChat && (
-        <div 
-          className="fixed z-50"
-          style={{
-            left: 'max(1rem, env(safe-area-inset-left))',
-            bottom: chatActive 
-              ? `calc(${chatHeight + 28}px + env(safe-area-inset-bottom))` 
-              : 'calc(8.75rem + env(safe-area-inset-bottom))',
-            transition: 'bottom 0.3s ease'
-          }}
-        >
-          <div className="flex items-center gap-2">
-            {/* Open Now Toggle */}
+      {/* Filter Controls - Bottom left */}
+      <div 
+        className="fixed z-50"
+        style={{
+          left: 'max(1rem, env(safe-area-inset-left))',
+          bottom: 'calc(5rem + env(safe-area-inset-bottom))',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          {/* Open Now Toggle */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenNow(!openNow);
+            }}
+            className={`
+              relative flex items-center justify-center gap-1.5 px-2.5 rounded-full text-[10px] font-semibold h-[26px]
+              transition-all duration-300 border backdrop-blur-sm
+              ${openNow
+                ? 'bg-emerald-500 text-white border-emerald-500 shadow-[0_2px_8px_rgba(16,185,129,0.3)]'
+                : 'bg-white/95 text-gray-800 border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)]'
+              }
+              hover:scale-[1.02] active:scale-[0.98] cursor-pointer
+            `}
+            style={{ paddingTop: '5px', paddingBottom: '5px' }}
+          >
+            <div 
+              className={`w-1.5 h-1.5 rounded-full animate-pulse ${openNow ? 'bg-white' : 'bg-emerald-500'}`}
+              style={{ position: 'relative', top: '3.5px' }}
+            />
+            <span style={{ lineHeight: '1', position: 'relative', top: '0px' }}>Open Now</span>
+          </button>
+
+          {/* Following / All Dropup Selector */}
+          <div className="relative">
+            {/* Dropup Menu */}
+            {showViewDropup && (
+              <div 
+                className="absolute bottom-full mb-2 left-0 bg-white/95 backdrop-blur-sm rounded-xl border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden animate-fade-in"
+                style={{ minWidth: '100%' }}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewModeChange('following');
+                  }}
+                  className="w-full px-3 py-2 text-[10px] font-semibold text-left hover:bg-gray-50 transition-colors"
+                  style={{ color: viewMode === 'following' ? '#C5459C' : '#374151' }}
+                >
+                  Following
+                </button>
+                <div className="w-full h-px bg-gray-200" />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewModeChange('all');
+                  }}
+                  className="w-full px-3 py-2 text-[10px] font-semibold text-left hover:bg-gray-50 transition-colors"
+                  style={{ color: viewMode === 'all' ? '#C5459C' : '#374151' }}
+                >
+                  All
+                </button>
+              </div>
+            )}
+
+            {/* Selected Option Button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setOpenNow(!openNow);
+                setShowViewDropup(!showViewDropup);
               }}
-              className={`
-                relative flex items-center justify-center gap-1.5 px-2.5 rounded-full text-[10px] font-semibold h-[26px]
-                transition-all duration-300 border backdrop-blur-sm
-                ${openNow
-                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-[0_2px_8px_rgba(16,185,129,0.3)]'
-                  : 'bg-white/95 text-gray-800 border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)]'
-                }
-                hover:scale-[1.02] active:scale-[0.98] cursor-pointer
-              `}
-              style={{ paddingTop: '5px', paddingBottom: '5px' }}
+              disabled={isTogglingView}
+              className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold h-[26px] bg-white/95 backdrop-blur-sm border border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all duration-300"
             >
-              <div 
-                className={`w-1.5 h-1.5 rounded-full animate-pulse ${openNow ? 'bg-white' : 'bg-emerald-500'}`}
-                style={{ position: 'relative', top: '3.5px' }}
-              />
-              <span style={{ lineHeight: '1', position: 'relative', top: '0px' }}>Open Now</span>
-            </button>
-
-            {/* Following / All Dropup Selector */}
-            <div className="relative">
-              {/* Dropup Menu */}
-              {showViewDropup && (
-                <div 
-                  className="absolute bottom-full mb-2 left-0 bg-white/95 backdrop-blur-sm rounded-xl border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden animate-fade-in"
-                  style={{ minWidth: '100%' }}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewModeChange('following');
-                    }}
-                    className="w-full px-3 py-2 text-[10px] font-semibold text-left hover:bg-gray-50 transition-colors"
-                    style={{ color: viewMode === 'following' ? '#C5459C' : '#374151' }}
-                  >
-                    Following
-                  </button>
-                  <div className="w-full h-px bg-gray-200" />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewModeChange('all');
-                    }}
-                    className="w-full px-3 py-2 text-[10px] font-semibold text-left hover:bg-gray-50 transition-colors"
-                    style={{ color: viewMode === 'all' ? '#C5459C' : '#374151' }}
-                  >
-                    All
-                  </button>
+              {/* Loader overlay */}
+              {isTogglingView && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-full z-10">
+                  <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 </div>
               )}
-
-              {/* Selected Option Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowViewDropup(!showViewDropup);
-                }}
-                disabled={isTogglingView}
-                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold h-[26px] bg-white/95 backdrop-blur-sm border border-gray-200 shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all duration-300"
+              <span className={isTogglingView ? 'opacity-0' : ''} style={{ color: '#C5459C' }}>
+                {viewMode === 'following' ? 'Following' : 'All'}
+              </span>
+              <svg 
+                className={`w-3 h-3 transition-transform duration-200 ${showViewDropup ? 'rotate-180' : ''}`}
+                style={{ color: '#C5459C' }}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
               >
-                {/* Loader overlay */}
-                {isTogglingView && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-full z-10">
-                    <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                  </div>
-                )}
-                <span className={isTogglingView ? 'opacity-0' : ''} style={{ color: '#C5459C' }}>
-                  {viewMode === 'following' ? 'Following' : 'All'}
-                </span>
-                <svg 
-                  className={`w-3 h-3 transition-transform duration-200 ${showViewDropup ? 'rotate-180' : ''}`}
-                  style={{ color: '#C5459C' }}
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            </div>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
           </div>
         </div>
-      )}
-
-      {/* AI Chat Bottom Sheet - Hide when restaurant selected */}
-      {showChat && (
-        <AIChatSheet 
-          onFilterChange={handleFilterChange}
-          onRestaurantsFound={handleRestaurantsFound}
-          onRestaurantClick={handleRestaurantClickFromChat}
-          matchedCount={filteredRestaurants.length}
-          userLocation={userLocation}
-          onChatStateChange={handleChatStateChange}
-        />
-      )}
+      </div>
 
       {/* Restaurant Detail Card */}
       <RestaurantCard 
         restaurant={selectedRestaurant}
         onClose={() => {
           setSelectedRestaurant(null);
-          setShowChat(true);
         }}
         userLocation={userLocation}
         onReviewModalChange={setIsReviewModalOpen}
       />
 
-      {/* Bottom Navigation - Hide when chat is active or review modal is open */}
-      <BottomNav show={!isReviewModalOpen && !chatActive} />
+      {/* Bottom Navigation - Hide when review modal is open */}
+      <BottomNav show={!isReviewModalOpen} />
     </div>
   );
 }

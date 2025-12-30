@@ -37,9 +37,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Redirect to feed if already logged in and trying to access auth pages
-  if (user && (request.nextUrl.pathname === '/auth/login' || request.nextUrl.pathname === '/auth/signup')) {
-    const redirectUrl = new URL('/feed', request.url);
+  // Redirect to agent if already logged in and trying to access auth pages or root
+  if (user && (request.nextUrl.pathname === '/auth/login' || request.nextUrl.pathname === '/auth/signup' || request.nextUrl.pathname === '/')) {
+    const redirectUrl = new URL('/agent', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 

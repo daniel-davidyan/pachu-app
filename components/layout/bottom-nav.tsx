@@ -1,10 +1,9 @@
 'use client';
 
-import { Newspaper, Plus, User } from 'lucide-react';
+import { Newspaper, Plus, User, Map, Bot } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { MapSearchIcon } from '@/components/icons';
 
 interface BottomNavProps {
   show?: boolean;
@@ -25,9 +24,14 @@ export function BottomNav({ show = true }: BottomNavProps) {
       icon: Plus,
     },
     {
+      name: 'Agent',
+      href: '/agent',
+      icon: Bot,
+    },
+    {
       name: 'Map',
       href: '/map',
-      icon: MapSearchIcon,
+      icon: Map,
     },
     {
       name: 'Profile',
@@ -70,7 +74,7 @@ export function BottomNav({ show = true }: BottomNavProps) {
                 <Icon
                   className={cn(
                     "transition-all duration-200",
-                    item.name === 'Search' ? "w-7 h-7" : "w-5 h-5",
+                    item.name === 'Search' ? "w-7 h-7" : item.name === 'Agent' ? "w-6 h-6" : "w-5 h-5",
                     active ? "text-[#C5459C]" : "text-gray-400"
                   )}
                   strokeWidth={active ? 2.5 : 1.5}
