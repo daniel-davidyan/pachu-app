@@ -54,8 +54,8 @@ export function BottomNav({ show = true }: BottomNavProps) {
         bottom: 'calc(0rem + env(safe-area-inset-bottom))',
       }}
     >
-      <div className="bg-white rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.3)] border-2 border-gray-300 px-2">
-        <div className="flex items-center justify-center gap-1 h-12">
+      <div className="bg-white rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.3)] border-2 border-gray-300 px-1.5">
+        <div className="flex items-center justify-center gap-1.5 h-12">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -65,7 +65,7 @@ export function BottomNav({ show = true }: BottomNavProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center py-2 px-4 rounded-full transition-all duration-200",
+                  "flex flex-col items-center justify-center py-2 px-2.5 rounded-full transition-all duration-200",
                   active 
                     ? "bg-primary/10" 
                     : "hover:bg-gray-100 active:scale-95"
