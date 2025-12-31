@@ -54,7 +54,6 @@ interface City {
 
 export default function FeedPage() {
   // Always use default values for SSR compatibility
-  const [feedMode, setFeedMode] = useState<'all' | 'following'>('all');
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [restaurants, setRestaurants] = useState<RestaurantFeed[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +65,7 @@ export default function FeedPage() {
   const [distanceKm, setDistanceKm] = useState(5);
   const [showHeader, setShowHeader] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [showingSource, setShowingSource] = useState<'following' | 'pachu' | 'google' | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastScrollY = useRef(0);
@@ -83,7 +83,6 @@ export default function FeedPage() {
       const settings = sessionStorage.getItem('pachu_feed_settings');
       if (settings) {
         const data = JSON.parse(settings);
-        if (data.feedMode) setFeedMode(data.feedMode);
         if (data.locationFilterEnabled !== undefined) setLocationFilterEnabled(data.locationFilterEnabled);
         if (data.distanceKm) setDistanceKm(data.distanceKm);
       }
@@ -155,7 +154,6 @@ export default function FeedPage() {
     // Save settings
     const saveSettings = () => {
       sessionStorage.setItem('pachu_feed_settings', JSON.stringify({
-        feedMode,
         locationFilterEnabled,
         distanceKm
       }));
@@ -169,7 +167,7 @@ export default function FeedPage() {
       saveScroll();
       saveSettings();
     };
-  }, [feedMode, locationFilterEnabled, distanceKm]);
+  }, [locationFilterEnabled, distanceKm]);
 
 
   // Prevent Next.js from scrolling to top on navigation
@@ -232,7 +230,7 @@ export default function FeedPage() {
     );
   }, []);
 
-  // Fetch restaurants based on mode
+  // Fetch restaurants based on priority
   const fetchRestaurants = useCallback(async (pageNum: number) => {
     if (!userLocation) return;
     
@@ -246,143 +244,37 @@ export default function FeedPage() {
         setLoadingMore(true);
       }
 
-      if (feedMode === 'all') {
-        // Use selected city location or user location
-        const searchLocation = selectedCity || userLocation;
-        
-        // Fetch real restaurants from Google Places
-        const radius = locationFilterEnabled ? distanceKm * 1000 : 50000; // 50km when no location filter
-        const googleResponse = await fetch(
-          `/api/restaurants/nearby?latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}`
-        );
-        const googleData = await googleResponse.json();
+      // Use selected city location or user location
+      const searchLocation = selectedCity || userLocation;
+      
+      // Use new prioritized endpoint
+      const radius = locationFilterEnabled ? distanceKm * 1000 : 50000;
+      const response = await fetch(
+        `/api/feed/prioritized?page=${pageNum}&limit=5&latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}`
+      );
+      const data = await response.json();
 
-        if (googleData.restaurants) {
-          // Fetch reviews for each restaurant
-          const restaurantsWithReviews = await Promise.all(
-            googleData.restaurants.slice(pageNum * 5, (pageNum + 1) * 5).map(async (restaurant: any) => {
-              try {
-                const detailsResponse = await fetch(`/api/restaurants/details?placeId=${restaurant.googlePlaceId}`);
-                const detailsData = await detailsResponse.json();
-                
-                const reviews = (detailsData.reviews || []).slice(0, 10).map((googleReview: any, index: number) => {
-                  // Extract photos from Google review if available
-                  const reviewPhotos = [];
-                  if (googleReview.photos && Array.isArray(googleReview.photos)) {
-                    reviewPhotos.push(...googleReview.photos.map((photo: any) => 
-                      photo.photo_reference 
-                        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
-                        : null
-                    ).filter(Boolean));
-                  }
-                  
-                  // If no review photos, use restaurant photos (Google reviews typically don't have individual photos)
-                  // Skip the first photo (index 0) as it's used as the main restaurant photo
-                  if (reviewPhotos.length === 0 && detailsData.photos && detailsData.photos[index + 1]) {
-                    const photo = detailsData.photos[index + 1];
-                    if (photo.photo_reference) {
-                      reviewPhotos.push(
-                        `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
-                      );
-                    }
-                  }
-                  
-                  // NOTE: Google review profile photos (profile_photo_url) often don't load due to CORS/authentication issues
-                  // We set it here as a fallback, but the UI will show initials if the image fails to load
-                  // This is a limitation of Google Places API - profile photos are not reliably accessible
-                  return {
-                    id: `google-${restaurant.id}-${googleReview.author_name}-${index}`,
-                    rating: googleReview.rating,
-                    content: googleReview.text,
-                    createdAt: new Date(googleReview.time * 1000).toISOString(),
-                    user: {
-                      id: `google-user-${googleReview.author_name}`,
-                      username: googleReview.author_name,
-                      fullName: googleReview.author_name,
-                      // Google profile photos are often blocked by CORS, so they may not display
-                      // The UI fallback will show user initials instead
-                      avatarUrl: googleReview.profile_photo_url || undefined,
-                    },
-                    photos: reviewPhotos,
-                  };
-                });
-
-                return {
-                  id: restaurant.id,
-                  name: restaurant.name,
-                  address: restaurant.address,
-                  imageUrl: restaurant.photoUrl,
-                  rating: restaurant.rating,
-                  totalReviews: restaurant.totalReviews || 0,
-                  distance: restaurant.distance,
-                  matchPercentage: Math.floor(Math.random() * 30 + 70), // 70-100%
-                  mutualFriends: [],
-                  reviews,
-                  googlePlaceId: restaurant.googlePlaceId,
-                  latitude: restaurant.latitude,
-                  longitude: restaurant.longitude,
-                };
-              } catch (error) {
-                return null;
-              }
-            })
-          );
-
-          const validRestaurants = restaurantsWithReviews.filter(r => r !== null) as RestaurantFeed[];
-          
-          // Only update state if this is still the latest request
-          if (requestId === latestRequestId.current) {
-            if (pageNum === 0) {
-              setRestaurants(validRestaurants);
-            } else {
-              // Deduplicate when appending new restaurants
-              setRestaurants(prev => {
-                const combined = [...prev, ...validRestaurants];
-                const unique = combined.reduce((acc, restaurant) => {
-                  if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
-                    acc.push(restaurant);
-                  }
-                  return acc;
-                }, [] as RestaurantFeed[]);
-                return unique;
-              });
-            }
-            setHasMore(googleData.restaurants.length > (pageNum + 1) * 5);
-            setPage(pageNum);
+      if (data.restaurants) {
+        // Only update state if this is still the latest request
+        if (requestId === latestRequestId.current) {
+          if (pageNum === 0) {
+            setRestaurants(data.restaurants);
+            setShowingSource(data.showingSource);
+          } else {
+            // Deduplicate when appending new restaurants
+            setRestaurants(prev => {
+              const combined = [...prev, ...data.restaurants];
+              const unique = combined.reduce((acc, restaurant) => {
+                if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
+                  acc.push(restaurant);
+                }
+                return acc;
+              }, [] as RestaurantFeed[]);
+              return unique;
+            });
           }
-        }
-      } else {
-        // Use selected city location or user location
-        const searchLocation = selectedCity || userLocation;
-        
-        // Following mode - fetch from database with mutual friends
-        const radius = locationFilterEnabled ? distanceKm * 1000 : 50000; // 50km when no location filter
-        const response = await fetch(
-          `/api/feed/following?page=${pageNum}&limit=5&latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}`
-        );
-        const data = await response.json();
-
-        if (data.restaurants) {
-          // Only update state if this is still the latest request
-          if (requestId === latestRequestId.current) {
-            if (pageNum === 0) {
-              setRestaurants(data.restaurants);
-            } else {
-              // Deduplicate when appending new restaurants
-              setRestaurants(prev => {
-                const combined = [...prev, ...data.restaurants];
-                const unique = combined.reduce((acc, restaurant) => {
-                  if (!acc.find((r: RestaurantFeed) => r.id === restaurant.id)) {
-                    acc.push(restaurant);
-                  }
-                  return acc;
-                }, [] as RestaurantFeed[]);
-                return unique;
-              });
-            }
-            setHasMore(data.hasMore);
-            setPage(pageNum);
-          }
+          setHasMore(data.hasMore);
+          setPage(pageNum);
         }
       }
     } catch (error) {
@@ -394,9 +286,9 @@ export default function FeedPage() {
         setLoadingMore(false);
       }
     }
-  }, [userLocation, feedMode, locationFilterEnabled, distanceKm, selectedCity]);
+  }, [userLocation, locationFilterEnabled, distanceKm, selectedCity]);
 
-  // Initial load and when mode, distance, or city changes
+  // Initial load and when distance or city changes
   useEffect(() => {
     if (!userLocation) return;
     
@@ -407,9 +299,9 @@ export default function FeedPage() {
       return;
     }
     
-    // For subsequent changes (mode, distance, or city), fetch new data
+    // For subsequent changes (distance or city), fetch new data
     fetchRestaurants(0);
-  }, [userLocation, feedMode, locationFilterEnabled, distanceKm, selectedCity, fetchRestaurants]);
+  }, [userLocation, locationFilterEnabled, distanceKm, selectedCity, fetchRestaurants]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -439,7 +331,7 @@ export default function FeedPage() {
   return (
     <MainLayout showBottomNav={showHeader && !sheetOpen}>
       <div className="pb-24 min-h-screen bg-gray-50">
-        {/* Header with Tabs */}
+        {/* Header with Filters */}
         <div 
           className={`sticky z-20 bg-white border-b border-gray-200 transition-transform duration-300 ease-in-out ${
             showHeader ? 'translate-y-0' : '-translate-y-full'
@@ -448,7 +340,7 @@ export default function FeedPage() {
             top: 'calc(3.5rem + env(safe-area-inset-top))',
           }}
         >
-          <div className="px-4 pt-3 pb-2 space-y-1">
+          <div className="px-4 pt-3 pb-2">
             {/* Nearby Dropdown - Centered */}
             <div className="flex justify-center">
               <FiltersDropdown
@@ -460,64 +352,56 @@ export default function FeedPage() {
                 setDistanceKm={setDistanceKm}
               />
             </div>
-            
-            {/* Feed Mode Tabs - Minimal Design with Sliding Underline */}
-            <div className="relative border-b border-gray-100">
-              {/* Text Buttons */}
-              <div className="relative w-full h-10 flex items-center">
-                <button
-                  onClick={() => setFeedMode('all')}
-                  className="absolute transition-colors"
-                  style={{ left: '25%', transform: 'translateX(-50%)' }}
-                >
-                  <span 
-                    className={`text-base font-medium transition-all duration-300 ${
-                      feedMode === 'all' ? 'text-[#C5459C]' : 'text-black'
-                    }`}
-                  >
-                    All
-                  </span>
-                </button>
-                <button
-                  onClick={() => setFeedMode('following')}
-                  className="absolute transition-colors"
-                  style={{ left: '75%', transform: 'translateX(-50%)' }}
-                >
-                  <span 
-                    className={`text-base font-medium transition-all duration-300 ${
-                      feedMode === 'following' ? 'text-[#C5459C]' : 'text-black'
-                    }`}
-                  >
-                    Following
-                  </span>
-                </button>
-              </div>
-              
-              {/* Animated Underline - Below Text */}
-              <div className="relative w-full">
-                <div 
-                  className="h-0.5 rounded-full transition-all duration-300 ease-out"
-                  style={{
-                    backgroundColor: '#C5459C',
-                    boxShadow: '0 0 8px rgba(197, 69, 156, 0.4)',
-                    marginLeft: feedMode === 'all' ? '0%' : '50%',
-                    width: '50%'
-                  }}
-                />
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Feed Content */}
         <div className="px-4 py-4 space-y-4">
+          {/* Info banner when showing Google reviews */}
+          {showingSource === 'google' && restaurants.length > 0 && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900 mb-1">
+                    No Pachu experiences found in this area
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    We're showing reviews from Google to help you discover places. Be the first to share your experience on Pachu!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Info banner when showing all Pachu reviews (not following) */}
+          {showingSource === 'pachu' && restaurants.length > 0 && (
+            <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-2xl">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-purple-900 mb-1">
+                    No experiences from people you follow
+                  </p>
+                  <p className="text-xs text-purple-700">
+                    We're showing all Pachu experiences in this area. Follow people to see their experiences first!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Loading Overlay - shows when switching tabs */}
           {loading && restaurants.length > 0 && (
             <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-30 flex items-center justify-center" style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }}>
               <div className="flex flex-col items-center">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
                 <p className="text-sm text-gray-500 font-medium">
-                  {feedMode === 'following' ? "Loading your friends' favorites..." : 'Discovering restaurants for you...'}
+                  Discovering restaurants for you...
                 </p>
               </div>
             </div>
@@ -528,14 +412,14 @@ export default function FeedPage() {
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
               <p className="text-sm text-gray-500">
-                {feedMode === 'following' ? "Loading your friends' favorites..." : 'Discovering restaurants for you...'}
+                Discovering restaurants for you...
               </p>
             </div>
           )}
 
           {/* Restaurant Cards */}
           {restaurants.map((restaurant) => (
-            feedMode === 'following' ? (
+            showingSource === 'following' ? (
               <FeedExperienceCard
                 key={restaurant.id}
                 restaurant={restaurant}
@@ -548,7 +432,7 @@ export default function FeedPage() {
                 key={restaurant.id}
                 restaurant={restaurant}
                 onUpdate={() => fetchRestaurants(0)}
-                showInteractions={false}
+                showInteractions={showingSource === 'pachu'}
                 onSheetStateChange={setSheetOpen}
               />
             )
@@ -571,11 +455,9 @@ export default function FeedPage() {
               </div>
               <p className="text-gray-500 font-medium">No restaurants found</p>
               <p className="text-sm text-gray-400 mt-1">
-                {feedMode === 'following' 
-                  ? 'Follow people to see their favorite restaurants' 
-                  : locationFilterEnabled 
-                    ? 'Try increasing the distance range or disable location filter'
-                    : 'No restaurants available at the moment'}
+                {locationFilterEnabled 
+                  ? 'Try increasing the distance range or disable location filter'
+                  : 'No restaurants available at the moment'}
               </p>
             </div>
           )}
