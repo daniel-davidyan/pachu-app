@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { AgentRecommendRequest, AgentRecommendResponse, RestaurantRecommendation } from '@/types/api';
-import { addTasteSignal } from '@/app/api/user/taste-signals/route';
+import { addTasteSignal } from '@/lib/taste-signals';
 
 /**
  * POST /api/agent/recommend

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { addTasteSignal } from '@/app/api/user/taste-signals/route';
+import { addTasteSignal } from '@/lib/taste-signals';
 
 /**
  * GET /api/wishlist?userId=xxx

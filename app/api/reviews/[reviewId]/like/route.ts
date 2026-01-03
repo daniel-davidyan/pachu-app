@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { addTasteSignal } from '@/app/api/user/taste-signals/route';
+import { addTasteSignal } from '@/lib/taste-signals';
 
 // POST /api/reviews/[reviewId]/like - Add like
 export async function POST(
