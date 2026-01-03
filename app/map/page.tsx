@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RestaurantCard } from '@/components/map/restaurant-card';
-import { Loader2, UtensilsCrossed, Hotel, Home, Landmark, Car, MapPin } from 'lucide-react';
+import { Loader2, UtensilsCrossed, Hotel, Home, Landmark, Car, MapPin, Sparkles, X } from 'lucide-react';
 import type { Restaurant } from '@/components/map/mapbox';
 import type mapboxgl from 'mapbox-gl';
 import { useToast } from '@/components/ui/toast';
@@ -34,6 +34,7 @@ const categories = [
 function MapPageContent() {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const { showToast } = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -48,6 +49,33 @@ function MapPageContent() {
   const [showViewDropup, setShowViewDropup] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [hasHandledUrlParams, setHasHandledUrlParams] = useState(false);
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(false);
+
+  // Check if user needs onboarding
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const response = await fetch('/api/user/taste-profile');
+        if (response.ok) {
+          const data = await response.json();
+          // Show banner if user has profile but hasn't completed onboarding
+          if (data.hasProfile && !data.onboardingCompleted) {
+            setShowOnboardingBanner(true);
+          } else if (!data.hasProfile) {
+            // First time user - show banner
+            setShowOnboardingBanner(true);
+          }
+        }
+      } catch (error) {
+        // Not logged in or error - don't show banner
+        console.log('Not showing onboarding banner:', error);
+      }
+    };
+    
+    // Check after a short delay to not block initial render
+    const timer = setTimeout(checkOnboarding, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleViewModeChange = (mode: 'following' | 'all') => {
     if (mode !== viewMode) {
@@ -441,12 +469,44 @@ function MapPageContent() {
         </div>
       </div>
 
+      {/* Onboarding Banner */}
+      {showOnboardingBanner && (
+        <div 
+          className="absolute left-3 right-3 bg-gradient-to-r from-primary to-pink-500 rounded-2xl px-4 py-3 z-40 animate-fade-in shadow-xl"
+          style={{
+            top: 'calc(4rem + env(safe-area-inset-top))',
+          }}
+        >
+          <button 
+            onClick={() => setShowOnboardingBanner(false)}
+            className="absolute top-2 right-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X className="w-4 h-4 text-white" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-semibold text-sm">Get Better Recommendations!</p>
+              <p className="text-white/80 text-xs">Tell us your taste in 2 minutes</p>
+            </div>
+            <button
+              onClick={() => router.push('/onboarding')}
+              className="px-4 py-2 bg-white text-primary rounded-full text-xs font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all flex-shrink-0"
+            >
+              Start
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Loading Indicator */}
       {loading && (
         <div 
           className="absolute left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-2 z-30 animate-fade-in"
           style={{
-            top: 'calc(4rem + env(safe-area-inset-top))',
+            top: showOnboardingBanner ? 'calc(9rem + env(safe-area-inset-top))' : 'calc(4rem + env(safe-area-inset-top))',
             boxShadow: '0 4px 16px rgba(197, 69, 156, 0.2), 0 0 0 2px white',
           }}
         >

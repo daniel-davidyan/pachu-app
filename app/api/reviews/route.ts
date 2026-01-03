@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { addTasteSignal } from '@/app/api/user/taste-signals/route';
 
 export async function POST(request: NextRequest) {
   try {
@@ -228,6 +229,29 @@ export async function POST(request: NextRequest) {
       }));
 
       await supabase.from('review_photos').insert(photoInserts);
+    }
+
+    // Add taste signal for the review (strongest signal - user actually visited)
+    try {
+      const isPositive = rating >= 4; // 4-5 stars = positive, 1-3 = negative
+      const signalContent = isPositive
+        ? `Visited and liked ${restaurant.name}${restaurant.cuisineTypes?.length ? `, ${restaurant.cuisineTypes.join(', ')}` : ''}`
+        : `Visited but didn't like ${restaurant.name}${restaurant.cuisineTypes?.length ? `, ${restaurant.cuisineTypes.join(', ')}` : ''}`;
+
+      await addTasteSignal(supabase, user.id, {
+        signalType: 'review',
+        signalStrength: 5,
+        isPositive,
+        restaurantId: restaurantId,
+        googlePlaceId: restaurant.googlePlaceId,
+        restaurantName: restaurant.name,
+        cuisineTypes: restaurant.cuisineTypes || [],
+        content: signalContent,
+        sourceId: newReview.id,
+      });
+    } catch (signalError) {
+      // Don't fail the review if signal fails
+      console.error('Error adding taste signal for review:', signalError);
     }
 
     return NextResponse.json({ 

@@ -405,22 +405,91 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
     }
 
     try {
-      const conversationHistory = messages.map(m => ({
+      // Build conversation history for the API
+      const allMessages = [...messages, userMessage];
+      const conversationHistory = allMessages.map(m => ({
         role: m.role,
         content: m.content
       }));
 
-      const response = await fetch('/api/map-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: inputValue,
-          conversationHistory,
-          location: userLocation || { lat: 32.0853, lng: 34.7818 }
-        })
-      });
+      const location = userLocation || { lat: 32.0853, lng: 34.7818 };
 
-      const data = await response.json();
+      // Try the new agent/recommend API first, fallback to map-chat
+      let data;
+      let useNewAgent = true; // Feature flag - set to true to use new AI agent
+
+      if (useNewAgent) {
+        try {
+          // Use new Agent API with 4-step algorithm
+          const agentResponse = await fetch('/api/agent/recommend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: conversationHistory,
+              latitude: location.lat,
+              longitude: location.lng,
+              radiusMeters: 5000,
+              conversationId: currentChatId,
+            })
+          });
+
+          const agentData = await agentResponse.json();
+
+          if (agentData.recommendations && agentData.recommendations.length > 0) {
+            // Transform recommendations to restaurant format
+            const restaurants = agentData.recommendations.map((rec: any) => ({
+              id: rec.restaurant.id,
+              name: rec.restaurant.name,
+              address: rec.restaurant.address,
+              rating: rec.restaurant.googleRating || rec.restaurant.rating || 0,
+              totalReviews: rec.restaurant.googleReviewsCount || 0,
+              cuisineTypes: rec.restaurant.cuisineTypes,
+              priceLevel: rec.restaurant.priceLevel,
+              photoUrl: rec.restaurant.photos?.[0]?.url || 
+                (rec.restaurant.photos?.[0]?.photoReference 
+                  ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photoReference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
+                  : undefined),
+              latitude: rec.restaurant.latitude,
+              longitude: rec.restaurant.longitude,
+              matchPercentage: rec.matchScore,
+              source: 'google' as const,
+              googlePlaceId: rec.restaurant.googlePlaceId,
+              website: rec.restaurant.website,
+              // Add explanation as a property
+              _explanation: rec.explanation,
+            }));
+
+            data = {
+              message: agentData.explanation || '',
+              restaurants,
+            };
+          } else {
+            // No recommendations yet, continue conversation
+            data = {
+              message: agentData.explanation || "I'm finding the best restaurants for you... Tell me more about what you're looking for!",
+              restaurants: [],
+            };
+          }
+        } catch (agentError) {
+          console.log('Agent API error, falling back to map-chat:', agentError);
+          useNewAgent = false;
+        }
+      }
+
+      if (!useNewAgent || !data) {
+        // Fallback to original map-chat API
+        const response = await fetch('/api/map-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: inputValue,
+            conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
+            location
+          })
+        });
+
+        data = await response.json();
+      }
 
       if (data.error) {
         throw new Error(data.error);

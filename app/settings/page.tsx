@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { User, Globe, Bell, Shield, HelpCircle, LogOut, ChevronRight, Moon, Mail, LucideIcon } from 'lucide-react';
+import { User, Globe, Bell, Shield, HelpCircle, LogOut, ChevronRight, Moon, Mail, LucideIcon, Sparkles, UtensilsCrossed } from 'lucide-react';
 
 interface SettingsItem {
   icon: LucideIcon;
@@ -49,6 +49,27 @@ export default function SettingsPage() {
           iconColor: 'text-green-600',
           label: 'Email',
           value: user?.email || 'Not set',
+        },
+      ],
+    },
+    {
+      title: 'Personalization',
+      items: [
+        {
+          icon: Sparkles,
+          iconBg: 'bg-pink-100',
+          iconColor: 'text-pink-600',
+          label: 'Taste Profile',
+          value: 'Edit your food preferences',
+          href: '/onboarding?edit=true',
+        },
+        {
+          icon: UtensilsCrossed,
+          iconBg: 'bg-amber-100',
+          iconColor: 'text-amber-600',
+          label: 'Dietary Restrictions',
+          value: 'Kosher, Vegan, Allergies...',
+          href: '/onboarding?edit=true&step=dietary',
         },
       ],
     },

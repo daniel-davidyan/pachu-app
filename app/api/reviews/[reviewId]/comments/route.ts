@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { addTasteSignal } from '@/app/api/user/taste-signals/route';
 
 // GET /api/reviews/[reviewId]/comments - Get comments for a review
 export async function GET(
@@ -234,6 +235,43 @@ export async function POST(
         fullName: m.mentioned_user.full_name,
       })),
     };
+
+    // Add taste signal for commenting on a review
+    try {
+      // Get review and restaurant details for the signal
+      const { data: review } = await supabase
+        .from('reviews')
+        .select(`
+          id,
+          restaurant_id,
+          restaurants (
+            id,
+            name,
+            google_place_id,
+            cuisine_types
+          )
+        `)
+        .eq('id', reviewId)
+        .single();
+
+      if (review?.restaurants) {
+        const restaurant = review.restaurants as any;
+        await addTasteSignal(supabase, user.id, {
+          signalType: 'comment',
+          signalStrength: 3,
+          isPositive: true,
+          restaurantId: restaurant.id,
+          googlePlaceId: restaurant.google_place_id,
+          restaurantName: restaurant.name,
+          cuisineTypes: restaurant.cuisine_types || [],
+          content: `Interested in ${restaurant.name}`,
+          sourceId: completeComment.id,
+        });
+      }
+    } catch (signalError) {
+      // Don't fail the comment if signal fails
+      console.error('Error adding taste signal for comment:', signalError);
+    }
 
     console.log('[API] Returning formatted comment');
     return NextResponse.json({ comment: formattedComment });

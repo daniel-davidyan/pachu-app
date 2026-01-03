@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { addTasteSignal } from '@/app/api/user/taste-signals/route';
 
 /**
  * GET /api/wishlist?userId=xxx
@@ -148,6 +149,23 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error adding to wishlist:', insertError);
       throw insertError;
+    }
+
+    // Add taste signal for adding to wishlist
+    try {
+      await addTasteSignal(supabase, user.id, {
+        signalType: 'wishlist',
+        signalStrength: 2,
+        isPositive: true,
+        restaurantId: finalRestaurantId,
+        googlePlaceId: googlePlaceId,
+        restaurantName: name,
+        content: `Wants to visit ${name}`,
+        sourceId: finalRestaurantId,
+      });
+    } catch (signalError) {
+      // Don't fail the wishlist add if signal fails
+      console.error('Error adding taste signal for wishlist:', signalError);
     }
 
     return NextResponse.json({

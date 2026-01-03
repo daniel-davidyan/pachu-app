@@ -130,3 +130,162 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+// ============================================================================
+// RECOMMENDATION SYSTEM TYPES
+// ============================================================================
+
+/**
+ * Cached restaurant data with embedding for vector search
+ */
+export interface RestaurantCache {
+  id: string;
+  googlePlaceId: string;
+  name: string;
+  address?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  phone?: string;
+  website?: string;
+  googleRating?: number;
+  googleReviewsCount?: number;
+  priceLevel?: number;
+  cuisineTypes?: string[];
+  isKosher: boolean;
+  isVegetarianFriendly: boolean;
+  openingHours?: OpeningHours;
+  photos?: RestaurantPhoto[];
+  googleReviews?: GoogleReview[];
+  summaryText?: string;
+  embedding?: number[]; // VECTOR(1536) as array
+  lastUpdated?: string;
+  createdAt?: string;
+}
+
+export interface OpeningHours {
+  monday?: DayHours;
+  tuesday?: DayHours;
+  wednesday?: DayHours;
+  thursday?: DayHours;
+  friday?: DayHours;
+  saturday?: DayHours;
+  sunday?: DayHours;
+}
+
+export interface DayHours {
+  open: string;
+  close: string;
+}
+
+export interface RestaurantPhoto {
+  photoReference: string;
+  width: number;
+  height: number;
+}
+
+export interface GoogleReview {
+  authorName: string;
+  rating: number;
+  text: string;
+  time: number;
+  profilePhotoUrl?: string;
+}
+
+/**
+ * User taste profile from onboarding
+ */
+export interface UserTasteProfile {
+  id: string;
+  userId: string;
+  
+  // Basic info
+  birthDate?: string;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  phone?: string;
+  
+  // Hard parameters (for SQL filtering)
+  isKosher: boolean;
+  isVegetarian: boolean;
+  isVegan: boolean;
+  glutenFree: boolean;
+  
+  // Preferences (in English)
+  dislikes?: string[];
+  likes?: string[];
+  freeText?: string;
+  
+  // Restaurants by context
+  dateRestaurants?: ContextRestaurant[];
+  friendsRestaurants?: ContextRestaurant[];
+  familyRestaurants?: ContextRestaurant[];
+  soloRestaurants?: ContextRestaurant[];
+  workRestaurants?: ContextRestaurant[];
+  dislikedRestaurants?: ContextRestaurant[];
+  
+  // Google favorites import
+  googleFavorites?: ContextRestaurant[];
+  
+  // Computed embedding
+  tasteText?: string;
+  tasteEmbedding?: number[];
+  
+  // Meta
+  onboardingCompleted: boolean;
+  onboardingStep: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ContextRestaurant {
+  googlePlaceId: string;
+  name: string;
+}
+
+/**
+ * Signal types for taste learning
+ */
+export type SignalType = 'review' | 'chat' | 'like' | 'comment' | 'wishlist' | 'click';
+
+/**
+ * User taste signal for learning preferences
+ */
+export interface UserTasteSignal {
+  id: string;
+  userId: string;
+  
+  signalType: SignalType;
+  signalStrength: 1 | 2 | 3 | 4 | 5;
+  isPositive: boolean;
+  
+  // Restaurant context
+  restaurantId?: string;
+  googlePlaceId?: string;
+  restaurantName?: string;
+  cuisineTypes?: string[];
+  
+  // Signal content (in English)
+  content?: string;
+  
+  // Source reference
+  sourceId?: string;
+  
+  createdAt?: string;
+}
+
+/**
+ * Match score result from vector search
+ */
+export interface MatchScoreResult {
+  restaurantId: string;
+  matchScore: number; // 0-1, displayed as percentage
+}
+
+/**
+ * Restaurant search result with similarity and distance
+ */
+export interface RestaurantSearchResult extends RestaurantCache {
+  distanceMeters?: number;
+  similarity?: number; // 0-1 from vector search
+  matchScore?: number; // 0-1 computed match score
+}
+

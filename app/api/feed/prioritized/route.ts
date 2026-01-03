@@ -1,6 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Helper function to calculate match score
+async function calculateMatchScore(
+  supabase: any,
+  userId: string | undefined,
+  restaurantId: string,
+  googlePlaceId: string | undefined
+): Promise<number> {
+  // If no user, return default score
+  if (!userId) {
+    return 75;
+  }
+
+  try {
+    // Get user's taste profile with embedding
+    const { data: tasteProfile } = await supabase
+      .from('user_taste_profiles')
+      .select('taste_embedding')
+      .eq('user_id', userId)
+      .single();
+
+    // If no taste profile or embedding, return default
+    if (!tasteProfile?.taste_embedding) {
+      return 75;
+    }
+
+    // Try to get restaurant from cache with embedding
+    if (googlePlaceId) {
+      const { data: cachedRestaurant } = await supabase
+        .from('restaurant_cache')
+        .select('embedding, google_rating')
+        .eq('google_place_id', googlePlaceId)
+        .single();
+
+      if (cachedRestaurant?.embedding) {
+        // Calculate cosine similarity
+        const similarity = cosineSimilarity(
+          tasteProfile.taste_embedding,
+          cachedRestaurant.embedding
+        );
+
+        // Calculate score: 50% similarity + 25% rating + 25% default
+        const rating = cachedRestaurant.google_rating || 3.5;
+        const score = (0.50 * similarity + 0.25 * (rating / 5) + 0.25 * 0.75) * 100;
+        return Math.max(50, Math.min(100, Math.round(score)));
+      }
+    }
+
+    // Fallback: return slightly randomized score based on something
+    return Math.floor(Math.random() * 20 + 70); // 70-90
+  } catch (error) {
+    console.error('Error calculating match score:', error);
+    return 75;
+  }
+}
+
+// Cosine similarity helper
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a || !b || a.length !== b.length) return 0.7;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  
+  if (normA === 0 || normB === 0) return 0.7;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
@@ -195,6 +268,11 @@ export async function GET(request: NextRequest) {
                 };
               });
 
+              // Calculate match score for Google results
+              const matchPercentage = user 
+                ? await calculateMatchScore(supabase, user.id, restaurant.id, restaurant.googlePlaceId)
+                : Math.floor(Math.random() * 20 + 70);
+
               return {
                 id: restaurant.id,
                 name: restaurant.name,
@@ -203,7 +281,7 @@ export async function GET(request: NextRequest) {
                 rating: restaurant.rating,
                 totalReviews: restaurant.totalReviews || 0,
                 distance: restaurant.distance,
-                matchPercentage: Math.floor(Math.random() * 30 + 70),
+                matchPercentage,
                 mutualFriends: [],
                 reviews,
                 googlePlaceId: restaurant.googlePlaceId,
@@ -303,7 +381,8 @@ async function buildRestaurantData(
   supabase: any,
   restaurant: any,
   followingIds: string[],
-  user: any
+  user: any,
+  calculateScore: boolean = true
 ) {
   // Get all reviews for this restaurant from specified users (or all if empty)
   let reviewsQuery = supabase
@@ -443,6 +522,11 @@ async function buildRestaurantData(
     }));
   }
 
+  // Calculate match score
+  const matchPercentage = calculateScore && user 
+    ? await calculateMatchScore(supabase, user.id, restaurant.id, restaurant.google_place_id)
+    : Math.floor(Math.random() * 20 + 70);
+
   return {
     id: restaurant.id,
     name: restaurant.name,
@@ -451,7 +535,7 @@ async function buildRestaurantData(
     rating: restaurant.average_rating || 0,
     totalReviews: reviews.length,
     distance: undefined,
-    matchPercentage: Math.floor(Math.random() * 30 + 70),
+    matchPercentage,
     mutualFriends,
     reviews,
     googlePlaceId: restaurant.google_place_id,
