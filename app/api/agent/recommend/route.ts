@@ -385,7 +385,7 @@ async function rerankCandidates(
   userId?: string
 ): Promise<any[]> {
   // Get friends scores if user is logged in
-  let friendsScores = new Map<string, number>();
+  const friendsScores = new Map<string, number>();
   
   if (userId) {
     const { data: followingData } = await supabase

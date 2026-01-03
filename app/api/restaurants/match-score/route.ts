@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     // Get friends' reviews for these restaurants
     const dbRestaurantIds = (dbRestaurants || []).map((r: any) => r.id);
-    let friendsReviewsMap = new Map<string, number>();
+    const friendsReviewsMap = new Map<string, number>();
 
     if (followingIds.length > 0 && dbRestaurantIds.length > 0) {
       const { data: friendsReviews } = await supabase
