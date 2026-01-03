@@ -35,17 +35,42 @@ import OpenAI from 'openai';
 // Israel Grid Configuration
 // ========================================
 
-// Comprehensive grid covering all of Israel
-// Each point with 3km radius for dense coverage
+// Helper function to generate a dense grid for a bounding box
+function generateDenseGrid(
+  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number },
+  stepDegrees: number = 0.008, // ~800m spacing
+  namePrefix: string = 'Grid'
+): Array<{ lat: number; lng: number; name: string }> {
+  const grid: Array<{ lat: number; lng: number; name: string }> = [];
+  let pointNum = 1;
+  
+  for (let lat = bounds.minLat; lat <= bounds.maxLat; lat += stepDegrees) {
+    for (let lng = bounds.minLng; lng <= bounds.maxLng; lng += stepDegrees) {
+      grid.push({
+        lat: Math.round(lat * 10000) / 10000, // Round to 4 decimal places
+        lng: Math.round(lng * 10000) / 10000,
+        name: `${namePrefix} ${pointNum++}`,
+      });
+    }
+  }
+  
+  return grid;
+}
+
+// Tel Aviv DENSE grid - ~800m spacing for comprehensive coverage
+// Tel Aviv bounds: South (Jaffa) to North (Reading), West (Beach) to East (Ayalon)
+const TEL_AVIV_DENSE_GRID = generateDenseGrid(
+  { minLat: 32.04, maxLat: 32.13, minLng: 34.76, maxLng: 34.82 },
+  0.008, // ~800m spacing = ~90 grid points
+  'TLV'
+);
+
+// Comprehensive grid covering all of Israel (for other regions)
 const ISRAEL_FULL_GRID = [
-  // Tel Aviv & Gush Dan (Dense coverage)
-  { lat: 32.0853, lng: 34.7818, name: 'Tel Aviv Center' },
-  { lat: 32.0750, lng: 34.7650, name: 'Jaffa' },
-  { lat: 32.0620, lng: 34.7720, name: 'Neve Tzedek' },
-  { lat: 32.0733, lng: 34.7680, name: 'Florentin' },
-  { lat: 32.0900, lng: 34.7900, name: 'North Tel Aviv' },
-  { lat: 32.1050, lng: 34.8050, name: 'Ramat Aviv' },
-  { lat: 32.0650, lng: 34.8050, name: 'East Tel Aviv' },
+  // Tel Aviv - use dense grid
+  ...TEL_AVIV_DENSE_GRID,
+  
+  // Gush Dan (surrounding cities)
   { lat: 32.1100, lng: 34.8400, name: 'Ramat Gan Center' },
   { lat: 32.0900, lng: 34.8500, name: 'Givatayim' },
   { lat: 32.1200, lng: 34.8700, name: 'Bnei Brak' },
@@ -155,9 +180,16 @@ const ISRAEL_FULL_GRID = [
 // Region subsets for partial scans
 const REGIONS: Record<string, typeof ISRAEL_FULL_GRID> = {
   israel: ISRAEL_FULL_GRID,
-  tel_aviv: ISRAEL_FULL_GRID.filter(p => 
-    p.lat >= 32.0 && p.lat <= 32.2 && p.lng >= 34.7 && p.lng <= 34.95
+  // Tel Aviv ONLY - dense grid focused on Tel Aviv city limits
+  tel_aviv: TEL_AVIV_DENSE_GRID,
+  // Gush Dan - Tel Aviv + surrounding cities
+  gush_dan: [
+    ...TEL_AVIV_DENSE_GRID,
+    ...ISRAEL_FULL_GRID.filter(p => 
+      p.lat >= 32.0 && p.lat <= 32.2 && p.lng >= 34.7 && p.lng <= 34.95 &&
+      !TEL_AVIV_DENSE_GRID.some(t => t.lat === p.lat && t.lng === p.lng)
   ),
+  ],
   center: ISRAEL_FULL_GRID.filter(p => 
     p.lat >= 31.7 && p.lat <= 32.4 && p.lng >= 34.6 && p.lng <= 35.1
   ),
@@ -185,7 +217,7 @@ export async function POST(request: NextRequest) {
       batchSize = 5, // Reduced for stability
       delayBetweenBatches = 3000, // 3 seconds between batches
       delayBetweenAreas = 5000, // 5 seconds between areas
-      radius = 3000, // 3km radius for good coverage with overlap
+      radius = 1500, // 1.5km radius - works well with dense grid (800m spacing)
     } = body;
 
     // API keys
@@ -233,15 +265,18 @@ export async function POST(request: NextRequest) {
       console.log(`   Coordinates: ${area.lat}, ${area.lng}`);
 
       try {
-        // Fetch restaurants from Google Places (with pagination)
-        const places = await fetchNearbyRestaurants(googleApiKey, area.lat, area.lng, radius);
-        const newPlaces = places.filter(p => !seenPlaceIds.has(p.place_id));
-        
-        // Mark as seen
-        places.forEach(p => seenPlaceIds.add(p.place_id));
+        // Fetch restaurants from Google Places (with recursive subdivision for dense areas)
+        // The function handles deduplication internally via seenPlaceIds
+        const newPlaces = await fetchNearbyRestaurants(
+          googleApiKey, 
+          area.lat, 
+          area.lng, 
+          radius,
+          seenPlaceIds // Pass shared set for cross-area deduplication
+        );
         
         restaurantsFound += newPlaces.length;
-        console.log(`   Found: ${places.length} restaurants (${newPlaces.length} new, ${places.length - newPlaces.length} duplicates)`);
+        console.log(`   Found: ${newPlaces.length} new restaurants (total unique so far: ${seenPlaceIds.size})`);
 
         // Process in batches
         for (let i = 0; i < newPlaces.length; i += batchSize) {
@@ -331,7 +366,7 @@ export async function POST(request: NextRequest) {
 // Core Processing Functions
 // ========================================
 
-// Valid Tel Aviv city names (in English and Hebrew)
+// Valid Tel Aviv city names (in English and Hebrew) - expanded list
 const TEL_AVIV_CITY_NAMES = new Set([
   'Tel Aviv-Yafo',
   'Tel Aviv',
@@ -342,7 +377,30 @@ const TEL_AVIV_CITY_NAMES = new Set([
   'תל אביב',
   'Jaffa',
   'יפו',
+  'TLV',
+  'tel aviv',
+  'tel-aviv',
+  'telaviv',
+  'Tel Aviv District', // Sometimes Google returns the district
+  'מחוז תל אביב',
 ]);
+
+// Tel Aviv approximate bounding box for coordinate-based filtering
+// Slightly larger than the grid to catch edge cases
+const TEL_AVIV_BOUNDS = {
+  minLat: 32.035,
+  maxLat: 32.135,
+  minLng: 34.755,
+  maxLng: 34.825,
+};
+
+// Function to check if coordinates are in Tel Aviv
+function isInTelAviv(lat: number, lng: number): boolean {
+  return lat >= TEL_AVIV_BOUNDS.minLat && 
+         lat <= TEL_AVIV_BOUNDS.maxLat && 
+         lng >= TEL_AVIV_BOUNDS.minLng && 
+         lng <= TEL_AVIV_BOUNDS.maxLng;
+}
 
 async function processRestaurant(
   supabase: any,
@@ -368,15 +426,29 @@ async function processRestaurant(
     }
   }
 
-  // Fetch place details
-  const details = await fetchPlaceDetails(googleApiKey, place.place_id);
+  // Fetch place details (English) and Hebrew name in parallel
+  const [details, nameHe] = await Promise.all([
+    fetchPlaceDetails(googleApiKey, place.place_id),
+    fetchHebrewName(googleApiKey, place.place_id),
+  ]);
   
-  // Filter by city - only Tel Aviv-Yafo
+  // Extract coordinates
+  const lat = place.geometry.location.lat;
+  const lng = place.geometry.location.lng;
+  
+  // Filter by Tel Aviv - use BOTH city name AND coordinates
   const city = extractCity(details.address_components);
-  if (!city || !TEL_AVIV_CITY_NAMES.has(city)) {
-    console.log(`   ⏭️ Filtered: ${place.name} (city: ${city || 'unknown'})`);
+  const inTelAvivByCoordinates = isInTelAviv(lat, lng);
+  const inTelAvivByName = city && TEL_AVIV_CITY_NAMES.has(city);
+  
+  // Accept if EITHER coordinates OR name match (coordinates are more reliable)
+  if (!inTelAvivByCoordinates && !inTelAvivByName) {
+    console.log(`   ⏭️ Filtered: ${place.name} (city: ${city || 'unknown'}, coords: ${lat.toFixed(4)}, ${lng.toFixed(4)})`);
     return 'filtered';
   }
+  
+  // If coordinates say Tel Aviv but name doesn't match, override the city name
+  const finalCity = inTelAvivByCoordinates ? 'Tel Aviv-Yafo' : city;
   
   // Generate summary AND cuisine types with LLM (single call)
   const { summary, cuisineTypes } = await retryOperation(() => 
@@ -389,14 +461,12 @@ async function processRestaurant(
   );
 
   // Prepare data - use proper PostGIS format
-  const lat = place.geometry.location.lat;
-  const lng = place.geometry.location.lng;
-
   const restaurantData = {
     google_place_id: place.place_id,
-    name: place.name,
+    name_en: place.name, // English name (from language=en search)
+    name_he: nameHe,     // Hebrew name for local search
     address: details.formatted_address || place.vicinity,
-    city: extractCity(details.address_components),
+    city: finalCity, // Use the corrected city name
     // PostGIS GEOGRAPHY format - use raw SQL for location
     phone: details.formatted_phone_number || null,
     website: details.website || null,
@@ -431,7 +501,8 @@ async function processRestaurant(
   // Use raw SQL for proper PostGIS point insertion
   const { error: upsertError } = await supabase.rpc('upsert_restaurant_cache', {
     p_google_place_id: restaurantData.google_place_id,
-    p_name: restaurantData.name,
+    p_name_en: restaurantData.name_en,
+    p_name_he: restaurantData.name_he,
     p_address: restaurantData.address,
     p_city: restaurantData.city,
     p_lat: lat,
@@ -486,12 +557,13 @@ async function processRestaurant(
 // Google Places API Functions
 // ========================================
 
-async function fetchNearbyRestaurants(
+// Single area search - returns results and whether it hit the limit
+async function fetchNearbyRestaurantsSingle(
   apiKey: string,
   lat: number,
   lng: number,
   radius: number
-): Promise<any[]> {
+): Promise<{ results: any[]; hitLimit: boolean }> {
   const allResults: any[] = [];
   let nextPageToken: string | undefined;
   let pageCount = 0;
@@ -528,7 +600,76 @@ async function fetchNearbyRestaurants(
     }
   } while (nextPageToken && pageCount < maxPages);
 
-  return allResults;
+  // If we got exactly 60 results, we likely hit the Google limit
+  const hitLimit = allResults.length >= 60;
+  
+  return { results: allResults, hitLimit };
+}
+
+// Recursive search that subdivides dense areas into 4 quadrants
+// This ensures we capture all restaurants even in very dense areas
+async function fetchNearbyRestaurants(
+  apiKey: string,
+  lat: number,
+  lng: number,
+  radius: number,
+  seenPlaceIds: Set<string> = new Set(),
+  depth: number = 0,
+  maxDepth: number = 3, // Max 3 levels of subdivision (1 -> 4 -> 16 -> 64 areas)
+  minRadius: number = 200 // Stop subdividing below 200m radius
+): Promise<any[]> {
+  const { results, hitLimit } = await fetchNearbyRestaurantsSingle(apiKey, lat, lng, radius);
+  
+  // Filter out already seen places
+  const newResults = results.filter(r => !seenPlaceIds.has(r.place_id));
+  newResults.forEach(r => seenPlaceIds.add(r.place_id));
+  
+  // If we didn't hit the limit, or we've subdivided enough, return what we have
+  if (!hitLimit || depth >= maxDepth || radius <= minRadius) {
+    if (hitLimit && depth >= maxDepth) {
+      console.log(`   ⚠️ Still hitting limit at max depth ${depth}, radius ${radius}m - some restaurants may be missed`);
+    }
+    return newResults;
+  }
+  
+  // Hit the limit - subdivide into 4 quadrants and search each
+  console.log(`   🔄 Area at (${lat.toFixed(4)}, ${lng.toFixed(4)}) hit 60 limit, subdividing (depth ${depth + 1})`);
+  
+  // Calculate offset for quadrants (roughly half the radius in degrees)
+  // 1 degree lat ≈ 111km, 1 degree lng ≈ 85km at Israel's latitude
+  const latOffset = (radius / 1000) / 111 / 2; // Half radius in degrees
+  const lngOffset = (radius / 1000) / 85 / 2;  // Half radius in degrees
+  const newRadius = Math.round(radius / 2);     // Half the radius for quadrants
+  
+  // 4 quadrants: NW, NE, SW, SE
+  const quadrants = [
+    { lat: lat + latOffset, lng: lng - lngOffset, name: 'NW' },
+    { lat: lat + latOffset, lng: lng + lngOffset, name: 'NE' },
+    { lat: lat - latOffset, lng: lng - lngOffset, name: 'SW' },
+    { lat: lat - latOffset, lng: lng + lngOffset, name: 'SE' },
+  ];
+  
+  // Search each quadrant (with delay to avoid rate limiting)
+  const allQuadrantResults: any[] = [...newResults];
+  
+  for (const quadrant of quadrants) {
+    await sleep(1000); // Small delay between quadrant searches
+    
+    const quadrantResults = await fetchNearbyRestaurants(
+      apiKey,
+      quadrant.lat,
+      quadrant.lng,
+      newRadius,
+      seenPlaceIds,
+      depth + 1,
+      maxDepth,
+      minRadius
+    );
+    
+    allQuadrantResults.push(...quadrantResults);
+  }
+  
+  return allQuadrantResults;
 }
 
 async function fetchPlaceDetails(apiKey: string, placeId: string): Promise<any> {
@@ -554,6 +695,24 @@ async function fetchPlaceDetails(apiKey: string, placeId: string): Promise<any> 
   }
   
   return data.result || {};
+}
+
+// Fetch Hebrew name for a place (separate call to avoid mixing languages)
+async function fetchHebrewName(apiKey: string, placeId: string): Promise<string | null> {
+  try {
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name&key=${apiKey}&language=iw`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.result?.name) {
+      return data.result.name;
+    }
+    return null;
+  } catch (error) {
+    console.error(`   Error fetching Hebrew name for ${placeId}:`, error);
+    return null;
+  }
 }
 
 // ========================================

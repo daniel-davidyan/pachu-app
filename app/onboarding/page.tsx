@@ -120,10 +120,10 @@ function OnboardingContent() {
   // Restaurant search state for contexts
   const [activeContext, setActiveContext] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Array<{ place_id: string; name: string; address: string; rating?: number }>>([]);
+  const [searchResults, setSearchResults] = useState<Array<{ place_id: string; name: string; address: string; rating?: number; categories?: string[] }>>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Debounced search function
+  // Debounced search function - uses local cache (fast & free!)
   const searchRestaurants = useCallback(async (query: string) => {
     if (!query || query.length < 2) {
       setSearchResults([]);
@@ -132,15 +132,17 @@ function OnboardingContent() {
 
     setIsSearching(true);
     try {
-      const response = await fetch(`/api/restaurants/search?query=${encodeURIComponent(query)}&location=32.0853,34.7818&radius=50000`);
+      // Search from local restaurant_cache table
+      const response = await fetch(`/api/restaurants/cache/search?query=${encodeURIComponent(query)}&limit=10`);
       const data = await response.json();
       
       if (data.results) {
         setSearchResults(data.results.slice(0, 8).map((r: any) => ({
           place_id: r.place_id,
           name: r.name,
-          address: r.formatted_address || r.vicinity || '',
-          rating: r.rating
+          address: r.address || '',
+          rating: r.rating,
+          categories: r.categories || []
         })));
       }
     } catch (error) {
@@ -770,6 +772,15 @@ function OnboardingContent() {
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 truncate">{r.name}</p>
                                 <p className="text-sm text-gray-500 truncate">{r.address}</p>
+                                {r.categories && r.categories.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {r.categories.slice(0, 3).map((cat, i) => (
+                                      <span key={i} className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                        {cat}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 ml-2">
                                 {r.rating && (
