@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
  * GET /api/restaurants/cache/search
  * 
  * Search restaurants from the local cache (restaurant_cache table).
- * Fast and free - no external API calls!
+ * Uses Fuzzy Search (trigrams) for better matching with typos!
  * 
  * Query params:
  * - query: search term (required)
@@ -25,26 +25,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createClient();
-    const searchTerm = `%${query}%`;
 
-    // Search by name (case-insensitive) using ILIKE
-    // Also search in summary and categories for better results
-    const { data: restaurants, error } = await supabase
-      .from('restaurant_cache')
-      .select(`
-        google_place_id,
-        name,
-        address,
-        google_rating,
-        price_level,
-        categories,
-        photos,
-        latitude,
-        longitude
-      `)
-      .or(`name.ilike.${searchTerm},summary.ilike.${searchTerm}`)
-      .order('google_rating', { ascending: false, nullsFirst: false })
-      .limit(limit);
+    // Use Fuzzy Search with trigram similarity (pg_trgm)
+    // This finds "mayer" when searching "meyer", handles typos, etc.
+    const { data: restaurants, error } = await supabase.rpc(
+      'search_restaurants_fuzzy',
+      {
+        search_query: query,
+        max_results: limit
+      }
+    );
 
     if (error) {
       console.error('Error searching restaurants:', error);

@@ -22,6 +22,7 @@ interface PlaceResult {
   rating: number;
   photoUrl?: string;
   visitedByFollowing?: VisitedUser[];
+  distance?: number; // meters
 }
 
 interface MutualFriend {
@@ -117,26 +118,47 @@ export default function SearchPage() {
         navigator.geolocation.getCurrentPosition(resolve, reject);
       }).catch(() => ({ coords: { latitude: 32.0853, longitude: 34.7818 } } as GeolocationPosition));
 
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+
       const response = await fetch(
-        `/api/restaurants/nearby?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&radius=5000`
+        `/api/restaurants/nearby?latitude=${userLat}&longitude=${userLng}&radius=2000`
       );
       const data = await response.json();
-      // Get top 5 trending places by rating - KEEP ALL FIELDS including visitedByFollowing
-      const trending = (data.restaurants || [])
-        .filter((r: any) => r.rating > 4.0)
-        .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
-        .slice(0, 5)
-        .map((r: any) => ({
+      
+      // Calculate distance and sort by closest
+      const placesWithDistance = (data.restaurants || []).map((r: any) => {
+        const lat = r.latitude || 0;
+        const lng = r.longitude || 0;
+        // Haversine distance in meters
+        const R = 6371000;
+        const dLat = (lat - userLat) * Math.PI / 180;
+        const dLng = (lng - userLng) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(userLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
+                  Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        
+        return {
           googlePlaceId: r.googlePlaceId || r.id,
           name: r.name,
           address: r.address,
           rating: r.rating,
           photoUrl: r.photoUrl,
-          visitedByFollowing: r.visitedByFollowing || [] // KEEP THIS FIELD!
-        }));
-      setTrendingPlaces(trending);
+          visitedByFollowing: r.visitedByFollowing || [],
+          distance: Math.round(distance), // meters
+        };
+      });
+      
+      // Sort by distance (closest first) and take top 5
+      const nearbyPlaces = placesWithDistance
+        .sort((a: any, b: any) => a.distance - b.distance)
+        .slice(0, 5);
+      
+      setTrendingPlaces(nearbyPlaces);
     } catch (error) {
-      console.error('Error loading trending places:', error);
+      console.error('Error loading nearby places:', error);
       setTrendingPlaces([]);
     } finally {
       setLoadingTrending(false);
@@ -362,16 +384,16 @@ export default function SearchPage() {
                 </>
               ) : (
                 <>
-                  {/* Best Match for You Section */}
+                  {/* Places Near You Section */}
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-1.5">
-                      <span className="text-base">✨</span>
-                      Best Match for You
+                      <span className="text-base">📍</span>
+                      Places Near You
                     </h2>
                     {loadingTrending ? (
                       <div className="text-center py-8">
                         <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">Finding your best matches...</p>
+                        <p className="text-sm text-gray-500">Finding places near you...</p>
                       </div>
                     ) : trendingPlaces.length > 0 ? (
                       <div className="space-y-2.5">
@@ -394,13 +416,22 @@ export default function SearchPage() {
                               <h3 className="font-semibold text-sm text-gray-900 truncate">{place.name}</h3>
                               <p className="text-xs text-gray-500 truncate">{formatAddress(place.address)}</p>
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                {place.rating > 0 && (
+                                {place.distance !== undefined && (
                                   <div className="bg-white border border-gray-200 rounded-full px-2 py-0.5 shadow-sm">
                                     <div className="flex items-center gap-1">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-green-400 to-green-500 animate-pulse" />
-                                      <span className="text-xs font-bold text-gray-900">{Math.round((place.rating / 5) * 100)}%</span>
-                                      <span className="text-[9px] text-gray-500">match</span>
+                                      <MapPin className="w-3 h-3 text-primary" />
+                                      <span className="text-xs font-bold text-gray-900">
+                                        {place.distance < 1000 
+                                          ? `${place.distance}m` 
+                                          : `${(place.distance / 1000).toFixed(1)}km`}
+                                      </span>
                                     </div>
+                                  </div>
+                                )}
+                                {place.rating > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                    <span className="text-xs text-gray-700">{place.rating.toFixed(1)}</span>
                                   </div>
                                 )}
                                 {place.visitedByFollowing && place.visitedByFollowing.length > 0 && (
@@ -438,7 +469,7 @@ export default function SearchPage() {
                     ) : (
                       <div className="text-center py-8 text-gray-500">
                         <MapPin className="w-8 h-8 mx-auto mb-3 text-gray-300" />
-                        <p className="text-sm">No matches found</p>
+                        <p className="text-sm">No places found nearby</p>
                         <p className="text-xs mt-1">Try searching for restaurants</p>
                       </div>
                     )}

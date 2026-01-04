@@ -37,36 +37,31 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // LOCAL DB ONLY MODE - No Google API calls
-    const searchTerm = `%${query}%`;
-    const { data: localResults, error: localError } = await supabase
-      .from('restaurant_cache')
-      .select(`
-        google_place_id,
-        name,
-        address,
-        latitude,
-        longitude,
-        google_rating,
-        google_reviews_count,
-        price_level,
-        categories,
-        photos
-      `)
-      .or(`name.ilike.${searchTerm},summary.ilike.${searchTerm}`)
-      .order('google_rating', { ascending: false, nullsFirst: false })
-      .limit(15);
+    // LOCAL DB ONLY MODE with FUZZY SEARCH
+    const { data: localResults, error: localError } = await supabase.rpc(
+      'search_restaurants_fuzzy',
+      {
+        search_query: query,
+        max_results: 15
+      }
+    );
 
     if (localError) {
       console.error('Error searching local DB:', localError);
       return NextResponse.json({ restaurants: [] });
     }
 
-    console.log(`🔍 Search "${query}": Found ${localResults?.length || 0} in local DB`);
+    console.log(`🔍 Fuzzy Search "${query}": Found ${localResults?.length || 0} in local DB`);
     
     // Transform local results to match expected format
     const restaurants = (localResults || []).map((place: any) => {
-      const photoRef = place.photos?.[0]?.photo_reference;
+      // photos is JSONB, need to parse if string
+      let photos = place.photos;
+      if (typeof photos === 'string') {
+        try { photos = JSON.parse(photos); } catch { photos = []; }
+      }
+      const photoRef = photos?.[0]?.photo_reference;
+      
       return {
         googlePlaceId: place.google_place_id,
         name: place.name,
@@ -81,6 +76,7 @@ export async function GET(request: NextRequest) {
         cuisineTypes: place.categories || [],
         source: 'cache',
         visitedByFollowing: [],
+        similarityScore: place.similarity_score, // Include fuzzy match score
       };
     });
 
