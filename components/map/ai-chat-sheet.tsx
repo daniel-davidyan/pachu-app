@@ -20,11 +20,18 @@ interface Restaurant {
   website?: string;
 }
 
+interface Chip {
+  label: string;
+  value: string;
+  emoji?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   restaurants?: Restaurant[];
+  chips?: Chip[];
 }
 
 interface ChatConversation {
@@ -54,6 +61,17 @@ export interface RestaurantFilters {
 }
 
 const STORAGE_KEY = 'pachu-chat-history';
+
+// Conversation context tracking
+interface ConversationContext {
+  where: string | null;
+  withWho: string | null;
+  purpose: string | null;
+  budget: string | null;
+  when: string | null;
+  cuisinePreference: string | null;
+  additionalNotes: string[];
+}
 
 // Helper function to get restaurant icon emoji
 const getRestaurantIcon = (restaurant: Restaurant): string => {
@@ -189,6 +207,8 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
   const [showHistory, setShowHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [conversationContext, setConversationContext] = useState<ConversationContext | null>(null);
+  const [currentChips, setCurrentChips] = useState<Chip[]>([]);
   
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -348,9 +368,161 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
     setCurrentChatId(Date.now().toString());
     setShowHistory(false);
     setInputValue('');
+    setConversationContext(null);
+    setCurrentChips([]);
     setTimeout(() => {
       inputRef.current?.focus();
     }, 100);
+  };
+
+  const handleChipClick = (chip: Chip) => {
+    // Set the chip value as input and send
+    const chipText = chip.emoji ? `${chip.emoji} ${chip.label}` : chip.label;
+    setInputValue(chip.label);
+    setCurrentChips([]); // Clear chips after selection
+    // Trigger send with the chip value
+    setTimeout(() => {
+      handleSendWithValue(chip.label);
+    }, 50);
+  };
+
+  const handleSendWithValue = async (value: string) => {
+    if (!value.trim() || isLoading) return;
+    
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: value
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+    setCurrentChips([]);
+
+    // Auto-expand if small
+    if (!isActive || sheetHeight < 300) {
+      setIsActive(true);
+      setSheetHeight(400);
+    }
+
+    await processAgentResponse([...messages, userMessage]);
+  };
+
+  const processAgentResponse = async (allMessages: Message[]) => {
+    try {
+      const location = userLocation || { lat: 32.0853, lng: 34.7818 };
+      const conversationHistory = allMessages.map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      // First, call the smart agent to process the message
+      const agentResponse = await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: allMessages[allMessages.length - 1].content,
+          conversationId: currentChatId,
+          previousContext: conversationContext,
+          messages: conversationHistory.slice(0, -1), // All except current
+          userLocation: location,
+        })
+      });
+
+      const agentData = await agentResponse.json();
+
+      if (agentData.error) {
+        throw new Error(agentData.error);
+      }
+
+      // Update conversation context
+      if (agentData.context) {
+        setConversationContext(agentData.context);
+      }
+
+      // If ready to recommend, call the recommend API
+      if (agentData.readyToRecommend) {
+        const recommendResponse = await fetch('/api/agent/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: conversationHistory,
+            latitude: location.lat,
+            longitude: location.lng,
+            radiusMeters: 5000,
+            conversationId: currentChatId,
+            context: agentData.context,
+          })
+        });
+
+        const recommendData = await recommendResponse.json();
+
+        if (recommendData.recommendations && recommendData.recommendations.length > 0) {
+          const restaurants = recommendData.recommendations.map((rec: any) => ({
+            id: rec.restaurant.id,
+            name: rec.restaurant.name,
+            address: rec.restaurant.address,
+            rating: rec.restaurant.googleRating || rec.restaurant.rating || 0,
+            totalReviews: rec.restaurant.googleReviewsCount || 0,
+            cuisineTypes: rec.restaurant.cuisineTypes,
+            priceLevel: rec.restaurant.priceLevel,
+            photoUrl: rec.restaurant.photos?.[0]?.url || 
+              (rec.restaurant.photos?.[0]?.photoReference 
+                ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photoReference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
+                : undefined),
+            latitude: rec.restaurant.latitude,
+            longitude: rec.restaurant.longitude,
+            matchPercentage: rec.matchScore,
+            source: 'google' as const,
+            googlePlaceId: rec.restaurant.googlePlaceId,
+            website: rec.restaurant.website,
+          }));
+
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: recommendData.explanation || agentData.message,
+            restaurants,
+          };
+
+          setMessages(prev => [...prev, assistantMessage]);
+          onRestaurantsFound?.(restaurants);
+          setCurrentChips([]);
+        } else {
+          // No recommendations found
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: agentData.message || "Let me search for some options...",
+            chips: agentData.chips,
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+          setCurrentChips(agentData.chips || []);
+        }
+      } else {
+        // Not ready yet, show agent response with chips
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentData.message,
+          chips: agentData.chips,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setCurrentChips(agentData.chips || []);
+      }
+
+    } catch (error) {
+      console.error('Agent error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I'm having trouble connecting. Let me help you find restaurants near you! 📍"
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLoadChat = (conversation: ChatConversation) => {
@@ -388,141 +560,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
       return;
     }
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: inputValue
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
-    // Auto-expand if small
-    if (!isActive || sheetHeight < 300) {
-      setIsActive(true);
-      setSheetHeight(400);
-    }
-
-    try {
-      // Build conversation history for the API
-      const allMessages = [...messages, userMessage];
-      const conversationHistory = allMessages.map(m => ({
-        role: m.role,
-        content: m.content
-      }));
-
-      const location = userLocation || { lat: 32.0853, lng: 34.7818 };
-
-      // Try the new agent/recommend API first, fallback to map-chat
-      let data;
-      let useNewAgent = true; // Feature flag - set to true to use new AI agent
-
-      if (useNewAgent) {
-        try {
-          // Use new Agent API with 4-step algorithm
-          const agentResponse = await fetch('/api/agent/recommend', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messages: conversationHistory,
-              latitude: location.lat,
-              longitude: location.lng,
-              radiusMeters: 5000,
-              conversationId: currentChatId,
-            })
-          });
-
-          const agentData = await agentResponse.json();
-
-          if (agentData.recommendations && agentData.recommendations.length > 0) {
-            // Transform recommendations to restaurant format
-            const restaurants = agentData.recommendations.map((rec: any) => ({
-              id: rec.restaurant.id,
-              name: rec.restaurant.name,
-              address: rec.restaurant.address,
-              rating: rec.restaurant.googleRating || rec.restaurant.rating || 0,
-              totalReviews: rec.restaurant.googleReviewsCount || 0,
-              cuisineTypes: rec.restaurant.cuisineTypes,
-              priceLevel: rec.restaurant.priceLevel,
-              photoUrl: rec.restaurant.photos?.[0]?.url || 
-                (rec.restaurant.photos?.[0]?.photoReference 
-                  ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photoReference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
-                  : undefined),
-              latitude: rec.restaurant.latitude,
-              longitude: rec.restaurant.longitude,
-              matchPercentage: rec.matchScore,
-              source: 'google' as const,
-              googlePlaceId: rec.restaurant.googlePlaceId,
-              website: rec.restaurant.website,
-              // Add explanation as a property
-              _explanation: rec.explanation,
-            }));
-
-            data = {
-              message: agentData.explanation || '',
-              restaurants,
-            };
-          } else {
-            // No recommendations yet, continue conversation
-            data = {
-              message: agentData.explanation || "I'm finding the best restaurants for you... Tell me more about what you're looking for!",
-              restaurants: [],
-            };
-          }
-        } catch (agentError) {
-          console.log('Agent API error, falling back to map-chat:', agentError);
-          useNewAgent = false;
-        }
-      }
-
-      if (!useNewAgent || !data) {
-        // Fallback to original map-chat API
-        const response = await fetch('/api/map-chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: inputValue,
-            conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
-            location
-          })
-        });
-
-        data = await response.json();
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.message,
-        restaurants: data.restaurants || []
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      if (data.restaurants && data.restaurants.length > 0) {
-        onRestaurantsFound?.(data.restaurants);
-      }
-
-      if (data.filters) {
-        onFilterChange?.(data.filters);
-      }
-
-    } catch (error) {
-      console.error('Chat error:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "I'm having trouble connecting. Let me help you find restaurants near you! 📍"
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
+    await handleSendWithValue(inputValue);
   };
 
   // If not active, show only floating search bar (positioned above nav-bar)
@@ -598,6 +636,17 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
               opacity: 1;
               transform: translateY(0);
             }
+          }
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+          .animate-fadeIn {
+            animation: fadeIn 0.3s ease-out;
           }
           /* Hide scrollbar for webkit browsers */
           .hide-scrollbar::-webkit-scrollbar {
@@ -815,6 +864,27 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                   <div className="bg-white shadow-sm border border-gray-100 px-3 py-2 rounded-2xl rounded-bl-md">
                     <Loader2 className="w-5 h-5 animate-spin text-primary" />
                   </div>
+                </div>
+              )}
+
+              {/* Quick Reply Chips */}
+              {currentChips.length > 0 && !isLoading && (
+                <div className="flex flex-wrap gap-2 mt-2 mb-1 animate-fadeIn">
+                  {currentChips.map((chip, index) => (
+                    <button
+                      key={`chip-${index}-${chip.value}`}
+                      onClick={() => handleChipClick(chip)}
+                      className="px-3 py-1.5 bg-white border-2 border-primary/30 text-primary rounded-full text-sm font-medium 
+                        hover:bg-primary hover:text-white hover:border-primary 
+                        active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md"
+                      style={{
+                        animation: `slideIn 0.3s ease-out ${index * 0.05}s both`
+                      }}
+                    >
+                      {chip.emoji && <span className="mr-1">{chip.emoji}</span>}
+                      {chip.label}
+                    </button>
+                  ))}
                 </div>
               )}
 

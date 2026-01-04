@@ -42,15 +42,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ scores: defaultScores });
     }
 
-    // Get user's taste profile with embedding
+    // Get user's taste profile with embeddings (prefer combined > onboarding > taste)
     const { data: tasteProfile, error: profileError } = await supabase
       .from('user_taste_profiles')
-      .select('taste_embedding, is_kosher, is_vegetarian, is_vegan')
+      .select('combined_embedding, onboarding_embedding, taste_embedding, is_kosher, is_vegetarian, is_vegan')
       .eq('user_id', user.id)
       .single();
 
+    // Get the best available user embedding (combined > onboarding > taste)
+    const userEmbedding = tasteProfile?.combined_embedding 
+      || tasteProfile?.onboarding_embedding 
+      || tasteProfile?.taste_embedding;
+
     // If no taste profile or embedding, return default scores
-    if (profileError || !tasteProfile?.taste_embedding) {
+    if (profileError || !userEmbedding) {
       const defaultScores = restaurantIds.map((id: string) => ({
         restaurantId: id,
         matchScore: 75,
@@ -70,13 +75,13 @@ export async function POST(request: NextRequest) {
     // Try to get scores from restaurant_cache first (if restaurants are in cache)
     const { data: cachedRestaurants } = await supabase
       .from('restaurant_cache')
-      .select('id, google_place_id, google_rating, embedding')
+      .select('id, google_place_id, google_rating, summary_embedding, reviews_embedding')
       .in('id', restaurantIds);
 
     // Also check by google_place_id (in case restaurantIds are place IDs)
     const { data: cachedByPlaceId } = await supabase
       .from('restaurant_cache')
-      .select('id, google_place_id, google_rating, embedding')
+      .select('id, google_place_id, google_rating, summary_embedding, reviews_embedding')
       .in('google_place_id', restaurantIds);
 
     // Combine results
@@ -128,12 +133,26 @@ export async function POST(request: NextRequest) {
       const cached = cachedMap.get(restaurantId);
       const dbRestaurant = dbRestaurantMap.get(restaurantId);
 
-      if (cached && cached.embedding && tasteProfile.taste_embedding) {
-        // Calculate cosine similarity
-        const similarity = cosineSimilarity(
-          tasteProfile.taste_embedding,
-          cached.embedding
+      if (cached && cached.summary_embedding && userEmbedding) {
+        // Calculate cosine similarity with summary embedding
+        const summarySimilarity = cosineSimilarity(
+          userEmbedding,
+          cached.summary_embedding
         );
+        
+        // Also check reviews embedding if available
+        let reviewsSimilarity = 0;
+        if (cached.reviews_embedding) {
+          reviewsSimilarity = cosineSimilarity(
+            userEmbedding,
+            cached.reviews_embedding
+          );
+        }
+        
+        // Combined similarity: 70% summary, 30% reviews
+        const similarity = cached.reviews_embedding 
+          ? (summarySimilarity * 0.7 + reviewsSimilarity * 0.3)
+          : summarySimilarity;
 
         // Get Google rating (0-1 scale)
         const ratingScore = (cached.google_rating || 3.5) / 5;

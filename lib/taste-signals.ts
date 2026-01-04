@@ -50,3 +50,29 @@ export async function addTasteSignal(
   }
 }
 
+/**
+ * Update user's reviews embedding
+ * Called after a user writes a review
+ */
+export async function updateUserReviewsEmbedding(userId: string) {
+  try {
+    // Call the embeddings API
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/user/embeddings?type=reviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('Failed to update reviews embedding');
+      return false;
+    }
+
+    console.log(`✅ Updated reviews embedding for user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error('Error updating reviews embedding:', error);
+    return false;
+  }
+}

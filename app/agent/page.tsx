@@ -22,11 +22,28 @@ interface Restaurant {
   website?: string;
 }
 
+interface Chip {
+  label: string;
+  value: string;
+  emoji?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   restaurants?: Restaurant[];
+  chips?: Chip[];
+}
+
+interface ConversationContext {
+  where: string | null;
+  withWho: string | null;
+  purpose: string | null;
+  budget: string | null;
+  when: string | null;
+  cuisinePreference: string | null;
+  additionalNotes: string[];
 }
 
 interface ChatConversation {
@@ -162,6 +179,8 @@ export default function AgentPage() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [currentChips, setCurrentChips] = useState<Chip[]>([]);
+  const [conversationContext, setConversationContext] = useState<ConversationContext | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -199,7 +218,6 @@ export default function AgentPage() {
           setCurrentChatId(mostRecent.id);
           setMessages(mostRecent.messages);
         } else {
-          // Create new chat if no history
           setCurrentChatId(Date.now().toString());
         }
       } catch (e) {
@@ -225,26 +243,24 @@ export default function AgentPage() {
 
     setChatHistory(prev => {
       const filtered = prev.filter(c => c.id !== currentChatId);
-      const updated = [conversation, ...filtered].slice(0, 10); // Keep max 10 conversations
+      const updated = [conversation, ...filtered].slice(0, 10);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   }, [messages, currentChatId]);
 
-  // Scroll to bottom when new messages arrive or when keyboard appears
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (messagesEndRef.current && messagesContainerRef.current) {
-      // Use a slight delay to ensure DOM has updated
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }, 100);
     }
-  }, [messages, isInputFocused]);
+  }, [messages, isInputFocused, currentChips]);
 
   // Handle iOS keyboard behavior
   useEffect(() => {
     const handleResize = () => {
-      // When keyboard opens, scroll to bottom
       if (isInputFocused && messagesEndRef.current) {
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -257,10 +273,8 @@ export default function AgentPage() {
   }, [isInputFocused]);
 
   const generateChatTitle = (messages: Message[]): string => {
-    // Find first user message
     const firstUserMsg = messages.find(m => m.role === 'user');
     if (firstUserMsg) {
-      // Truncate to first 40 characters
       const content = firstUserMsg.content.trim();
       return content.length > 40 ? content.substring(0, 40) + '...' : content;
     }
@@ -272,6 +286,8 @@ export default function AgentPage() {
     setCurrentChatId(Date.now().toString());
     setShowHistory(false);
     setInputValue('');
+    setCurrentChips([]);
+    setConversationContext(null);
     setTimeout(() => {
       inputRef.current?.focus();
     }, 100);
@@ -281,6 +297,7 @@ export default function AgentPage() {
     setMessages(conversation.messages);
     setCurrentChatId(conversation.id);
     setShowHistory(false);
+    setCurrentChips([]);
   };
 
   const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
@@ -289,86 +306,146 @@ export default function AgentPage() {
     setChatHistory(updated);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     
-    // If deleting current chat, start new one
     if (chatId === currentChatId) {
       handleNewChat();
     }
   };
 
   const handleRestaurantClick = (restaurant: Restaurant) => {
-    // Store restaurant data in sessionStorage for instant loading on map page
     sessionStorage.setItem('selectedRestaurant', JSON.stringify(restaurant));
-    // Navigate to map with the selected restaurant
     router.push(`/map?restaurantId=${restaurant.id}&lat=${restaurant.latitude}&lng=${restaurant.longitude}&fromAgent=true`);
   };
 
-  const handleSend = async () => {
-    if (!inputValue.trim() || isLoading) {
-      return;
-    }
+  const handleChipClick = (chip: Chip) => {
+    // Construct a natural message from the chip
+    const chipMessage = chip.emoji ? `${chip.emoji} ${chip.label}` : chip.label;
+    setInputValue(chipMessage);
+    // Immediately send the message
+    handleSendWithMessage(chipMessage);
+  };
+
+  const handleSendWithMessage = async (messageContent: string) => {
+    if (!messageContent.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputValue
+      content: messageContent
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInputValue('');
     setIsLoading(true);
+    setCurrentChips([]); // Clear chips while loading
 
-    // Scroll to bottom after adding message
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, 100);
 
     try {
-      const conversationHistory = messages.map(m => ({
+      const location = userLocation || { lat: 32.0853, lng: 34.7818 };
+      const conversationHistory = newMessages.map(m => ({
         role: m.role,
         content: m.content
       }));
 
-      const response = await fetch('/api/map-chat', {
+      // Call the smart agent API
+      const agentResponse = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: inputValue,
-          conversationHistory,
-          location: userLocation || { lat: 32.0853, lng: 34.7818 }
+          message: messageContent,
+          conversationId: currentChatId,
+          previousContext: conversationContext,
+          messages: conversationHistory.slice(0, -1),
+          userLocation: location,
         })
       });
 
-      const data = await response.json();
+      const agentData = await agentResponse.json();
+      console.log('Agent response:', agentData);
 
-      if (data.error) {
-        throw new Error(data.error);
+      if (agentData.error) {
+        throw new Error(agentData.error);
       }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.message,
-        restaurants: data.restaurants || []
-      };
+      // Update conversation context
+      if (agentData.context) {
+        setConversationContext(agentData.context);
+      }
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // If recommendations are returned, display them
+      if (agentData.recommendations && agentData.recommendations.length > 0) {
+        const restaurants = agentData.recommendations.map((rec: any) => ({
+          id: rec.restaurant.id || rec.restaurant.google_place_id,
+          name: rec.restaurant.name,
+          address: rec.restaurant.address,
+          rating: rec.restaurant.google_rating || rec.restaurant.googleRating || 0,
+          totalReviews: rec.restaurant.google_reviews_count || rec.restaurant.googleReviewsCount || 0,
+          cuisineTypes: rec.restaurant.categories || rec.restaurant.cuisineTypes,
+          priceLevel: rec.restaurant.price_level || rec.restaurant.priceLevel,
+          photoUrl: rec.restaurant.photos?.[0]?.url || 
+            (rec.restaurant.photos?.[0]?.photo_reference 
+              ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
+              : undefined),
+          latitude: rec.restaurant.latitude,
+          longitude: rec.restaurant.longitude,
+          matchPercentage: rec.matchScore,
+          source: 'google' as const,
+          googlePlaceId: rec.restaurant.google_place_id || rec.restaurant.googlePlaceId,
+          website: rec.restaurant.website,
+        }));
 
-      // Scroll to bottom after assistant response
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }, 100);
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentData.message,
+          restaurants,
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        setCurrentChips([]);
+      } else if (agentData.readyToRecommend) {
+        // Ready but no recommendations found
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentData.message || "לא מצאתי מקומות מתאימים, אפשר לנסות לחפש משהו אחר?",
+          chips: agentData.chips,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setCurrentChips(agentData.chips || []);
+      } else {
+        // Not ready yet, show agent response with chips
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentData.message,
+          chips: agentData.chips,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setCurrentChips(agentData.chips || []);
+      }
 
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('Agent error:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I'm having trouble connecting. Let me help you find restaurants near you! 📍"
+        content: "אופס, משהו השתבש. בוא ננסה שוב! 🙏"
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
     }
+  };
+
+  const handleSend = () => {
+    handleSendWithMessage(inputValue);
   };
 
   return (
@@ -376,11 +453,11 @@ export default function AgentPage() {
       className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col overflow-hidden" 
       style={{ 
         height: '100dvh',
-        touchAction: 'pan-y', // Only allow vertical panning
-        overscrollBehavior: 'none' // Prevent pull-to-refresh and bounce effects
+        touchAction: 'pan-y',
+        overscrollBehavior: 'none'
       }}
     >
-      {/* Global styles for animations and iOS keyboard handling */}
+      {/* Global styles for animations */}
       <style jsx global>{`
         @keyframes slideIn {
           from {
@@ -392,31 +469,33 @@ export default function AgentPage() {
             transform: translateY(0);
           }
         }
-        /* Hide scrollbar for webkit browsers */
+        @keyframes chipSlide {
+          from {
+            opacity: 0;
+            transform: translateY(8px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
         }
-        /* Hide scrollbar for IE, Edge and Firefox */
         .hide-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
-        
-        /* Prevent iOS zoom on input focus */
         input[type="text"],
         input[type="email"],
         input[type="password"],
         textarea {
           font-size: 16px !important;
         }
-        
-        /* Smooth scrolling */
         html {
           scroll-behavior: smooth;
           overflow-x: hidden;
         }
-        
-        /* Prevent horizontal overflow on body */
         body {
           overflow-x: hidden;
           overscroll-behavior-x: none;
@@ -461,7 +540,6 @@ export default function AgentPage() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              {/* New Chat Button */}
               <button
                 onClick={handleNewChat}
                 className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
@@ -469,7 +547,6 @@ export default function AgentPage() {
               >
                 <Plus className="w-5 h-5 text-gray-600" strokeWidth={2.5} />
               </button>
-              {/* History Button */}
               <button
                 onClick={() => setShowHistory(true)}
                 className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
@@ -531,7 +608,6 @@ export default function AgentPage() {
               )}
             </div>
 
-            {/* New Chat Button */}
             <div 
               className="flex-shrink-0 py-4"
               style={{
@@ -551,7 +627,6 @@ export default function AgentPage() {
           <>
             {/* Messages / Empty State */}
             {messages.length === 0 ? (
-              /* Empty state - centered in available space using grid */
               <div 
                 className="flex-1 min-h-0 grid place-items-center text-center px-4"
                 style={{
@@ -567,7 +642,6 @@ export default function AgentPage() {
                 </div>
               </div>
             ) : (
-              /* Messages list - scrollable */
               <div 
                 ref={messagesContainerRef}
                 className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-4 hide-scrollbar"
@@ -578,13 +652,11 @@ export default function AgentPage() {
                   touchAction: 'pan-y'
                 }}
               >
-
                 {messages.map((message) => (
                   <div
                     key={message.id}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    {/* Only show message bubble if there's content or no restaurants */}
                     {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
                       <div
                         className={`max-w-[80%] px-4 py-3 rounded-2xl ${
@@ -597,9 +669,13 @@ export default function AgentPage() {
                       </div>
                     )}
                     
-                    {/* Show restaurants if available */}
                     {message.restaurants && message.restaurants.length > 0 && (
                       <div className="w-full overflow-hidden">
+                        {message.content && (
+                          <div className="mb-3 bg-white text-gray-900 rounded-2xl rounded-bl-md shadow-sm border border-gray-100 px-4 py-3">
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          </div>
+                        )}
                         <div className={`grid gap-3 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                           {message.restaurants.map((restaurant, index) => (
                             <RestaurantCard
@@ -624,6 +700,25 @@ export default function AgentPage() {
                   </div>
                 )}
 
+                {/* Chips - Show below messages */}
+                {currentChips.length > 0 && !isLoading && (
+                  <div className="flex flex-wrap gap-2 py-2">
+                    {currentChips.map((chip, index) => (
+                      <button
+                        key={`${chip.value}-${index}`}
+                        onClick={() => handleChipClick(chip)}
+                        className="px-4 py-2 bg-white border-2 border-primary/30 rounded-full text-sm font-medium text-gray-700 hover:bg-primary/10 hover:border-primary/50 transition-all active:scale-95 shadow-sm"
+                        style={{
+                          animation: `chipSlide 0.3s ease-out ${index * 0.05}s both`
+                        }}
+                      >
+                        {chip.emoji && <span className="mr-1.5">{chip.emoji}</span>}
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </div>
             )}
@@ -637,8 +732,8 @@ export default function AgentPage() {
               style={{
                 paddingTop: '0.75rem',
                 paddingBottom: isInputFocused 
-                  ? '0.25rem' // Minimal padding when keyboard is open (almost zero gap)
-                  : 'calc(env(safe-area-inset-bottom) + 5rem)', // Account for bottom nav when keyboard closed
+                  ? '0.25rem'
+                  : 'calc(env(safe-area-inset-bottom) + 5rem)',
                 transition: 'padding-bottom 0.15s ease-out'
               }}
             >
@@ -649,7 +744,6 @@ export default function AgentPage() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => {
-                    // Delay blur to allow button clicks to register
                     setTimeout(() => setIsInputFocused(false), 100);
                   }}
                   onKeyPress={(e) => {
@@ -663,7 +757,7 @@ export default function AgentPage() {
                   className="flex-1 bg-transparent outline-none text-base text-gray-900 placeholder-gray-400 resize-none overflow-hidden max-h-32 leading-6"
                   style={{
                     minHeight: '24px',
-                    fontSize: '16px', // Prevent iOS zoom
+                    fontSize: '16px',
                     lineHeight: '24px'
                   }}
                   onInput={(e) => {
@@ -697,9 +791,8 @@ export default function AgentPage() {
         )}
       </div>
 
-      {/* Bottom Navigation - Hide when input is focused */}
+      {/* Bottom Navigation */}
       <BottomNav show={!isInputFocused} />
     </div>
   );
 }
-

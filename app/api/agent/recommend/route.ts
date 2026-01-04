@@ -1,656 +1,643 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
-import { AgentRecommendRequest, AgentRecommendResponse, RestaurantRecommendation } from '@/types/api';
-import { addTasteSignal } from '@/lib/taste-signals';
 
 /**
  * POST /api/agent/recommend
  * 
- * New Agent recommendation endpoint using the 4-step search algorithm:
- * 1. SQL Pre-Filter (hard criteria)
- * 2. Vector Search (semantic)
- * 3. Reranking (complex scoring)
- * 4. LLM Final Selection (o1-mini)
- * 
- * Returns 3 highly-matched restaurants within 10 seconds.
+ * Full recommendation pipeline:
+ * 1. Hard filters (location, opening hours)
+ * 2. Vector search
+ * 3. Re-ranking with social signals
+ * 4. LLM final selection with reasons
  */
+
+interface RecommendationContext {
+  where: string | null;           // 'walking_distance' | 'willing_to_travel' | 'outside_city' | specific location
+  withWho: string | null;         // 'date' | 'friends' | 'family' | 'solo' | 'work'
+  purpose: string | null;         // 'romantic_dinner' | 'casual_meal' | 'quick_bite' | 'drinks' | 'celebration' | 'business'
+  budget: string | null;          // 'cheap' | 'moderate' | 'expensive' | 'any'
+  when: string | null;            // 'now' | 'tonight' | 'tomorrow' | 'weekend'
+  cuisinePreference: string | null;
+}
+
+interface Restaurant {
+  id: string;
+  google_place_id: string;
+  name: string;
+  address: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  google_rating: number;
+  google_reviews_count: number;
+  price_level: number;
+  categories: string[];
+  summary: string;
+  opening_hours: any;
+  photos: any[];
+  distance?: number;
+  vectorScore?: number;
+  socialScore?: number;
+  finalScore?: number;
+  friendsWhoVisited?: string[];
+}
+
+interface Recommendation {
+  restaurant: Restaurant;
+  reason: string;
+  matchScore: number;
+}
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-  
   try {
     const supabase = await createClient();
-    
-    // Get current user
     const { data: { user } } = await supabase.auth.getUser();
 
-    const body: AgentRecommendRequest = await request.json();
-    const { 
-      conversationId, 
-      messages, 
-      latitude, 
-      longitude, 
-      radiusMeters = 5000 
+    const body = await request.json();
+    const {
+      context,
+      userLocation,       // { lat, lng }
+      conversationSummary, // Text summary of what user is looking for
     } = body;
 
-    if (!messages || messages.length === 0) {
+    if (!context || !userLocation) {
       return NextResponse.json(
-        { error: 'messages array is required' },
+        { error: 'context and userLocation are required' },
         { status: 400 }
       );
     }
 
-    if (!latitude || !longitude) {
-      return NextResponse.json(
-        { error: 'latitude and longitude are required' },
-        { status: 400 }
-      );
-    }
-
-    // Initialize OpenAI
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
-        { status: 500 }
-      );
-    }
-
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    // Detect language from first user message
-    const firstUserMessage = messages.find(m => m.role === 'user')?.content || '';
-    const language = detectLanguage(firstUserMessage);
-
-    // Get user's taste profile
-    let tasteProfile: any = null;
-    let tasteEmbedding: number[] | null = null;
-    
-    if (user) {
-      const { data: profile } = await supabase
-        .from('user_taste_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      
-      tasteProfile = profile;
-      tasteEmbedding = profile?.taste_embedding || null;
-    }
-
-    console.log(`🤖 Agent recommend: user=${user?.id || 'anon'}, location=${latitude},${longitude}, radius=${radiusMeters}m`);
+    console.log('🔍 Starting recommendation pipeline...');
+    console.log('📍 Context:', context);
+    console.log('📍 User location:', userLocation);
 
     // ========================================
-    // STEP 1: Extract search intent from conversation
+    // STEP 1: HARD FILTERS (Location + Hours)
     // ========================================
-    const extractionPrompt = buildExtractionPrompt(messages, language);
-    
-    const extractionResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: extractionPrompt },
-        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      ],
-      temperature: 0.3,
-      max_tokens: 500,
-    });
-
-    const extractionText = extractionResponse.choices[0].message.content || '';
-    const searchIntent = parseSearchIntent(extractionText);
-    
-    console.log('📊 Search intent:', JSON.stringify(searchIntent, null, 2));
-
-    // Save extracted preferences as signals (for learning)
-    if (user && searchIntent.preferences) {
-      await savePreferencesAsSignals(supabase, user.id, searchIntent.preferences, conversationId);
-    }
-
-    // ========================================
-    // STEP 2: Create combined query embedding
-    // ========================================
-    const queryText = buildQueryText(searchIntent, tasteProfile);
-    
-    const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: queryText,
-    });
-    
-    const conversationEmbedding = embeddingResponse.data[0].embedding;
-
-    // Combine with taste embedding (65% conversation + 35% taste)
-    let queryEmbedding = conversationEmbedding;
-    if (tasteEmbedding) {
-      queryEmbedding = combineEmbeddings(conversationEmbedding, tasteEmbedding, 0.65, 0.35);
-    }
-
-    // ========================================
-    // STEP 3: Vector Search from restaurant_cache
-    // ========================================
-    const { data: searchResults, error: searchError } = await supabase.rpc(
-      'search_restaurants_by_embedding',
-      {
-        query_embedding: queryEmbedding,
-        user_lat: latitude,
-        user_lng: longitude,
-        radius_meters: radiusMeters,
-        max_results: 100,
-        filter_kosher: tasteProfile?.is_kosher || false,
-        filter_vegetarian: (tasteProfile?.is_vegetarian || tasteProfile?.is_vegan) || false,
-      }
+    const filteredRestaurants = await applyHardFilters(
+      supabase,
+      userLocation,
+      context
     );
 
-    console.log(`🔍 Vector search found ${searchResults?.length || 0} restaurants`);
+    console.log(`📊 After hard filters: ${filteredRestaurants.length} restaurants`);
 
-    // LOCAL DB ONLY MODE - No Google API calls
-    const candidates: any[] = searchResults || [];
-    
-    if (candidates.length < 5) {
-      console.log('⚠️ Not enough results from cache (DB only mode - no Google fallback)');
+    if (filteredRestaurants.length === 0) {
+      return NextResponse.json({
+        recommendations: [],
+        message: 'לא מצאתי מסעדות שעונות לקריטריונים. אולי תנסה להרחיב את החיפוש?',
+      });
     }
 
     // ========================================
-    // STEP 4: Reranking
+    // STEP 2: VECTOR SEARCH
     // ========================================
-    const rankedCandidates = await rerankCandidates(
-      candidates,
-      searchIntent,
-      tasteEmbedding,
-      conversationEmbedding,
+    const queryText = buildQueryText(context, conversationSummary);
+    const vectorResults = await performVectorSearch(
       supabase,
+      filteredRestaurants,
+      queryText,
       user?.id
     );
 
-    console.log(`📊 Reranked ${rankedCandidates.length} candidates`);
+    console.log(`📊 After vector search: ${vectorResults.length} restaurants scored`);
 
     // ========================================
-    // STEP 5: LLM Final Selection
+    // STEP 3: RE-RANKING (Social signals + friends)
     // ========================================
-    const top15 = rankedCandidates.slice(0, 15);
-    
-    const finalSelections = await llmFinalSelection(
-      openai,
-      top15,
-      searchIntent,
-      tasteProfile,
-      language
+    const rerankedResults = await rerank(
+      supabase,
+      vectorResults,
+      user?.id,
+      context
     );
 
-    console.log(`✅ LLM selected ${finalSelections.length} restaurants`);
+    console.log(`📊 After re-ranking: ${rerankedResults.length} restaurants`);
 
-    // Build response
-    const recommendations: RestaurantRecommendation[] = finalSelections.map(selection => ({
-      restaurant: {
-        id: selection.restaurant.id,
-        googlePlaceId: selection.restaurant.google_place_id || selection.restaurant.googlePlaceId,
-        name: selection.restaurant.name,
-        address: selection.restaurant.address,
-        city: selection.restaurant.city,
-        latitude: selection.restaurant.latitude,
-        longitude: selection.restaurant.longitude,
-        phone: selection.restaurant.phone,
-        website: selection.restaurant.website,
-        googleRating: selection.restaurant.google_rating || selection.restaurant.rating,
-        googleReviewsCount: selection.restaurant.google_reviews_count,
-        priceLevel: selection.restaurant.price_level,
-        cuisineTypes: selection.restaurant.cuisine_types || selection.restaurant.cuisineTypes,
-        isKosher: selection.restaurant.is_kosher || false,
-        isVegetarianFriendly: selection.restaurant.is_vegetarian_friendly || false,
-        openingHours: selection.restaurant.opening_hours,
-        photos: selection.restaurant.photos,
-        summaryText: selection.restaurant.summary_text,
-        distanceMeters: selection.restaurant.distance_meters || selection.restaurant.distance,
-        similarity: selection.restaurant.similarity,
-        matchScore: selection.matchScore,
-      },
-      matchScore: selection.matchScore,
-      explanation: selection.explanation,
-      contextMatch: searchIntent.occasion,
-    }));
+    // ========================================
+    // STEP 4: LLM FINAL SELECTION
+    // ========================================
+    const topCandidates = rerankedResults.slice(0, 15); // Send top 15 to LLM
+    const recommendations = await selectWithLLM(
+      topCandidates,
+      context,
+      conversationSummary
+    );
 
-    const duration = Date.now() - startTime;
-    console.log(`⏱️ Agent recommend completed in ${duration}ms`);
+    console.log(`✅ Final recommendations: ${recommendations.length}`);
 
-    const response: AgentRecommendResponse = {
+    return NextResponse.json({
       recommendations,
-      conversationId: conversationId || `conv_${Date.now()}`,
-      language,
-      explanation: buildOverallExplanation(searchIntent, recommendations, language),
-      extractedPreferences: searchIntent.preferences,
-    };
+      totalConsidered: filteredRestaurants.length,
+      message: generateResultMessage(recommendations, context),
+    });
 
-    return NextResponse.json(response);
   } catch (error) {
-    console.error('Error in agent recommend:', error);
+    console.error('Recommendation error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to generate recommendations' },
       { status: 500 }
     );
   }
 }
 
-// ========================================
-// Helper Functions
-// ========================================
-
-function detectLanguage(message: string): 'he' | 'en' {
-  const hebrewChars = message.match(/[\u0590-\u05FF]/g);
-  if (hebrewChars && hebrewChars.length > 3) {
-    return 'he';
-  }
-  return 'en';
-}
-
-function buildExtractionPrompt(messages: any[], language: 'he' | 'en'): string {
-  return `You are analyzing a conversation about restaurant recommendations.
-
-Extract the following information from the conversation and return as JSON:
-{
-  "cuisineType": "type of food/cuisine mentioned",
-  "occasion": "date/friends/family/solo/work or null",
-  "priceLevel": 1-4 or null,
-  "atmosphere": "romantic/casual/trendy/quiet/lively or null",
-  "specificRequest": "any specific restaurant name mentioned",
-  "searchQuery": "best search term for Google Places",
-  "distance": "walking/driving/any",
-  "timing": "now/tonight/tomorrow or null",
-  "city": "city name if mentioned",
-  "preferences": {
-    "positive": ["list of positive preferences in English"],
-    "negative": ["list of negative preferences in English"]
-  }
-}
-
-Important:
-- Extract actual values mentioned, use null if not mentioned
-- The searchQuery should be a good term to search for on Google Places
-- preferences.positive and preferences.negative should be in ENGLISH for storage
-- Look for implicit preferences (e.g., "romantic" implies quiet, nice atmosphere)
-- If a specific restaurant name is mentioned, put it in specificRequest
-
-Respond ONLY with the JSON, no other text.`;
-}
-
-function parseSearchIntent(text: string): any {
-  try {
-    // Try to parse JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-  } catch (e) {
-    console.error('Error parsing search intent:', e);
+// ============================================
+// STEP 1: Hard Filters
+// ============================================
+async function applyHardFilters(
+  supabase: any,
+  userLocation: { lat: number; lng: number },
+  context: RecommendationContext
+): Promise<Restaurant[]> {
+  
+  // Determine radius based on "where"
+  let radiusMeters = 10000; // Default 10km
+  if (context.where === 'walking_distance') {
+    radiusMeters = 3000; // 3km - reasonable walking distance
+  } else if (context.where === 'willing_to_travel') {
+    radiusMeters = 20000; // 20km
+  } else if (context.where === 'outside_city') {
+    radiusMeters = 50000; // 50km
   }
   
-  return {
-    cuisineType: null,
-    occasion: null,
-    priceLevel: null,
-    atmosphere: null,
-    specificRequest: null,
-    searchQuery: 'restaurant',
-    distance: 'any',
-    timing: null,
-    city: null,
-    preferences: { positive: [], negative: [] },
-  };
-}
+  console.log(`🎯 Using radius: ${radiusMeters}m`);
 
-function buildQueryText(searchIntent: any, tasteProfile: any): string {
-  const parts: string[] = [];
+  // Build query - support both 'Tel Aviv' and 'Tel Aviv-Yafo'
+  let query = supabase
+    .from('restaurant_cache')
+    .select('*')
+    .or('city.eq.Tel Aviv,city.eq.Tel Aviv-Yafo')
+    .not('summary_embedding', 'is', null);
 
-  // Add search intent
-  if (searchIntent.cuisineType) {
-    parts.push(`Looking for ${searchIntent.cuisineType} food.`);
-  }
-  if (searchIntent.occasion) {
-    parts.push(`For a ${searchIntent.occasion} occasion.`);
-  }
-  if (searchIntent.atmosphere) {
-    parts.push(`${searchIntent.atmosphere} atmosphere.`);
-  }
-  if (searchIntent.priceLevel) {
-    const priceLabels = ['cheap', 'moderate', 'upscale', 'luxury'];
-    parts.push(`${priceLabels[searchIntent.priceLevel - 1]} price range.`);
-  }
-
-  // Add positive preferences from intent
-  if (searchIntent.preferences?.positive?.length > 0) {
-    parts.push(`Likes: ${searchIntent.preferences.positive.join(', ')}.`);
-  }
-
-  // Add context from taste profile
-  if (tasteProfile) {
-    if (tasteProfile.likes?.length > 0) {
-      parts.push(`Generally likes: ${tasteProfile.likes.slice(0, 5).join(', ')}.`);
+  // Budget filter (price_level)
+  if (context.budget && context.budget !== 'any') {
+    const priceMap: Record<string, number[]> = {
+      'cheap': [1],
+      'moderate': [1, 2],
+      'expensive': [3, 4],
+    };
+    const priceLevels = priceMap[context.budget];
+    if (priceLevels) {
+      query = query.in('price_level', priceLevels);
     }
   }
 
-  return parts.join(' ') || 'Looking for a good restaurant.';
-}
+  const { data: restaurants, error } = await query;
 
-function combineEmbeddings(a: number[], b: number[], weightA: number, weightB: number): number[] {
-  const result: number[] = [];
-  for (let i = 0; i < a.length; i++) {
-    result.push(a[i] * weightA + b[i] * weightB);
-  }
-  
-  // Normalize
-  const norm = Math.sqrt(result.reduce((sum, val) => sum + val * val, 0));
-  return result.map(val => val / norm);
-}
-
-async function searchGooglePlaces(
-  request: NextRequest,
-  query: string,
-  latitude: number,
-  longitude: number,
-  radiusMeters: number
-): Promise<any[]> {
-  try {
-    const searchUrl = `${request.nextUrl.origin}/api/restaurants/search?query=${encodeURIComponent(query)}&latitude=${latitude}&longitude=${longitude}&radius=${radiusMeters}`;
-    const response = await fetch(searchUrl, { headers: request.headers });
-    const data = await response.json();
-    
-    return (data.restaurants || []).map((r: any) => ({
-      id: r.id,
-      google_place_id: r.googlePlaceId,
-      name: r.name,
-      address: r.address,
-      google_rating: r.rating,
-      cuisine_types: r.cuisineTypes,
-      distance_meters: r.distance,
-      photos: r.photoUrl ? [{ url: r.photoUrl }] : [],
-      source: 'google',
-    }));
-  } catch (error) {
-    console.error('Error searching Google Places:', error);
+  if (error) {
+    console.error('Hard filter query error:', error);
     return [];
   }
-}
 
-async function rerankCandidates(
-  candidates: any[],
-  searchIntent: any,
-  tasteEmbedding: number[] | null,
-  conversationEmbedding: number[],
-  supabase: any,
-  userId?: string
-): Promise<any[]> {
-  // Get friends scores if user is logged in
-  const friendsScores = new Map<string, number>();
-  
-  if (userId) {
-    const { data: followingData } = await supabase
-      .from('follows')
-      .select('following_id')
-      .eq('follower_id', userId);
+  console.log(`📊 Query returned ${restaurants?.length || 0} restaurants`);
+
+  // Filter by distance (PostGIS would be better but we'll do it in JS)
+  const filtered = (restaurants || []).filter((r: any) => {
+    if (!r.latitude || !r.longitude) return false;
     
-    const followingIds = (followingData || []).map((f: any) => f.following_id);
+    const distance = calculateDistance(
+      userLocation.lat,
+      userLocation.lng,
+      r.latitude,
+      r.longitude
+    );
     
-    if (followingIds.length > 0) {
-      const googlePlaceIds = candidates
-        .map(c => c.google_place_id || c.googlePlaceId)
-        .filter(Boolean);
-      
-      const { data: dbRestaurants } = await supabase
-        .from('restaurants')
-        .select('id, google_place_id')
-        .in('google_place_id', googlePlaceIds);
-      
-      const restaurantIds = (dbRestaurants || []).map((r: any) => r.id);
-      
-      if (restaurantIds.length > 0) {
-        const { data: friendsReviews } = await supabase
-          .from('reviews')
-          .select('restaurant_id, rating')
-          .in('restaurant_id', restaurantIds)
-          .in('user_id', followingIds);
-        
-        (friendsReviews || []).forEach((review: any) => {
-          const current = friendsScores.get(review.restaurant_id) || 0;
-          friendsScores.set(review.restaurant_id, current + review.rating);
-        });
-        
-        // Map back to google_place_id
-        (dbRestaurants || []).forEach((r: any) => {
-          if (friendsScores.has(r.id)) {
-            friendsScores.set(r.google_place_id, friendsScores.get(r.id)!);
-          }
-        });
-      }
-    }
-  }
-
-  // Calculate rerank score for each candidate
-  const scored = candidates.map(candidate => {
-    let score = 0;
-
-    // 30% conversation similarity (from vector search)
-    const convSimilarity = candidate.similarity || 0.7;
-    score += 0.30 * convSimilarity;
-
-    // 20% taste similarity (if available)
-    // Note: This would need the restaurant embedding, which we have from search
-    score += 0.20 * convSimilarity; // Simplified - using same similarity
-
-    // 20% context match
-    let contextScore = 0.5; // Default
-    if (searchIntent.occasion) {
-      // Check if restaurant matches the occasion
-      const name = (candidate.name || '').toLowerCase();
-      const summary = (candidate.summary_text || '').toLowerCase();
-      
-      const occasionKeywords: Record<string, string[]> = {
-        'date': ['romantic', 'intimate', 'cozy', 'wine', 'candle'],
-        'friends': ['bar', 'pub', 'casual', 'lively', 'fun'],
-        'family': ['family', 'kids', 'casual', 'spacious'],
-        'work': ['business', 'meeting', 'quiet', 'professional'],
-        'solo': ['bar', 'counter', 'casual'],
-      };
-      
-      const keywords = occasionKeywords[searchIntent.occasion] || [];
-      const matches = keywords.filter(kw => 
-        name.includes(kw) || summary.includes(kw)
-      );
-      contextScore = matches.length > 0 ? 0.8 : 0.5;
-    }
-    score += 0.20 * contextScore;
-
-    // 15% Google rating
-    const rating = candidate.google_rating || candidate.rating || 3.5;
-    score += 0.15 * (rating / 5);
-
-    // 15% friends score
-    const placeId = candidate.google_place_id || candidate.googlePlaceId;
-    const friendsScore = friendsScores.get(placeId);
-    if (friendsScore) {
-      score += 0.15 * Math.min(friendsScore / 20, 1);
-    } else {
-      score += 0.15 * 0.5; // Default
-    }
-
-    return {
-      ...candidate,
-      rerankScore: score,
-      matchScore: Math.round(score * 100),
-    };
+    r.distance = distance;
+    return distance <= radiusMeters;
   });
 
-  // Sort by rerank score
-  scored.sort((a, b) => b.rerankScore - a.rerankScore);
-
-  return scored;
-}
-
-async function llmFinalSelection(
-  openai: OpenAI,
-  candidates: any[],
-  searchIntent: any,
-  tasteProfile: any,
-  language: 'he' | 'en'
-): Promise<{ restaurant: any; matchScore: number; explanation: string }[]> {
-  // Build candidate summaries
-  const candidateSummaries = candidates.slice(0, 15).map((c, i) => 
-    `${i + 1}. ${c.name}
-   Rating: ${c.google_rating || c.rating || 'N/A'}
-   Cuisine: ${(c.cuisine_types || c.cuisineTypes || []).join(', ') || 'Unknown'}
-   Distance: ${c.distance_meters ? `${Math.round(c.distance_meters)}m` : 'Unknown'}
-   Summary: ${c.summary_text || 'No summary available'}
-   Match Score: ${c.matchScore || 'N/A'}%`
-  ).join('\n\n');
-
-  const selectionPrompt = language === 'he'
-    ? `אתה מומחה מסעדות. בחר את 3 המסעדות הטובות ביותר עבור הלקוח.
-
-הבקשה של הלקוח:
-- סוג אוכל: ${searchIntent.cuisineType || 'לא צוין'}
-- אירוע: ${searchIntent.occasion || 'לא צוין'}
-- אווירה: ${searchIntent.atmosphere || 'לא צוין'}
-- תקציב: ${searchIntent.priceLevel ? `רמה ${searchIntent.priceLevel}` : 'לא צוין'}
-
-פרופיל טעם:
-${tasteProfile ? `- כשרות: ${tasteProfile.is_kosher ? 'כן' : 'לא'}
-- צמחוני: ${tasteProfile.is_vegetarian ? 'כן' : 'לא'}
-- אוהב: ${tasteProfile.likes?.join(', ') || 'לא צוין'}` : 'אין פרופיל'}
-
-המסעדות האפשריות:
-${candidateSummaries}
-
-בחר 3 מסעדות וענה בפורמט JSON:
-[
-  {"index": 1, "explanation": "הסבר קצר למה המסעדה מתאימה"},
-  {"index": 2, "explanation": "הסבר קצר"},
-  {"index": 3, "explanation": "הסבר קצר"}
-]
-
-ענה רק ב-JSON.`
-    : `You are a restaurant expert. Select the 3 best restaurants for the customer.
-
-Customer request:
-- Cuisine: ${searchIntent.cuisineType || 'Not specified'}
-- Occasion: ${searchIntent.occasion || 'Not specified'}
-- Atmosphere: ${searchIntent.atmosphere || 'Not specified'}
-- Budget: ${searchIntent.priceLevel ? `Level ${searchIntent.priceLevel}` : 'Not specified'}
-
-Taste profile:
-${tasteProfile ? `- Kosher: ${tasteProfile.is_kosher ? 'Yes' : 'No'}
-- Vegetarian: ${tasteProfile.is_vegetarian ? 'Yes' : 'No'}
-- Likes: ${tasteProfile.likes?.join(', ') || 'Not specified'}` : 'No profile'}
-
-Candidate restaurants:
-${candidateSummaries}
-
-Select 3 restaurants and respond in JSON format:
-[
-  {"index": 1, "explanation": "Brief explanation why this restaurant matches"},
-  {"index": 2, "explanation": "Brief explanation"},
-  {"index": 3, "explanation": "Brief explanation"}
-]
-
-Respond only with JSON.`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Using gpt-4o-mini instead of o1-mini for speed
-      messages: [{ role: 'user', content: selectionPrompt }],
-      temperature: 0.3,
-      max_tokens: 500,
-    });
-
-    const responseText = response.choices[0].message.content || '';
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    
-    if (jsonMatch) {
-      const selections = JSON.parse(jsonMatch[0]);
-      return selections.map((sel: any) => {
-        const candidate = candidates[sel.index - 1];
-        return {
-          restaurant: candidate,
-          matchScore: candidate.matchScore || 85,
-          explanation: sel.explanation,
-        };
-      }).filter((s: any) => s.restaurant);
-    }
-  } catch (error) {
-    console.error('Error in LLM selection:', error);
+  // Check opening hours (if "when" is specified)
+  if (context.when === 'now') {
+    return filtered.filter((r: any) => isOpenNow(r.opening_hours));
   }
 
-  // Fallback: return top 3 candidates
-  return candidates.slice(0, 3).map(c => ({
-    restaurant: c,
-    matchScore: c.matchScore || 80,
-    explanation: language === 'he' 
-      ? 'מסעדה מומלצת על סמך ההעדפות שלך'
-      : 'Recommended based on your preferences',
-  }));
+  return filtered;
 }
 
-async function savePreferencesAsSignals(
+// ============================================
+// STEP 2: Vector Search
+// ============================================
+async function performVectorSearch(
   supabase: any,
-  userId: string,
-  preferences: { positive: string[]; negative: string[] },
-  conversationId?: string
-) {
-  try {
-    // Save positive preferences
-    for (const pref of preferences.positive.slice(0, 5)) {
-      await addTasteSignal(supabase, userId, {
-        signalType: 'chat',
-        signalStrength: 4,
-        isPositive: true,
-        content: pref,
-        sourceId: conversationId,
-      });
-    }
-
-    // Save negative preferences
-    for (const pref of preferences.negative.slice(0, 5)) {
-      await addTasteSignal(supabase, userId, {
-        signalType: 'chat',
-        signalStrength: 4,
-        isPositive: false,
-        content: pref,
-        sourceId: conversationId,
-      });
-    }
-  } catch (error) {
-    console.error('Error saving preferences as signals:', error);
-  }
-}
-
-function buildOverallExplanation(
-  searchIntent: any,
-  recommendations: RestaurantRecommendation[],
-  language: 'he' | 'en'
-): string {
-  if (recommendations.length === 0) {
-    return language === 'he'
-      ? 'לא מצאתי מסעדות מתאימות באזור שלך.'
-      : 'I could not find suitable restaurants in your area.';
-  }
-
-  const topMatch = recommendations[0];
+  restaurants: Restaurant[],
+  queryText: string,
+  userId?: string
+): Promise<Restaurant[]> {
   
-  if (language === 'he') {
-    let explanation = `מצאתי לך ${recommendations.length} מסעדות מושלמות`;
-    if (searchIntent.cuisineType) {
-      explanation += ` ל${searchIntent.cuisineType}`;
+  // Generate query embedding
+  const queryEmbedding = await generateEmbedding(queryText);
+  
+  // Get user's combined embedding if logged in
+  let userEmbedding: number[] | null = null;
+  if (userId) {
+    const { data: profile } = await supabase
+      .from('user_taste_profiles')
+      .select('combined_embedding, onboarding_embedding')
+      .eq('user_id', userId)
+      .single();
+    
+    if (profile?.combined_embedding) {
+      userEmbedding = profile.combined_embedding;
+    } else if (profile?.onboarding_embedding) {
+      userEmbedding = profile.onboarding_embedding;
     }
-    if (searchIntent.occasion) {
-      explanation += ` ל${searchIntent.occasion}`;
+  }
+
+  // Combine query and user embeddings (70% query, 30% user)
+  const finalEmbedding = userEmbedding
+    ? combineEmbeddings(queryEmbedding, userEmbedding, 0.7, 0.3)
+    : queryEmbedding;
+
+  // Score each restaurant
+  const restaurantIds = restaurants.map(r => r.id);
+  
+  // Get embeddings for filtered restaurants
+  const { data: embeddings } = await supabase
+    .from('restaurant_cache')
+    .select('id, summary_embedding, reviews_embedding')
+    .in('id', restaurantIds);
+
+  const embeddingMap = new Map(
+    (embeddings || []).map((e: any) => [e.id, e])
+  );
+
+  // Calculate vector scores
+  const scored = restaurants.map(r => {
+    const embData = embeddingMap.get(r.id);
+    if (!embData?.summary_embedding) {
+      r.vectorScore = 0;
+      return r;
     }
-    explanation += `! ההתאמה הגבוהה ביותר היא ${topMatch.restaurant.name} עם ${topMatch.matchScore}% התאמה.`;
-    return explanation;
-  } else {
-    let explanation = `I found ${recommendations.length} perfect restaurants`;
-    if (searchIntent.cuisineType) {
-      explanation += ` for ${searchIntent.cuisineType}`;
+
+    // Score against summary embedding (primary)
+    const summaryScore = cosineSimilarity(finalEmbedding, embData.summary_embedding);
+    
+    // Score against reviews embedding (secondary, if exists)
+    let reviewsScore = 0;
+    if (embData.reviews_embedding) {
+      reviewsScore = cosineSimilarity(finalEmbedding, embData.reviews_embedding);
     }
-    if (searchIntent.occasion) {
-      explanation += ` for your ${searchIntent.occasion}`;
+
+    // Weighted combination: 70% summary, 30% reviews
+    r.vectorScore = summaryScore * 0.7 + reviewsScore * 0.3;
+    return r;
+  });
+
+  // Sort by vector score
+  return scored.sort((a, b) => (b.vectorScore || 0) - (a.vectorScore || 0));
+}
+
+// ============================================
+// STEP 3: Re-ranking
+// ============================================
+async function rerank(
+  supabase: any,
+  restaurants: Restaurant[],
+  userId: string | undefined,
+  context: RecommendationContext
+): Promise<Restaurant[]> {
+  
+  // Get friends' reviews if user is logged in
+  let friendsReviews: Map<string, string[]> = new Map();
+  if (userId) {
+    friendsReviews = await getFriendsReviews(supabase, userId);
+  }
+
+  // Re-score with social signals
+  const reranked = restaurants.map(r => {
+    let socialScore = 0;
+
+    // Boost if friends visited
+    const friendsWhoVisited = friendsReviews.get(r.google_place_id) || [];
+    if (friendsWhoVisited.length > 0) {
+      socialScore += 0.2 * Math.min(friendsWhoVisited.length, 3); // Max 0.6 boost
+      r.friendsWhoVisited = friendsWhoVisited;
     }
-    explanation += `! The top match is ${topMatch.restaurant.name} with ${topMatch.matchScore}% match.`;
-    return explanation;
+
+    // Boost based on Google rating
+    if (r.google_rating >= 4.5) socialScore += 0.1;
+    else if (r.google_rating >= 4.0) socialScore += 0.05;
+
+    // Boost for high review count (popular places)
+    if (r.google_reviews_count > 1000) socialScore += 0.1;
+    else if (r.google_reviews_count > 500) socialScore += 0.05;
+
+    // Penalize for distance (prefer closer)
+    if (r.distance) {
+      const distanceKm = r.distance / 1000;
+      socialScore -= distanceKm * 0.01; // Small penalty per km
+    }
+
+    // Occasion-based boosts
+    if (context.withWho === 'date' && r.google_rating >= 4.3) {
+      socialScore += 0.1; // Prefer higher-rated for dates
+    }
+    if (context.purpose === 'quick_bite' && r.price_level && r.price_level <= 2) {
+      socialScore += 0.1; // Prefer cheaper for quick bites
+    }
+
+    r.socialScore = socialScore;
+    r.finalScore = (r.vectorScore || 0) + socialScore;
+    return r;
+  });
+
+  // Sort by final score
+  return reranked.sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
+}
+
+// ============================================
+// STEP 4: LLM Selection
+// ============================================
+async function selectWithLLM(
+  candidates: Restaurant[],
+  context: RecommendationContext,
+  conversationSummary?: string
+): Promise<Recommendation[]> {
+  
+  if (candidates.length === 0) return [];
+
+  // Build prompt
+  const restaurantList = candidates.map((r, i) => {
+    const parts = [
+      `${i + 1}. ${r.name}`,
+      `   Categories: ${(r.categories || []).join(', ')}`,
+      `   Rating: ${r.google_rating}/5 (${r.google_reviews_count} reviews)`,
+      `   Price: ${'$'.repeat(r.price_level || 2)}`,
+      `   Distance: ${r.distance ? Math.round(r.distance / 100) / 10 + 'km' : 'unknown'}`,
+      `   Summary: ${r.summary || 'No description'}`,
+    ];
+    if (r.friendsWhoVisited?.length) {
+      parts.push(`   Friends who visited: ${r.friendsWhoVisited.join(', ')}`);
+    }
+    return parts.join('\n');
+  }).join('\n\n');
+
+  const contextDesc = buildContextDescription(context);
+
+  const prompt = `You are a restaurant recommendation expert in Tel Aviv.
+
+User is looking for: ${contextDesc}
+${conversationSummary ? `Additional context: ${conversationSummary}` : ''}
+
+Here are the top candidates:
+
+${restaurantList}
+
+Select the TOP 3 best matches and explain why each is a good fit.
+Be specific about why each restaurant matches what the user is looking for.
+
+Return ONLY a JSON array:
+[
+  {
+    "index": 1,
+    "reason": "Hebrew explanation why this is perfect for them (1-2 sentences)"
+  },
+  ...
+]`;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.7,
+    max_tokens: 500,
+  });
+
+  try {
+    const responseText = response.choices[0].message.content || '[]';
+    const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
+    const selections = JSON.parse(cleaned);
+
+    return selections.slice(0, 3).map((sel: any) => {
+      const restaurant = candidates[sel.index - 1];
+      return {
+        restaurant,
+        reason: sel.reason,
+        matchScore: Math.round((restaurant.finalScore || 0.5) * 100),
+      };
+    });
+  } catch (e) {
+    // Fallback: return top 3 with generic reasons
+    return candidates.slice(0, 3).map(r => ({
+      restaurant: r,
+      reason: `מתאים למה שחיפשת - ${r.google_rating}/5 דירוג`,
+      matchScore: Math.round((r.finalScore || 0.5) * 100),
+    }));
   }
 }
 
+// ============================================
+// Helper Functions
+// ============================================
+
+function buildQueryText(context: RecommendationContext, conversationSummary?: string): string {
+  const parts: string[] = [];
+
+  if (context.cuisinePreference) {
+    parts.push(`${context.cuisinePreference} food`);
+  }
+
+  if (context.withWho) {
+    const whoMap: Record<string, string> = {
+      'date': 'romantic dinner for two',
+      'friends': 'casual dinner with friends',
+      'family': 'family-friendly restaurant',
+      'solo': 'comfortable solo dining',
+      'work': 'business meeting venue',
+    };
+    parts.push(whoMap[context.withWho] || context.withWho);
+  }
+
+  if (context.purpose) {
+    const purposeMap: Record<string, string> = {
+      'romantic_dinner': 'romantic atmosphere',
+      'casual_meal': 'casual relaxed vibe',
+      'quick_bite': 'quick service',
+      'drinks': 'good bar drinks',
+      'celebration': 'celebration special occasion',
+      'business': 'professional atmosphere',
+    };
+    parts.push(purposeMap[context.purpose] || context.purpose);
+  }
+
+  if (context.budget) {
+    const budgetMap: Record<string, string> = {
+      'cheap': 'budget friendly affordable',
+      'moderate': 'mid-range prices',
+      'expensive': 'upscale fine dining',
+    };
+    parts.push(budgetMap[context.budget] || '');
+  }
+
+  if (conversationSummary) {
+    parts.push(conversationSummary);
+  }
+
+  return parts.filter(Boolean).join('. ') || 'restaurant in Tel Aviv';
+}
+
+function buildContextDescription(context: RecommendationContext): string {
+  const parts: string[] = [];
+
+  if (context.withWho) {
+    const whoMap: Record<string, string> = {
+      'date': 'דייט',
+      'friends': 'יציאה עם חברים',
+      'family': 'ארוחה משפחתית',
+      'solo': 'לבד',
+      'work': 'פגישת עבודה',
+    };
+    parts.push(whoMap[context.withWho] || context.withWho);
+  }
+
+  if (context.cuisinePreference) {
+    parts.push(`אוכל ${context.cuisinePreference}`);
+  }
+
+  if (context.budget) {
+    const budgetMap: Record<string, string> = {
+      'cheap': 'תקציב נמוך',
+      'moderate': 'תקציב בינוני',
+      'expensive': 'לא מוגבל בתקציב',
+    };
+    parts.push(budgetMap[context.budget] || '');
+  }
+
+  if (context.where) {
+    const whereMap: Record<string, string> = {
+      'walking_distance': 'במרחק הליכה',
+      'willing_to_travel': 'מוכן לנסוע',
+      'outside_city': 'מחוץ לעיר',
+    };
+    parts.push(whereMap[context.where] || context.where);
+  }
+
+  return parts.filter(Boolean).join(', ') || 'מסעדה בתל אביב';
+}
+
+function generateResultMessage(recommendations: Recommendation[], context: RecommendationContext): string {
+  if (recommendations.length === 0) {
+    return 'לא מצאתי התאמות מושלמות, אבל אולי תרצה לשנות קצת את הקריטריונים?';
+  }
+
+  const intro = context.withWho === 'date' 
+    ? 'מצאתי לכם כמה מקומות מושלמים לדייט! 💕'
+    : context.withWho === 'friends'
+    ? 'הנה כמה מקומות מעולים ליציאה עם חברים! 🎉'
+    : 'הנה ההמלצות שלי! 🍽️';
+
+  return intro;
+}
+
+async function generateEmbedding(text: string): Promise<number[]> {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: text,
+  });
+  return response.data[0].embedding;
+}
+
+function combineEmbeddings(
+  emb1: number[],
+  emb2: number[],
+  weight1: number,
+  weight2: number
+): number[] {
+  return emb1.map((val, i) => val * weight1 + emb2[i] * weight2);
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a || !b || a.length !== b.length) return 0;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+function isOpenNow(openingHours: any): boolean {
+  if (!openingHours) return true; // Assume open if no data
+  
+  const now = new Date();
+  const day = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()];
+  const currentTime = now.getHours() * 100 + now.getMinutes();
+  
+  const todayHours = openingHours[day];
+  if (!todayHours) return true;
+  
+  // Simple check - could be improved
+  if (todayHours.open && todayHours.close) {
+    const open = parseInt(todayHours.open.replace(':', ''));
+    const close = parseInt(todayHours.close.replace(':', ''));
+    return currentTime >= open && currentTime <= close;
+  }
+  
+  return true;
+}
+
+async function getFriendsReviews(supabase: any, userId: string): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>();
+  
+  // Get user's friends
+  const { data: friendships } = await supabase
+    .from('friendships')
+    .select('friend_id')
+    .eq('user_id', userId)
+    .eq('status', 'accepted');
+  
+  if (!friendships?.length) return result;
+  
+  const friendIds = friendships.map((f: any) => f.friend_id);
+  
+  // Get friends' reviews
+  const { data: reviews } = await supabase
+    .from('reviews')
+    .select(`
+      user_id,
+      restaurants (google_place_id),
+      profiles:user_id (full_name, username)
+    `)
+    .in('user_id', friendIds)
+    .gte('rating', 4); // Only positive reviews
+  
+  if (!reviews) return result;
+  
+  // Build map of google_place_id -> friend names
+  reviews.forEach((r: any) => {
+    const placeId = r.restaurants?.google_place_id;
+    if (!placeId) return;
+    
+    const friendName = r.profiles?.full_name || r.profiles?.username || 'חבר';
+    const existing = result.get(placeId) || [];
+    if (!existing.includes(friendName)) {
+      existing.push(friendName);
+      result.set(placeId, existing);
+    }
+  });
+  
+  return result;
+}

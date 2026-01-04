@@ -122,9 +122,10 @@ export async function POST(request: NextRequest) {
       profile = data;
     }
 
-    // If onboarding is completed, build and store the taste embedding
+    // If onboarding is completed, build and store embeddings
     if (profile.onboarding_completed) {
       await rebuildTasteEmbedding(supabase, user.id, profile);
+      await generateOnboardingEmbedding(supabase, user.id, profile);
     }
 
     return NextResponse.json({
@@ -374,3 +375,76 @@ function buildTasteText(profile: any, signals: any[]): string {
   return parts.join(' ');
 }
 
+/**
+ * Generate onboarding-specific embedding
+ */
+async function generateOnboardingEmbedding(supabase: any, userId: string, profile: any) {
+  try {
+    const parts: string[] = [];
+
+    // Dietary preferences
+    const dietary: string[] = [];
+    if (profile.is_kosher) dietary.push('kosher');
+    if (profile.is_vegetarian) dietary.push('vegetarian');
+    if (profile.is_vegan) dietary.push('vegan');
+    if (profile.gluten_free) dietary.push('gluten-free');
+    if (dietary.length > 0) {
+      parts.push(`Dietary requirements: ${dietary.join(', ')}`);
+    }
+
+    // Likes
+    if (profile.likes?.length > 0) {
+      parts.push(`Likes: ${profile.likes.join(', ')}`);
+    }
+
+    // Dislikes
+    if (profile.dislikes?.length > 0) {
+      parts.push(`Dislikes: ${profile.dislikes.join(', ')}`);
+    }
+
+    // Free text
+    if (profile.free_text) {
+      parts.push(`Notes: ${profile.free_text}`);
+    }
+
+    // Restaurant preferences by context
+    const addRestaurants = (restaurants: any[], context: string) => {
+      if (restaurants?.length > 0) {
+        const names = restaurants.map((r: any) => r.name).slice(0, 3);
+        parts.push(`${context}: ${names.join(', ')}`);
+      }
+    };
+    
+    addRestaurants(profile.date_restaurants, 'Date spots');
+    addRestaurants(profile.friends_restaurants, 'With friends');
+    addRestaurants(profile.family_restaurants, 'Family favorites');
+
+    const onboardingText = parts.join('. ');
+    
+    if (!onboardingText || onboardingText.length < 10) {
+      return;
+    }
+
+    // Generate embedding
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const embeddingResponse = await openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: onboardingText,
+    });
+
+    const embedding = embeddingResponse.data[0].embedding;
+
+    // Update profile with onboarding embedding
+    await supabase
+      .from('user_taste_profiles')
+      .update({
+        onboarding_text: onboardingText,
+        onboarding_embedding: embedding,
+      })
+      .eq('user_id', userId);
+
+    console.log(`✅ Generated onboarding embedding for user ${userId}`);
+  } catch (error) {
+    console.error('Error generating onboarding embedding:', error);
+  }
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { addTasteSignal } from '@/lib/taste-signals';
+import { addTasteSignal, updateUserReviewsEmbedding } from '@/lib/taste-signals';
 
 export async function POST(request: NextRequest) {
   try {
@@ -253,6 +253,11 @@ export async function POST(request: NextRequest) {
       // Don't fail the review if signal fails
       console.error('Error adding taste signal for review:', signalError);
     }
+
+    // Trigger reviews embedding update (async, don't wait)
+    updateUserReviewsEmbedding(user.id).catch(err => 
+      console.error('Error updating reviews embedding:', err)
+    );
 
     return NextResponse.json({ 
       success: true, 
