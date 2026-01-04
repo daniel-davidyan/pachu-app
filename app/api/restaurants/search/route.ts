@@ -148,7 +148,7 @@ async function enrichWithFollowingData(supabase: any, userId: string, restaurant
     if (!reviewsByRestaurant.has(restId)) {
       reviewsByRestaurant.set(restId, new Map());
     }
-    const profile = profilesMap.get(review.user_id);
+    const profile: any = profilesMap.get(review.user_id);
     if (profile && !reviewsByRestaurant.get(restId)?.has(review.user_id)) {
       reviewsByRestaurant.get(restId)?.set(review.user_id, {
         id: profile.id,
