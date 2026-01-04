@@ -44,42 +44,18 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Check if we're in Tel Aviv - use local DB!
-    if (isInTelAviv(lat, lng)) {
-      console.log(`📍 Location (${lat.toFixed(4)}, ${lng.toFixed(4)}) is in Tel Aviv - using local DB`);
-      
-      const restaurants = await fetchFromLocalDB(supabase, lat, lng, radiusNum, apiKey);
-      
-      if (restaurants.length > 0) {
-        // Enrich with following data if user is logged in
-        if (user) {
-          await enrichWithFollowingData(supabase, user.id, restaurants);
-        }
-        
-        console.log(`✅ Found ${restaurants.length} restaurants from local DB`);
-        return NextResponse.json({ restaurants, source: 'local' });
-      }
-      
-      console.log(`⚠️ No local results, falling back to Google`);
-    }
-
-    // Not in Tel Aviv or no local results - use Google Places API
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Google Places API key not configured' },
-        { status: 500 }
-      );
-    }
-
-    console.log(`🌐 Location (${lat.toFixed(4)}, ${lng.toFixed(4)}) - using Google Places API`);
-    const restaurants = await fetchFromGoogle(apiKey, lat, lng, radiusNum);
+    // LOCAL DB ONLY MODE - No Google API calls
+    console.log(`📍 Location (${lat.toFixed(4)}, ${lng.toFixed(4)}) - using local DB only`);
+    
+    const restaurants = await fetchFromLocalDB(supabase, lat, lng, radiusNum, apiKey);
     
     // Enrich with following data if user is logged in
     if (user) {
       await enrichWithFollowingData(supabase, user.id, restaurants);
     }
-
-    return NextResponse.json({ restaurants, source: 'google' });
+    
+    console.log(`✅ Found ${restaurants.length} restaurants from local DB`);
+    return NextResponse.json({ restaurants, source: 'local' });
   } catch (error) {
     console.error('Error fetching nearby restaurants:', error);
     return NextResponse.json(

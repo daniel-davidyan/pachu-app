@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // STEP 1: Try to find in local DB first (fast & free!)
+    // LOCAL DB ONLY MODE - No Google API calls
     const searchTerm = `%${query}%`;
     const { data: localResults, error: localError } = await supabase
       .from('restaurant_cache')
@@ -57,108 +57,32 @@ export async function GET(request: NextRequest) {
       .order('google_rating', { ascending: false, nullsFirst: false })
       .limit(15);
 
-    if (!localError && localResults && localResults.length > 0) {
-      console.log(`🔍 Search "${query}": Found ${localResults.length} in local DB`);
-      
-      // Transform local results to match expected format
-      const restaurants = localResults.map((place: any) => {
-        const photoRef = place.photos?.[0]?.photo_reference;
-        return {
-          googlePlaceId: place.google_place_id,
-          name: place.name,
-          address: place.address,
-          latitude: place.latitude,
-          longitude: place.longitude,
-          photoUrl: photoRef && apiKey
-            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoRef}&key=${apiKey}`
-            : undefined,
-          rating: place.google_rating || 0,
-          priceLevel: place.price_level,
-          cuisineTypes: place.categories || [],
-          source: 'cache',
-          visitedByFollowing: [],
-        };
-      });
-
-      // Enrich with following data if user is logged in
-      if (user) {
-        await enrichWithFollowingData(supabase, user.id, restaurants);
-      }
-
-      return NextResponse.json({ restaurants });
+    if (localError) {
+      console.error('Error searching local DB:', localError);
+      return NextResponse.json({ restaurants: [] });
     }
 
-    // STEP 2: Fallback to Google Places API
-    console.log(`🔍 Search "${query}": Not in local DB, falling back to Google`);
+    console.log(`🔍 Search "${query}": Found ${localResults?.length || 0} in local DB`);
     
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'No results found and Google Places API key not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Use Google Places Text Search API
-    let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' restaurant')}&key=${apiKey}`;
-    
-    if (latitude && longitude) {
-      url += `&location=${latitude},${longitude}&radius=5000`;
-    }
-    
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      console.error('Google Places API error:', data);
-      return NextResponse.json(
-        { error: `Google Places API error: ${data.status}` },
-        { status: 500 }
-      );
-    }
-
-    // Transform Google Places data
-    const restaurants = await Promise.all(
-      (data.results?.slice(0, 10) || []).map(async (place: any) => {
-        const enrichedData: any = {
-          googlePlaceId: place.place_id,
-          name: place.name,
-          address: place.formatted_address,
-          latitude: place.geometry.location.lat,
-          longitude: place.geometry.location.lng,
-          photoUrl: place.photos?.[0]
-            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photos[0].photo_reference}&key=${apiKey}`
-            : undefined,
-          rating: place.rating || 0,
-          priceLevel: place.price_level,
-          cuisineTypes: place.types?.filter((t: string) => 
-            !['point_of_interest', 'establishment', 'food'].includes(t)
-          ) || [],
-          source: 'google',
-          visitedByFollowing: [],
-        };
-
-        // If no photo, try Place Details
-        if (!enrichedData.photoUrl && place.place_id) {
-          try {
-            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=photos,price_level,types&key=${apiKey}`;
-            const detailsResponse = await fetch(detailsUrl);
-            const detailsData = await detailsResponse.json();
-            
-            if (detailsData.status === 'OK' && detailsData.result) {
-              const details = detailsData.result;
-              if (details.photos?.[0]) {
-                enrichedData.photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${details.photos[0].photo_reference}&key=${apiKey}`;
-              }
-              if (details.price_level) enrichedData.priceLevel = details.price_level;
-            }
-          } catch (e) {
-            console.error('Error fetching place details:', e);
-          }
-        }
-
-        return enrichedData;
-      })
-    );
+    // Transform local results to match expected format
+    const restaurants = (localResults || []).map((place: any) => {
+      const photoRef = place.photos?.[0]?.photo_reference;
+      return {
+        googlePlaceId: place.google_place_id,
+        name: place.name,
+        address: place.address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        photoUrl: photoRef && apiKey
+          ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoRef}&key=${apiKey}`
+          : undefined,
+        rating: place.google_rating || 0,
+        priceLevel: place.price_level,
+        cuisineTypes: place.categories || [],
+        source: 'cache',
+        visitedByFollowing: [],
+      };
+    });
 
     // Enrich with following data if user is logged in
     if (user) {

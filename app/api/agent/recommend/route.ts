@@ -141,19 +141,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 Vector search found ${searchResults?.length || 0} restaurants`);
 
-    // If no results from cache, fallback to Google Places
-    let candidates: any[] = searchResults || [];
+    // LOCAL DB ONLY MODE - No Google API calls
+    const candidates: any[] = searchResults || [];
     
     if (candidates.length < 5) {
-      console.log('⚠️ Not enough results from cache, falling back to Google Places...');
-      const googleResults = await searchGooglePlaces(
-        request, 
-        searchIntent.searchQuery || searchIntent.cuisineType || 'restaurant',
-        latitude, 
-        longitude, 
-        radiusMeters
-      );
-      candidates = [...candidates, ...googleResults.slice(0, 20)];
+      console.log('⚠️ Not enough results from cache (DB only mode - no Google fallback)');
     }
 
     // ========================================
