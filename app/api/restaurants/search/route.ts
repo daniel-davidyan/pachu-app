@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Tel Aviv bounds - same as in populate script
+const TEL_AVIV_BOUNDS = {
+  south: 32.035,
+  north: 32.135,
+  west: 34.740,
+  east: 34.815,
+};
+
+function isInTelAviv(lat: number, lng: number): boolean {
+  return (
+    lat >= TEL_AVIV_BOUNDS.south &&
+    lat <= TEL_AVIV_BOUNDS.north &&
+    lng >= TEL_AVIV_BOUNDS.west &&
+    lng <= TEL_AVIV_BOUNDS.east
+  );
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('query');
@@ -15,24 +32,75 @@ export async function GET(request: NextRequest) {
   }
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
-  
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'Google Places API key not configured' },
-      { status: 500 }
-    );
-  }
 
   try {
     const supabase = await createClient();
-    
-    // Get current user
     const { data: { user } } = await supabase.auth.getUser();
+
+    // STEP 1: Try to find in local DB first (fast & free!)
+    const searchTerm = `%${query}%`;
+    const { data: localResults, error: localError } = await supabase
+      .from('restaurant_cache')
+      .select(`
+        google_place_id,
+        name,
+        address,
+        latitude,
+        longitude,
+        google_rating,
+        google_reviews_count,
+        price_level,
+        categories,
+        photos
+      `)
+      .or(`name.ilike.${searchTerm},summary.ilike.${searchTerm}`)
+      .order('google_rating', { ascending: false, nullsFirst: false })
+      .limit(15);
+
+    if (!localError && localResults && localResults.length > 0) {
+      console.log(`🔍 Search "${query}": Found ${localResults.length} in local DB`);
+      
+      // Transform local results to match expected format
+      const restaurants = localResults.map((place: any) => {
+        const photoRef = place.photos?.[0]?.photo_reference;
+        return {
+          googlePlaceId: place.google_place_id,
+          name: place.name,
+          address: place.address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          photoUrl: photoRef && apiKey
+            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoRef}&key=${apiKey}`
+            : undefined,
+          rating: place.google_rating || 0,
+          priceLevel: place.price_level,
+          cuisineTypes: place.categories || [],
+          source: 'cache',
+          visitedByFollowing: [],
+        };
+      });
+
+      // Enrich with following data if user is logged in
+      if (user) {
+        await enrichWithFollowingData(supabase, user.id, restaurants);
+      }
+
+      return NextResponse.json({ restaurants });
+    }
+
+    // STEP 2: Fallback to Google Places API
+    console.log(`🔍 Search "${query}": Not in local DB, falling back to Google`);
+    
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'No results found and Google Places API key not configured' },
+        { status: 500 }
+      );
+    }
 
     // Use Google Places Text Search API
     let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' restaurant')}&key=${apiKey}`;
     
-    // Add location bias if available
     if (latitude && longitude) {
       url += `&location=${latitude},${longitude}&radius=5000`;
     }
@@ -48,7 +116,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform Google Places data and enrich with Place Details
+    // Transform Google Places data
     const restaurants = await Promise.all(
       (data.results?.slice(0, 10) || []).map(async (place: any) => {
         const enrichedData: any = {
@@ -65,40 +133,26 @@ export async function GET(request: NextRequest) {
           cuisineTypes: place.types?.filter((t: string) => 
             !['point_of_interest', 'establishment', 'food'].includes(t)
           ) || [],
+          source: 'google',
+          visitedByFollowing: [],
         };
 
-        // If no photo from Text Search, try to get from Place Details
+        // If no photo, try Place Details
         if (!enrichedData.photoUrl && place.place_id) {
           try {
-            console.log(`📸 No photo for "${place.name}", trying Place Details API...`);
-            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,photos,formatted_phone_number,opening_hours,website,price_level,types&key=${apiKey}`;
+            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=photos,price_level,types&key=${apiKey}`;
             const detailsResponse = await fetch(detailsUrl);
             const detailsData = await detailsResponse.json();
             
             if (detailsData.status === 'OK' && detailsData.result) {
               const details = detailsData.result;
-              
-              // Get photo from details
               if (details.photos?.[0]) {
                 enrichedData.photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${details.photos[0].photo_reference}&key=${apiKey}`;
-                console.log(`✅ Found photo for "${place.name}" from Place Details`);
-              } else {
-                console.warn(`⚠️ Place Details for "${place.name}" has no photos`);
               }
-              
-              // Add additional details
               if (details.price_level) enrichedData.priceLevel = details.price_level;
-              if (details.types) {
-                enrichedData.cuisineTypes = details.types.filter((t: string) => 
-                  !['point_of_interest', 'establishment', 'food'].includes(t)
-                );
-              }
-            } else {
-              console.warn(`⚠️ Place Details API returned status: ${detailsData.status} for "${place.name}"`);
             }
-          } catch (detailsError) {
-            console.error(`❌ Error fetching place details for "${place.name}":`, detailsError);
-            // Continue without details if there's an error
+          } catch (e) {
+            console.error('Error fetching place details:', e);
           }
         }
 
@@ -106,106 +160,9 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // If user is logged in, get following users who visited these restaurants
+    // Enrich with following data if user is logged in
     if (user) {
-      const placeIds = restaurants.map((r: any) => r.googlePlaceId);
-      
-      // Get list of users the current user is following
-      const { data: followingData } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id);
-      
-      const followingIds = followingData?.map(f => f.following_id) || [];
-
-      if (followingIds.length > 0 && placeIds.length > 0) {
-        // Get restaurants from our database that match the place IDs
-        const { data: dbRestaurants } = await supabase
-          .from('restaurants')
-          .select('id, google_place_id')
-          .in('google_place_id', placeIds);
-
-        const restaurantIdMap = new Map<string, string>();
-        dbRestaurants?.forEach((r: any) => {
-          if (r.google_place_id) {
-            restaurantIdMap.set(r.google_place_id, r.id);
-          }
-        });
-
-        const dbRestaurantIds = dbRestaurants?.map(r => r.id) || [];
-
-        if (dbRestaurantIds.length > 0) {
-          // Get reviews from following users for these restaurants
-          const { data: reviewsData, error: reviewsError } = await supabase
-            .from('reviews')
-            .select('restaurant_id, user_id')
-            .in('restaurant_id', dbRestaurantIds)
-            .in('user_id', followingIds);
-
-          if (reviewsError) {
-            console.error('Error fetching reviews:', reviewsError);
-          }
-
-          // Get unique user IDs from reviews
-          const userIds = [...new Set(reviewsData?.map(r => r.user_id) || [])];
-
-          // Get profiles for these users
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, username, full_name, avatar_url')
-            .in('id', userIds);
-
-          // Create a map of user_id to profile
-          const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
-
-          // Group reviews by restaurant_id and deduplicate users
-          const reviewsByRestaurant = new Map<string, Map<string, any>>();
-          reviewsData?.forEach((review: any) => {
-            const restId = review.restaurant_id;
-            if (!reviewsByRestaurant.has(restId)) {
-              reviewsByRestaurant.set(restId, new Map());
-            }
-            const userId = review.user_id;
-            const profile = profilesMap.get(userId);
-            if (profile) {
-              // Only add each user once per restaurant
-              if (!reviewsByRestaurant.get(restId)?.has(userId)) {
-                reviewsByRestaurant.get(restId)?.set(userId, {
-                  id: profile.id,
-                  username: profile.username,
-                  fullName: profile.full_name || profile.username,
-                  avatarUrl: profile.avatar_url,
-                });
-              }
-            }
-          });
-
-          // Add visitedByFollowing to each restaurant
-          restaurants.forEach((restaurant: any) => {
-            const dbRestaurantId = restaurantIdMap.get(restaurant.googlePlaceId);
-            if (dbRestaurantId && reviewsByRestaurant.has(dbRestaurantId)) {
-              restaurant.visitedByFollowing = Array.from(reviewsByRestaurant.get(dbRestaurantId)!.values());
-            } else {
-              restaurant.visitedByFollowing = [];
-            }
-          });
-        } else {
-          // No restaurants in DB, set empty arrays
-          restaurants.forEach((restaurant: any) => {
-            restaurant.visitedByFollowing = [];
-          });
-        }
-      } else {
-        // No following users or no places, set empty arrays
-        restaurants.forEach((restaurant: any) => {
-          restaurant.visitedByFollowing = [];
-        });
-      }
-    } else {
-      // User not logged in, set empty arrays
-      restaurants.forEach((restaurant: any) => {
-        restaurant.visitedByFollowing = [];
-      });
+      await enrichWithFollowingData(supabase, user.id, restaurants);
     }
 
     return NextResponse.json({ restaurants });
@@ -218,3 +175,70 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Helper function to add visitedByFollowing data
+async function enrichWithFollowingData(supabase: any, userId: string, restaurants: any[]) {
+  const placeIds = restaurants.map(r => r.googlePlaceId);
+  
+  const { data: followingData } = await supabase
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', userId);
+  
+  const followingIds = followingData?.map((f: any) => f.following_id) || [];
+
+  if (followingIds.length === 0 || placeIds.length === 0) return;
+
+  const { data: dbRestaurants } = await supabase
+    .from('restaurants')
+    .select('id, google_place_id')
+    .in('google_place_id', placeIds);
+
+  const restaurantIdMap = new Map<string, string>();
+  dbRestaurants?.forEach((r: any) => {
+    if (r.google_place_id) {
+      restaurantIdMap.set(r.google_place_id, r.id);
+    }
+  });
+
+  const dbRestaurantIds = dbRestaurants?.map((r: any) => r.id) || [];
+  if (dbRestaurantIds.length === 0) return;
+
+  const { data: reviewsData } = await supabase
+    .from('reviews')
+    .select('restaurant_id, user_id')
+    .in('restaurant_id', dbRestaurantIds)
+    .in('user_id', followingIds);
+
+  const userIds = [...new Set(reviewsData?.map((r: any) => r.user_id) || [])];
+
+  const { data: profilesData } = await supabase
+    .from('profiles')
+    .select('id, username, full_name, avatar_url')
+    .in('id', userIds);
+
+  const profilesMap = new Map(profilesData?.map((p: any) => [p.id, p]) || []);
+
+  const reviewsByRestaurant = new Map<string, Map<string, any>>();
+  reviewsData?.forEach((review: any) => {
+    const restId = review.restaurant_id;
+    if (!reviewsByRestaurant.has(restId)) {
+      reviewsByRestaurant.set(restId, new Map());
+    }
+    const profile = profilesMap.get(review.user_id);
+    if (profile && !reviewsByRestaurant.get(restId)?.has(review.user_id)) {
+      reviewsByRestaurant.get(restId)?.set(review.user_id, {
+        id: profile.id,
+        username: profile.username,
+        fullName: profile.full_name || profile.username,
+        avatarUrl: profile.avatar_url,
+      });
+    }
+  });
+
+  restaurants.forEach((restaurant: any) => {
+    const dbRestaurantId = restaurantIdMap.get(restaurant.googlePlaceId);
+    if (dbRestaurantId && reviewsByRestaurant.has(dbRestaurantId)) {
+      restaurant.visitedByFollowing = Array.from(reviewsByRestaurant.get(dbRestaurantId)!.values());
+    }
+  });
+}
