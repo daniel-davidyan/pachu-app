@@ -260,14 +260,14 @@ async function performVectorSearch(
     .select('id, summary_embedding, reviews_embedding')
     .in('id', restaurantIds);
 
-  const embeddingMap = new Map(
+  const embeddingMap = new Map<string, { id: string; summary_embedding: number[] | null; reviews_embedding: number[] | null }>(
     (embeddings || []).map((e: any) => [e.id, e])
   );
 
   // Calculate vector scores
   const scored = restaurants.map(r => {
     const embData = embeddingMap.get(r.id);
-    if (!embData?.summary_embedding) {
+    if (!embData || !embData.summary_embedding) {
       r.vectorScore = 0;
       return r;
     }
