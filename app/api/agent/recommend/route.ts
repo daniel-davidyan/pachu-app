@@ -51,11 +51,8 @@ interface Recommendation {
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-// Whitelisted emails for debug mode
-const DEBUG_EMAILS = [
-  'amitchimya@pachu.app',
-  'danieldavidyan@pachu.app',
-];
+// Note: Debug data access is now controlled by password in the analytics page
+// No email whitelist needed anymore
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,10 +75,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user can access debug data
-    // Use passed email (from chat API) or fall back to auth user email
+    // Always include debug data when requested (analytics uses password-based access now)
     const userEmail = (passedEmail || user?.email)?.toLowerCase();
-    const canDebug = includeDebugData && userEmail && DEBUG_EMAILS.includes(userEmail);
+    const canDebug = includeDebugData === true; // Simply check if debug data was requested
 
     console.log('🔐 Debug access check:', { userEmail, includeDebugData, canDebug });
     console.log('🔍 Starting recommendation pipeline...');
