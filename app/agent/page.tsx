@@ -494,7 +494,6 @@ export default function AgentPage() {
       // Get detailed error info for debugging
       const errorName = error?.name || 'Unknown';
       const errorMsg = error?.message || 'No message';
-      const errorStack = error?.stack?.split('\n')[0] || '';
       
       let errorContent = "אופס, משהו השתבש. בוא ננסה שוב! 🙏";
       let errorChips: Chip[] = [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }];
