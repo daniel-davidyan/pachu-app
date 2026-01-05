@@ -51,6 +51,12 @@ interface Recommendation {
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
+// Whitelisted emails for debug mode
+const DEBUG_EMAILS = [
+  'amitchimya@pachu.app',
+  'danieldavidyan@pachu.app',
+];
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -61,6 +67,7 @@ export async function POST(request: NextRequest) {
       context,
       userLocation,       // { lat, lng }
       conversationSummary, // Text summary of what user is looking for
+      includeDebugData,   // If true, include full pipeline data
     } = body;
 
     if (!context || !userLocation) {
@@ -70,9 +77,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if user can access debug data
+    const userEmail = user?.email?.toLowerCase();
+    const canDebug = includeDebugData && userEmail && DEBUG_EMAILS.includes(userEmail);
+
     console.log('🔍 Starting recommendation pipeline...');
     console.log('📍 Context:', context);
     console.log('📍 User location:', userLocation);
+
+    // For debug: get total restaurant count
+    let totalInDb = 0;
+    if (canDebug) {
+      const { count } = await supabase
+        .from('restaurant_cache')
+        .select('*', { count: 'exact', head: true });
+      totalInDb = count || 0;
+    }
 
     // ========================================
     // STEP 1: HARD FILTERS (Location + Hours)
@@ -85,10 +105,23 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 After hard filters: ${filteredRestaurants.length} restaurants`);
 
+    // Debug data for step 1
+    const step1Data = canDebug ? {
+      totalInDb,
+      afterFilter: filteredRestaurants.length,
+      sampleRestaurants: filteredRestaurants.slice(0, 10).map(r => ({
+        name: r.name,
+        city: r.city,
+        distance: r.distance ? Math.round(r.distance) : null,
+        categories: r.categories,
+      })),
+    } : undefined;
+
     if (filteredRestaurants.length === 0) {
       return NextResponse.json({
         recommendations: [],
         message: 'לא מצאתי מסעדות שעונות לקריטריונים. אולי תנסה להרחיב את החיפוש?',
+        debugData: canDebug ? { step1: step1Data, step2: null, step3: null, step4: null } : undefined,
       });
     }
 
@@ -105,6 +138,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 After vector search: ${vectorResults.length} restaurants scored`);
 
+    // Debug data for step 2
+    const step2Data = canDebug ? {
+      queryText,
+      totalScored: vectorResults.length,
+      topByVector: vectorResults.slice(0, 20).map(r => ({
+        name: r.name,
+        vectorScore: r.vectorScore ? Math.round(r.vectorScore * 1000) / 1000 : 0,
+        categories: r.categories,
+      })),
+    } : undefined;
+
     // ========================================
     // STEP 3: RE-RANKING (Social signals + friends)
     // ========================================
@@ -116,6 +160,20 @@ export async function POST(request: NextRequest) {
     );
 
     console.log(`📊 After re-ranking: ${rerankedResults.length} restaurants`);
+
+    // Debug data for step 3
+    const step3Data = canDebug ? {
+      totalReranked: rerankedResults.length,
+      topByRerank: rerankedResults.slice(0, 20).map(r => ({
+        name: r.name,
+        vectorScore: r.vectorScore ? Math.round(r.vectorScore * 1000) / 1000 : 0,
+        socialScore: r.socialScore ? Math.round(r.socialScore * 1000) / 1000 : 0,
+        finalScore: r.finalScore ? Math.round(r.finalScore * 1000) / 1000 : 0,
+        googleRating: r.google_rating,
+        reviewCount: r.google_reviews_count,
+        friendsWhoVisited: r.friendsWhoVisited,
+      })),
+    } : undefined;
 
     // ========================================
     // STEP 4: LLM FINAL SELECTION
@@ -129,10 +187,31 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Final recommendations: ${recommendations.length}`);
 
+    // Debug data for step 4
+    const step4Data = canDebug ? {
+      candidatesSentToLLM: topCandidates.map(r => ({
+        name: r.name,
+        finalScore: r.finalScore ? Math.round(r.finalScore * 1000) / 1000 : 0,
+        categories: r.categories,
+        summary: r.summary?.substring(0, 100),
+      })),
+      finalRecommendations: recommendations.map(r => ({
+        name: r.restaurant.name,
+        matchScore: r.matchScore,
+        reason: r.reason,
+      })),
+    } : undefined;
+
     return NextResponse.json({
       recommendations,
       totalConsidered: filteredRestaurants.length,
       message: generateResultMessage(recommendations, context),
+      debugData: canDebug ? {
+        step1: step1Data,
+        step2: step2Data,
+        step3: step3Data,
+        step4: step4Data,
+      } : undefined,
     });
 
   } catch (error) {
