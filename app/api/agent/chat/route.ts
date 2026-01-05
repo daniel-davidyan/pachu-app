@@ -116,7 +116,10 @@ export async function POST(request: NextRequest) {
     
     if (context.state === 'ready_to_search') {
       // We have enough info - get recommendations!
-      response = await handleSearch(context, userLocation, userProfile, user?.email);
+      const requestUrl = new URL(request.url);
+      const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+      const cookies = request.headers.get('cookie') || '';
+      response = await handleSearch(context, userLocation, userProfile, user?.email, { baseUrl, cookies });
     } else if (context.state === 'small_talk') {
       // User is just chatting
       response = await handleSmallTalk(message, userProfile, isFirstTurn);
@@ -536,7 +539,8 @@ async function handleSearch(
   context: ConversationContext,
   userLocation: { lat: number; lng: number } | null,
   profile: UserProfile,
-  userEmail?: string
+  userEmail?: string,
+  requestInfo?: { baseUrl: string; cookies: string }
 ): Promise<AgentResponse> {
   
   // Default to Tel Aviv center if no valid location
@@ -574,9 +578,7 @@ async function handleSearch(
 
   try {
     // Call recommendation API with timeout
-    // Use the app's URL - prefer NEXT_PUBLIC_APP_URL for production domain
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    const baseUrl = requestInfo?.baseUrl || 'http://localhost:3000';
     const recommendUrl = `${baseUrl}/api/agent/recommend`;
     
     console.log('🔍 Calling recommend API...');
@@ -587,7 +589,10 @@ async function handleSearch(
     
     const recommendResponse = await fetch(recommendUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cookie': requestInfo?.cookies || '', // Forward authentication cookies
+      },
       body: JSON.stringify({
         context: recommendContext,
         userLocation: effectiveLocation,
