@@ -574,10 +574,9 @@ async function handleSearch(
 
   try {
     // Call recommendation API with timeout
-    // Use request origin for production, fallback to env var or localhost
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}`
-      : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    // Use the app's URL - prefer NEXT_PUBLIC_APP_URL for production domain
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     const recommendUrl = `${baseUrl}/api/agent/recommend`;
     
     console.log('🔍 Calling recommend API...');

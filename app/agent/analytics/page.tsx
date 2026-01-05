@@ -232,8 +232,8 @@ export default function PipelineAnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+      {/* Header - with safe area padding for mobile */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
