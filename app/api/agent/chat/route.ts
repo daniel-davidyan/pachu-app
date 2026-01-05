@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     
     if (context.state === 'ready_to_search') {
       // We have enough info - get recommendations!
-      response = await handleSearch(context, userLocation, userProfile);
+      response = await handleSearch(context, userLocation, userProfile, user?.email);
     } else if (context.state === 'small_talk') {
       // User is just chatting
       response = await handleSmallTalk(message, userProfile, isFirstTurn);
@@ -534,7 +534,8 @@ async function handleGathering(
 async function handleSearch(
   context: ConversationContext,
   userLocation: { lat: number; lng: number } | null,
-  profile: UserProfile
+  profile: UserProfile,
+  userEmail?: string
 ): Promise<AgentResponse> {
   
   // Default to Tel Aviv center if no valid location
@@ -588,6 +589,7 @@ async function handleSearch(
         userLocation: effectiveLocation,
         conversationSummary: buildSearchSummary(context.slots),
         includeDebugData: true, // Always include debug data for analytics
+        userEmail: userEmail, // Pass email for debug access check
       }),
       signal: controller.signal,
     });

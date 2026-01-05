@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       userLocation,       // { lat, lng }
       conversationSummary, // Text summary of what user is looking for
       includeDebugData,   // If true, include full pipeline data
+      userEmail: passedEmail, // Email passed from chat API (for internal calls)
     } = body;
 
     if (!context || !userLocation) {
@@ -78,9 +79,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user can access debug data
-    const userEmail = user?.email?.toLowerCase();
+    // Use passed email (from chat API) or fall back to auth user email
+    const userEmail = (passedEmail || user?.email)?.toLowerCase();
     const canDebug = includeDebugData && userEmail && DEBUG_EMAILS.includes(userEmail);
 
+    console.log('🔐 Debug access check:', { userEmail, includeDebugData, canDebug });
     console.log('🔍 Starting recommendation pipeline...');
     console.log('📍 Context:', context);
     console.log('📍 User location:', userLocation);

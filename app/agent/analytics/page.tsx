@@ -99,6 +99,11 @@ export default function PipelineAnalyticsPage() {
       if (stored) {
         try {
           const history = JSON.parse(stored);
+          console.log('📂 Loaded chat history:', history.map((c: ChatConversation) => ({
+            id: c.id,
+            title: c.title,
+            hasDebugData: !!c.debugData
+          })));
           setChatHistory(history);
         } catch (e) {
           console.error('Failed to load chat history', e);
@@ -111,15 +116,23 @@ export default function PipelineAnalyticsPage() {
   }, []);
 
   const analyzeConversation = (chat: ChatConversation) => {
+    console.log('📊 Analyzing conversation:', { 
+      id: chat.id, 
+      title: chat.title,
+      hasDebugData: !!chat.debugData,
+      debugDataKeys: chat.debugData ? Object.keys(chat.debugData) : null
+    });
+    
     setSelectedChat(chat);
     setError(null);
 
     // Use the stored debug data from the actual conversation - NO API CALL!
     if (chat.debugData) {
-      console.log('Using stored debug data from conversation');
+      console.log('✅ Using stored debug data from conversation');
       setDebugData(chat.debugData);
     } else {
       // No debug data stored - this is an old conversation before we added debug data
+      console.log('❌ No debug data found for conversation');
       setError('לא נמצא מידע על הפייפליין לשיחה הזו. נסה שיחה חדשה עם האייג\'נט.');
       setDebugData(null);
     }

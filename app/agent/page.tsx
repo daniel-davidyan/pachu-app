@@ -263,6 +263,13 @@ export default function AgentPage() {
       debugData: latestDebugData, // Include debug data for analytics
     };
 
+    console.log('💾 Saving conversation:', { 
+      id: currentChatId, 
+      messageCount: messages.length, 
+      hasDebugData: !!latestDebugData,
+      debugDataKeys: latestDebugData ? Object.keys(latestDebugData) : null
+    });
+
     setChatHistory(prev => {
       const filtered = prev.filter(c => c.id !== currentChatId);
       const updated = [conversation, ...filtered].slice(0, 10);
@@ -410,8 +417,10 @@ export default function AgentPage() {
 
       // Save debug data for analytics (if present)
       if (agentData.debugData) {
-        console.log('Saving debug data for analytics');
+        console.log('✅ Saving debug data for analytics:', Object.keys(agentData.debugData));
         setLatestDebugData(agentData.debugData);
+      } else {
+        console.log('⚠️ No debugData in response');
       }
 
       // PRIORITY: Check for recommendations FIRST (even if there's an error field)
