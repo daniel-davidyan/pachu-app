@@ -106,11 +106,18 @@ const getChipIcon = (label: string, value: string): LucideIcon => {
   if (text.includes('כלב') || text.includes('dog') || text.includes('חיות')) return Dog;
   if (text.includes('מסיבה') || text.includes('party') || text.includes('חגיגה') || text.includes('יומהולדת')) return PartyPopper;
   
-  // Location
+  // Location & Cities
+  if (text.includes('תל אביב') || text.includes('tel aviv') || text.includes('tlv')) return Building;
+  if (text.includes('ירושלים') || text.includes('jerusalem')) return Building;
+  if (text.includes('חיפה') || text.includes('haifa')) return Building;
+  if (text.includes('הרצליה') || text.includes('herzliya')) return Building;
+  if (text.includes('רמת גן') || text.includes('ramat gan')) return Building;
+  if (text.includes('בכל') || text.includes('כל ה') || text.includes('באזור') || text.includes('סביבה')) return MapPin;
   if (text.includes('מיקום') || text.includes('location') || text.includes('איפה') || text.includes('קרוב')) return MapPin;
   if (text.includes('חוץ') || text.includes('outdoor') || text.includes('גינה') || text.includes('מרפסת')) return TreePine;
   if (text.includes('פנים') || text.includes('indoor')) return Building;
   if (text.includes('חניה') || text.includes('parking') || text.includes('רכב')) return Car;
+  if (text.includes('ים') || text.includes('חוף') || text.includes('beach')) return Sun;
   
   // Food Types
   if (text.includes('אסייתי') || text.includes('asian') || text.includes('סיני') || text.includes('יפני') || text.includes('תאילנדי')) return Globe;
@@ -653,7 +660,7 @@ export default function AgentPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="font-bold text-gray-800 text-base">Pachu Taste Model</h2>
+                  <h2 className="font-bold text-gray-800 text-base">Pachu Agent</h2>
                   <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/80 text-primary rounded shadow-sm">
                     Beta
                   </span>

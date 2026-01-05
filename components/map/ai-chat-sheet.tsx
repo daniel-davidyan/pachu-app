@@ -800,7 +800,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-gray-800 text-sm">Pachu Taste Model</h2>
+                    <h2 className="font-bold text-gray-800 text-sm">Pachu Agent</h2>
                     <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/80 text-primary rounded shadow-sm">
                       Beta
                     </span>
