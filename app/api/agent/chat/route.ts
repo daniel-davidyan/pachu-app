@@ -573,7 +573,11 @@ async function handleSearch(
 
   try {
     // Call recommendation API with timeout
-    const recommendUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/agent/recommend`;
+    // Use request origin for production, fallback to env var or localhost
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const recommendUrl = `${baseUrl}/api/agent/recommend`;
     
     console.log('🔍 Calling recommend API...');
     console.log('📋 Recommend context:', recommendContext);
@@ -646,7 +650,9 @@ async function handleSearch(
     };
 
   } catch (error: any) {
-    console.error('❌ Search error:', error?.message || error);
+    const errorName = error?.name || 'Unknown';
+    const errorMsg = error?.message || 'No details';
+    console.error('❌ Search error:', errorName, errorMsg);
     
     // Check if it was a timeout
     if (error?.name === 'AbortError') {
@@ -656,15 +662,20 @@ async function handleSearch(
           { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
           { label: 'חיפוש פשוט יותר', value: 'simpler', emoji: '✨' },
         ],
+        error: 'timeout',
       };
     }
     
+    // Include error details for debugging
+    const debugInfo = `\n\n🔧 [${errorName}] ${errorMsg.substring(0, 150)}`;
+    
     return {
-      message: 'אופס, משהו השתבש. בוא ננסה שוב? 🙏',
+      message: `אופס, משהו השתבש. בוא ננסה שוב? 🙏${debugInfo}`,
       chips: [
         { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
         { label: 'התחל מחדש', value: 'start_over', emoji: '🆕' },
       ],
+      error: errorMsg,
     };
   }
 }
