@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
       },
       readyToRecommend: context.state === 'ready_to_search',
       recommendations: response.recommendations,
+      debugData: response.debugData, // Include debug data for analytics
       conversationId: conversationId || `conv_${Date.now()}`,
     });
 
@@ -163,6 +164,7 @@ interface AgentResponse {
   chips: Chip[];
   recommendations?: any[];
   questionType?: string;
+  debugData?: any;
 }
 
 // ============================================
@@ -585,6 +587,7 @@ async function handleSearch(
         context: recommendContext,
         userLocation: effectiveLocation,
         conversationSummary: buildSearchSummary(context.slots),
+        includeDebugData: true, // Always include debug data for analytics
       }),
       signal: controller.signal,
     });
@@ -599,6 +602,7 @@ async function handleSearch(
 
     const data = await recommendResponse.json();
     const recommendations = data.recommendations || [];
+    const debugData = data.debugData || null;
     
     console.log(`✅ Got ${recommendations.length} recommendations`);
 
@@ -610,6 +614,7 @@ async function handleSearch(
           { label: 'סוג אוכל אחר', value: 'change_cuisine', emoji: '🍽️' },
           { label: 'התחל מחדש', value: 'start_over', emoji: '🆕' },
         ],
+        debugData, // Include even for 0 results
       };
     }
 
@@ -635,6 +640,7 @@ async function handleSearch(
       message: personalizedMsg,
       chips: [],
       recommendations,
+      debugData, // Include debug data for analytics
     };
 
   } catch (error: any) {

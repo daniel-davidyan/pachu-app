@@ -55,6 +55,7 @@ interface ChatConversation {
   title: string;
   messages: Message[];
   timestamp: number;
+  debugData?: any; // Debug data from recommendation pipeline
 }
 
 const STORAGE_KEY = 'pachu-chat-history';
@@ -186,6 +187,7 @@ export default function AgentPage() {
   const [currentChips, setCurrentChips] = useState<Chip[]>([]);
   const [conversationContext, setConversationContext] = useState<ConversationContext | null>(null);
   const [hasDevAccess, setHasDevAccess] = useState(false);
+  const [latestDebugData, setLatestDebugData] = useState<any>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -257,7 +259,8 @@ export default function AgentPage() {
       id: currentChatId,
       title,
       messages,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      debugData: latestDebugData, // Include debug data for analytics
     };
 
     setChatHistory(prev => {
@@ -266,7 +269,7 @@ export default function AgentPage() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
-  }, [messages, currentChatId]);
+  }, [messages, currentChatId, latestDebugData]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -369,7 +372,12 @@ export default function AgentPage() {
         content: m.content
       }));
 
-      // Call the smart agent API
+      // Call the smart agent API with timeout for mobile networks
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout for mobile
+      
+      console.log('📡 Sending request to agent API...', { location });
+      
       const agentResponse = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -379,22 +387,31 @@ export default function AgentPage() {
           previousContext: conversationContext,
           messages: conversationHistory.slice(0, -1),
           userLocation: location,
-        })
+        }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       // Check if response is OK first
       if (!agentResponse.ok) {
         const errorText = await agentResponse.text();
         console.error('Agent API error:', agentResponse.status, errorText);
-        throw new Error(`API error: ${agentResponse.status}`);
+        throw new Error(`API error: ${agentResponse.status} - ${errorText.substring(0, 100)}`);
       }
 
       const agentData = await agentResponse.json();
-      console.log('Agent response:', agentData);
+      console.log('✅ Agent response received:', agentData);
 
       // Update conversation context first
       if (agentData.context) {
         setConversationContext(agentData.context);
+      }
+
+      // Save debug data for analytics (if present)
+      if (agentData.debugData) {
+        console.log('Saving debug data for analytics');
+        setLatestDebugData(agentData.debugData);
       }
 
       // PRIORITY: Check for recommendations FIRST (even if there's an error field)
@@ -462,14 +479,32 @@ export default function AgentPage() {
         setCurrentChips(agentData.chips || []);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Agent error:', error);
+      
+      let errorContent = "אופס, משהו השתבש. בוא ננסה שוב! 🙏";
+      let errorChips: Chip[] = [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }];
+      
+      // Handle specific error types
+      if (error?.name === 'AbortError') {
+        errorContent = "החיפוש לקח יותר מדי זמן 😅 נראה שהרשת איטית. בוא ננסה שוב?";
+        errorChips = [
+          { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
+          { label: 'חיפוש פשוט יותר', value: 'simpler', emoji: '✨' },
+        ];
+      } else if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        errorContent = "נראה שיש בעיה ברשת 📶 בדוק את החיבור ונסה שוב";
+        errorChips = [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }];
+      }
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "אופס, משהו השתבש. בוא ננסה שוב! 🙏"
+        content: errorContent,
+        chips: errorChips,
       };
       setMessages(prev => [...prev, errorMessage]);
+      setCurrentChips(errorChips);
     } finally {
       setIsLoading(false);
       setTimeout(() => {

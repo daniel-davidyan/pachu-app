@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Database, Filter, Sparkles, BarChart3, Trophy, ChevronDown, ChevronUp, Loader2, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Database, Filter, Sparkles, BarChart3, Trophy, ChevronDown, ChevronUp, MessageSquare, Loader2 } from 'lucide-react';
 
 interface Restaurant {
   id: string;
@@ -68,6 +68,7 @@ interface ChatConversation {
   messages: Message[];
   timestamp: number;
   context?: ConversationContext;
+  debugData?: DebugData; // Debug data from the actual conversation
 }
 
 const STORAGE_KEY = 'pachu-chat-history';
@@ -77,7 +78,6 @@ export default function PipelineAnalyticsPage() {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
   const [selectedChat, setSelectedChat] = useState<ChatConversation | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [debugData, setDebugData] = useState<DebugData | null>(null);
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,99 +110,18 @@ export default function PipelineAnalyticsPage() {
     }
   };
 
-  const extractContextFromMessages = (messages: Message[]): ConversationContext => {
-    // Try to extract context from the conversation
-    const context: ConversationContext = {
-      state: 'ready_to_search',
-      slots: {
-        occasion: null,
-        location: null,
-        cuisine: null,
-        vibe: null,
-        budget: null,
-        timing: null,
-      }
-    };
-
-    // Look for keywords in user messages
-    messages.forEach(msg => {
-      if (msg.role !== 'user') return;
-      const content = msg.content.toLowerCase();
-
-      // Occasion detection
-      if (content.includes('דייט') || content.includes('date')) context.slots.occasion = 'date';
-      else if (content.includes('חברים') || content.includes('friends')) context.slots.occasion = 'friends';
-      else if (content.includes('משפחה') || content.includes('family')) context.slots.occasion = 'family';
-      else if (content.includes('לבד') || content.includes('solo')) context.slots.occasion = 'solo';
-      else if (content.includes('עבודה') || content.includes('work')) context.slots.occasion = 'work';
-
-      // Location detection
-      if (content.includes('הליכה') || content.includes('walking')) context.slots.location = 'walking';
-      else if (content.includes('נסוע') || content.includes('travel')) context.slots.location = 'willing_to_travel';
-      else if (content.includes('תל אביב')) context.slots.location = 'tel_aviv';
-
-      // Cuisine detection
-      if (content.includes('איטלקי') || content.includes('italian')) context.slots.cuisine = 'Italian';
-      else if (content.includes('אסייתי') || content.includes('asian') || content.includes('סושי')) context.slots.cuisine = 'Asian';
-      else if (content.includes('בשרים') || content.includes('steak')) context.slots.cuisine = 'Steakhouse';
-      else if (content.includes('בריא') || content.includes('healthy')) context.slots.cuisine = 'Healthy';
-    });
-
-    return context;
-  };
-
-  const analyzeConversation = async (chat: ChatConversation) => {
-    setIsLoading(true);
-    setDebugData(null);
-    setError(null);
+  const analyzeConversation = (chat: ChatConversation) => {
     setSelectedChat(chat);
+    setError(null);
 
-    try {
-      // Extract context from messages
-      const context = extractContextFromMessages(chat.messages);
-      
-      // Build recommend context
-      const recommendContext = {
-        where: context.slots.location || 'tel_aviv',
-        withWho: context.slots.occasion || 'friends',
-        purpose: context.slots.occasion === 'date' ? 'romantic_dinner' : 'casual_meal',
-        budget: context.slots.budget,
-        when: context.slots.timing,
-        cuisinePreference: context.slots.cuisine,
-      };
-
-      // Build conversation summary
-      const summary = chat.messages
-        .filter(m => m.role === 'user')
-        .map(m => m.content)
-        .join(' ');
-
-      const response = await fetch('/api/agent/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context: recommendContext,
-          userLocation: { lat: 32.0853, lng: 34.7818 }, // Default Tel Aviv
-          conversationSummary: summary,
-          includeDebugData: true,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.debugData) {
-        setDebugData(data.debugData);
-      } else {
-        setError('No debug data returned. Make sure you are logged in with a developer account.');
-      }
-    } catch (err: any) {
-      console.error('Pipeline analysis error:', err);
-      setError(err.message || 'Failed to analyze pipeline');
-    } finally {
-      setIsLoading(false);
+    // Use the stored debug data from the actual conversation - NO API CALL!
+    if (chat.debugData) {
+      console.log('Using stored debug data from conversation');
+      setDebugData(chat.debugData);
+    } else {
+      // No debug data stored - this is an old conversation before we added debug data
+      setError('לא נמצא מידע על הפייפליין לשיחה הזו. נסה שיחה חדשה עם האייג\'נט.');
+      setDebugData(null);
     }
   };
 
@@ -337,15 +256,6 @@ export default function PipelineAnalyticsPage() {
                 </button>
               ))
             )}
-          </div>
-        )}
-
-        {/* Loading State */}
-        {isLoading && (
-          <div className="bg-white rounded-xl p-8 shadow-sm text-center">
-            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-gray-600 font-medium">Analyzing pipeline...</p>
-            <p className="text-sm text-gray-400 mt-1">This may take a few seconds</p>
           </div>
         )}
 
