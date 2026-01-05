@@ -302,7 +302,8 @@ Rules:
 - "זול" / "תקציב נמוך" → budget: "cheap"
 - "יקר" / "מפנק" → budget: "expensive"
 - Small talk: greetings, thanks, how are you, etc.
-- isComplete = true if we have at least occasion OR cuisine
+- isComplete = true ONLY if user provided MULTIPLE pieces of info (e.g. "מסעדה איטלקית לדייט" has both cuisine AND occasion)
+- A single word like "חברים" or "דייט" alone is NOT complete
 
 Return ONLY valid JSON.`;
 
@@ -343,17 +344,18 @@ function determineState(
     return 'small_talk';
   }
 
-  // Check if we have minimum required info
+  // Check what slots we have
   const slots = context.slots;
   const hasOccasion = !!slots.occasion;
   const hasLocation = !!slots.location;
   const hasCuisine = !!slots.cuisine;
   
-  // Ready to search if we have: occasion + location OR occasion + cuisine OR cuisine + location
-  const canSearch = (hasOccasion && hasLocation) || 
-                    (hasOccasion && hasCuisine) || 
-                    (hasCuisine && hasLocation) ||
-                    understanding.isComplete;
+  // Count filled slots (excluding vibe which is optional)
+  const filledSlots = [hasOccasion, hasLocation, hasCuisine].filter(Boolean).length;
+  
+  // Need at least 2 out of 3 core slots (occasion, location, cuisine) to search
+  // This ensures we ask at least 2 questions before recommending
+  const canSearch = filledSlots >= 2;
 
   if (canSearch) {
     return 'ready_to_search';
@@ -506,12 +508,20 @@ async function handleSearch(
   profile: UserProfile
 ): Promise<AgentResponse> {
   
-  // Default to Tel Aviv center if no location
+  // Default to Tel Aviv center if no valid location
   const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
-  const effectiveLocation = userLocation && 
-    userLocation.lat >= 29.5 && userLocation.lat <= 33.5
-      ? userLocation 
-      : TEL_AVIV_CENTER;
+  
+  // Validate location - must be in Israel region
+  let effectiveLocation = TEL_AVIV_CENTER;
+  if (userLocation && 
+      typeof userLocation.lat === 'number' && 
+      typeof userLocation.lng === 'number' &&
+      userLocation.lat >= 29.5 && userLocation.lat <= 33.5 &&
+      userLocation.lng >= 34 && userLocation.lng <= 36) {
+    effectiveLocation = userLocation;
+  }
+  
+  console.log(`📍 User location: ${JSON.stringify(userLocation)} → Effective: ${JSON.stringify(effectiveLocation)}`);
 
   // Build context for recommendation API
   const recommendContext = {
