@@ -5,12 +5,21 @@ import OpenAI from 'openai';
 /**
  * POST /api/agent/chat
  * 
- * Smart conversational agent that:
- * 1. Uses the user's name ONLY in the first message
- * 2. Tracks parameters and fills them progressively
- * 3. Generates RELEVANT chips using LLM
- * 4. Knows when to stop asking and recommend
+ * Pachu Agent v2.0 - Smart Conversational Restaurant Finder
+ * 
+ * Architecture:
+ * 1. State Machine - tracks conversation state and what we know
+ * 2. Intent Understanding - deeply understands what user wants
+ * 3. Progressive Disclosure - asks one question at a time, naturally
+ * 4. Smart Chips - context-aware quick replies
+ * 5. Personalization - uses first name, references history
  */
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
 
 interface Chip {
   label: string;
@@ -18,15 +27,43 @@ interface Chip {
   emoji?: string;
 }
 
-interface ConversationContext {
-  where: string | null;
-  withWho: string | null;
-  purpose: string | null;
-  budget: string | null;
-  when: string | null;
-  cuisinePreference: string | null;
-  turnCount: number;
+// What we need to know to recommend
+interface SearchSlots {
+  occasion: string | null;     // Who/why: date, friends, family, solo, work, celebration
+  location: string | null;     // Distance: walking, nearby, willing_to_travel
+  cuisine: string | null;      // Food type: italian, asian, israeli, etc.
+  vibe: string | null;         // Atmosphere: romantic, casual, upscale, lively
+  budget: string | null;       // Price: cheap, moderate, expensive
+  timing: string | null;       // When: now, tonight, weekend, specific
 }
+
+// Conversation state machine
+type ConversationState = 
+  | 'greeting'           // First message - warm welcome
+  | 'gathering_info'     // Collecting slots progressively  
+  | 'ready_to_search'    // Have enough info to recommend
+  | 'showing_results'    // Displayed recommendations
+  | 'refining'           // User wants changes
+  | 'small_talk';        // User is just chatting
+
+interface ConversationContext {
+  state: ConversationState;
+  slots: SearchSlots;
+  turnCount: number;
+  lastQuestion: string | null;
+  userPreferences: string[];  // Accumulated preferences from chat
+}
+
+interface UserProfile {
+  firstName: string;
+  fullName: string;
+  hasOnboarding: boolean;
+  favoriteCategories?: string[];
+}
+
+// ============================================
+// MAIN HANDLER
+// ============================================
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,329 +75,586 @@ export async function POST(request: NextRequest) {
       message,
       conversationId,
       previousContext,
-      messages = [],
-      userLocation, // { lat, lng } - needed for recommendations
+      userLocation,
     } = body;
 
     if (!message) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 });
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
     // ========================================
-    // STEP 1: Get user info for personalization
+    // STEP 1: Get User Profile
     // ========================================
-    let userName = '';
+    const userProfile = await getUserProfile(supabase, user?.id);
     
-    if (user) {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name, username')
-        .eq('id', user.id)
-        .single();
-      
-      userName = profileData?.full_name || profileData?.username || '';
-    }
+    // ========================================
+    // STEP 2: Initialize/Restore Context
+    // ========================================
+    const context = initializeContext(previousContext);
+    const isFirstTurn = context.turnCount === 0;
+    context.turnCount++;
 
     // ========================================
-    // STEP 2: Initialize or update context
+    // STEP 3: Understand User Intent (Deep Analysis)
     // ========================================
-    const context: ConversationContext = {
-      where: previousContext?.where || null,
-      withWho: previousContext?.withWho || null,
-      purpose: previousContext?.purpose || null,
-      budget: previousContext?.budget || null,
-      when: previousContext?.when || null,
-      cuisinePreference: previousContext?.cuisinePreference || null,
-      turnCount: (previousContext?.turnCount || 0) + 1,
-    };
-
-    const isFirstTurn = context.turnCount === 1;
-
-    // ========================================
-    // STEP 3: Use LLM to extract parameters from message
-    // ========================================
-    const extractionPrompt = `Analyze this user message and extract restaurant search parameters.
-
-User message: "${message}"
-
-Return ONLY a valid JSON object. Use null for anything not clearly mentioned:
-{
-  "where": "distance preference: 'walking_distance', 'willing_to_travel', 'outside_city', or specific location if mentioned, or null",
-  "withWho": "who they're with: 'date', 'friends', 'family', 'solo', 'work', or null",
-  "purpose": "occasion: 'romantic_dinner', 'casual_meal', 'quick_bite', 'drinks', 'celebration', 'business', or null",
-  "budget": "budget: 'cheap', 'moderate', 'expensive', 'any', or null",
-  "when": "timing: 'now', 'tonight', 'tomorrow', 'weekend', or null",
-  "cuisinePreference": "cuisine type if mentioned, or null"
-}`;
-
-    const extractionResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: extractionPrompt }],
-      temperature: 0,
-      max_tokens: 200,
-    });
-
-    try {
-      const extractedText = extractionResponse.choices[0].message.content || '{}';
-      const cleanedText = extractedText.replace(/```json\n?|\n?```/g, '').trim();
-      const extracted = JSON.parse(cleanedText);
-      
-      // Update context with newly extracted values
-      if (extracted.where) context.where = extracted.where;
-      if (extracted.withWho) context.withWho = extracted.withWho;
-      if (extracted.purpose) context.purpose = extracted.purpose;
-      if (extracted.budget) context.budget = extracted.budget;
-      if (extracted.when) context.when = extracted.when;
-      if (extracted.cuisinePreference) context.cuisinePreference = extracted.cuisinePreference;
-    } catch (e) {
-      console.log('Failed to parse extraction:', e);
-    }
-
-    console.log('📋 Context:', context);
-
-    // ========================================
-    // STEP 4: Determine what's missing and if ready
-    // ========================================
-    const hasWhere = !!context.where;
-    const hasOccasion = !!context.withWho || !!context.purpose;
-    const readyToRecommend = hasWhere && hasOccasion;
+    const understanding = await understandUserIntent(message, context);
     
-    // Determine next question type
-    let nextQuestionType: 'where' | 'occasion' | 'cuisine' | 'none' = 'none';
-    if (!hasOccasion) {
-      nextQuestionType = 'occasion';
-    } else if (!hasWhere) {
-      nextQuestionType = 'where';
-    } else if (!context.cuisinePreference) {
-      nextQuestionType = 'cuisine';
-    }
-
-    console.log('🎯 Ready:', readyToRecommend, '| Next:', nextQuestionType);
-
-    // ========================================
-    // STEP 5: Generate response + chips with LLM
-    // ========================================
-    const responsePrompt = buildResponsePrompt(userName, isFirstTurn, context, nextQuestionType, readyToRecommend);
+    // Update slots with new information
+    mergeSlots(context.slots, understanding.extractedSlots);
     
-    const responseResult = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: responsePrompt }],
-      temperature: 0.7,
-      max_tokens: 300,
-    });
+    // Update state based on understanding
+    context.state = determineState(context, understanding);
+    
+    console.log('🧠 Understanding:', understanding);
+    console.log('📋 Slots:', context.slots);
+    console.log('🔄 State:', context.state);
 
-    let responseMessage = '';
-    let chips: Chip[] = [];
-
-    try {
-      const responseText = responseResult.choices[0].message.content || '';
-      const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, '').trim();
-      const parsed = JSON.parse(cleanedResponse);
-      
-      responseMessage = parsed.message || '';
-      chips = (parsed.chips || []).map((c: any) => ({
-        label: c.label,
-        value: c.value,
-        emoji: c.emoji
-      }));
-    } catch (e) {
-      // If parsing fails, use raw response as message
-      responseMessage = responseResult.choices[0].message.content || 'איך אני יכול לעזור?';
-      chips = [];
-    }
-
-    console.log('💬 Response:', responseMessage);
-    console.log('🏷️ Chips:', chips.length);
-
-    // Save chat signal for learning (if user provided useful info)
-    if (user && !readyToRecommend && (context.where || context.withWho || context.purpose || context.cuisinePreference)) {
-      const signalContent = buildChatSignalContent(context);
-      if (signalContent) {
-        await supabase.from('user_taste_signals').insert({
-          user_id: user.id,
-          signal_type: 'chat',
-          signal_strength: 4,
-          is_positive: true,
-          content: signalContent,
-          source_id: conversationId,
-        });
-      }
+    // ========================================
+    // STEP 4: Generate Response Based on State
+    // ========================================
+    let response: AgentResponse;
+    
+    if (context.state === 'ready_to_search') {
+      // We have enough info - get recommendations!
+      response = await handleSearch(context, userLocation, userProfile);
+    } else if (context.state === 'small_talk') {
+      // User is just chatting
+      response = await handleSmallTalk(message, userProfile, isFirstTurn);
+    } else {
+      // Need more info - ask smart questions
+      response = await handleGathering(context, userProfile, isFirstTurn, understanding);
     }
 
     // ========================================
-    // STEP 6: If ready to recommend, get recommendations!
+    // STEP 5: Return Response
     // ========================================
-    let recommendations = null;
-    
-    // Default to Tel Aviv center if no valid location
-    const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
-    const effectiveLocation = userLocation && 
-      userLocation.lat >= 29.5 && userLocation.lat <= 33.5 &&
-      userLocation.lng >= 34 && userLocation.lng <= 36
-        ? userLocation 
-        : TEL_AVIV_CENTER;
-    
-    if (readyToRecommend) {
-      console.log('🚀 Ready to recommend! Calling recommend API...');
-      console.log('📍 User location:', effectiveLocation);
-      console.log('📋 Context:', context);
-      
-      try {
-        const recommendUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/agent/recommend`;
-        console.log('🔗 Recommend URL:', recommendUrl);
-        
-        const recommendResponse = await fetch(recommendUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            context,
-            userLocation: effectiveLocation,
-            conversationSummary: buildChatSignalContent(context),
-          }),
-        });
-        
-        console.log('📥 Recommend response status:', recommendResponse.status);
-        
-        if (recommendResponse.ok) {
-          const data = await recommendResponse.json();
-          console.log('✅ Recommend data:', JSON.stringify(data).substring(0, 500));
-          recommendations = data.recommendations;
-          
-          // Update message with recommendation count
-          if (recommendations && recommendations.length > 0) {
-            responseMessage = `מצאתי ${recommendations.length} מקומות מושלמים בשבילך! 🎉`;
-          } else {
-            responseMessage = 'לא מצאתי מקומות שמתאימים לקריטריונים. אולי ננסה משהו אחר?';
-          }
-        } else {
-          const errorText = await recommendResponse.text();
-          console.error('❌ Recommend API error:', errorText);
-          responseMessage = 'משהו השתבש בחיפוש, בוא ננסה שוב';
-        }
-      } catch (err) {
-        console.error('❌ Failed to get recommendations:', err);
-        responseMessage = 'משהו השתבש בחיפוש, בוא ננסה שוב';
-      }
-    }
-
     return NextResponse.json({
-      message: responseMessage,
-      chips: chips.length > 0 ? chips : undefined,
-      context,
-      readyToRecommend,
-      recommendations, // Include recommendations when ready
+      message: response.message,
+      chips: response.chips,
+      context: {
+        state: context.state,
+        slots: context.slots,
+        turnCount: context.turnCount,
+        lastQuestion: response.questionType,
+      },
+      readyToRecommend: context.state === 'ready_to_search',
+      recommendations: response.recommendations,
       conversationId: conversationId || `conv_${Date.now()}`,
     });
 
   } catch (error) {
-    console.error('Agent chat error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown' },
-      { status: 500 }
-    );
+    console.error('Agent error:', error);
+    return NextResponse.json({
+      message: 'אופס, משהו קרה. בוא ננסה שוב! 🙏',
+      chips: [
+        { label: 'התחל מחדש', value: 'start_over', emoji: '🔄' }
+      ],
+      readyToRecommend: false,
+    });
   }
 }
 
-function buildChatSignalContent(context: ConversationContext): string | null {
+// ============================================
+// RESPONSE INTERFACE
+// ============================================
+
+interface AgentResponse {
+  message: string;
+  chips: Chip[];
+  recommendations?: any[];
+  questionType?: string;
+}
+
+// ============================================
+// USER PROFILE
+// ============================================
+
+async function getUserProfile(supabase: any, userId?: string): Promise<UserProfile> {
+  if (!userId) {
+    return { firstName: '', fullName: '', hasOnboarding: false };
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, username')
+    .eq('id', userId)
+    .single();
+
+  const { data: tasteProfile } = await supabase
+    .from('user_taste_profiles')
+    .select('onboarding_completed, preferred_cuisines')
+    .eq('user_id', userId)
+    .single();
+
+  const fullName = profile?.full_name || profile?.username || '';
+  // Extract first name only (handle both "First Last" and "First")
+  const firstName = fullName.split(' ')[0];
+
+  return {
+    firstName,
+    fullName,
+    hasOnboarding: tasteProfile?.onboarding_completed || false,
+    favoriteCategories: tasteProfile?.preferred_cuisines,
+  };
+}
+
+// ============================================
+// CONTEXT MANAGEMENT
+// ============================================
+
+function initializeContext(previous: any): ConversationContext {
+  if (previous?.slots) {
+    return {
+      state: previous.state || 'gathering_info',
+      slots: previous.slots,
+      turnCount: previous.turnCount || 0,
+      lastQuestion: previous.lastQuestion || null,
+      userPreferences: previous.userPreferences || [],
+    };
+  }
+
+  return {
+    state: 'greeting',
+    slots: {
+      occasion: null,
+      location: null,
+      cuisine: null,
+      vibe: null,
+      budget: null,
+      timing: null,
+    },
+    turnCount: 0,
+    lastQuestion: null,
+    userPreferences: [],
+  };
+}
+
+function mergeSlots(existing: SearchSlots, extracted: Partial<SearchSlots>) {
+  Object.keys(extracted).forEach(key => {
+    const k = key as keyof SearchSlots;
+    if (extracted[k]) {
+      existing[k] = extracted[k];
+    }
+  });
+}
+
+// ============================================
+// INTENT UNDERSTANDING (The Brain)
+// ============================================
+
+interface IntentUnderstanding {
+  intent: 'search' | 'refine' | 'question' | 'small_talk' | 'greeting';
+  extractedSlots: Partial<SearchSlots>;
+  sentiment: 'positive' | 'neutral' | 'negative';
+  isComplete: boolean;  // Has user provided enough for search?
+  keywords: string[];
+}
+
+async function understandUserIntent(
+  message: string, 
+  context: ConversationContext
+): Promise<IntentUnderstanding> {
+  
+  const prompt = `Analyze this Hebrew/English message from a user looking for restaurant recommendations in Tel Aviv.
+
+MESSAGE: "${message}"
+
+CURRENT CONTEXT:
+- Occasion: ${context.slots.occasion || 'unknown'}
+- Location preference: ${context.slots.location || 'unknown'}
+- Cuisine: ${context.slots.cuisine || 'unknown'}
+- Vibe: ${context.slots.vibe || 'unknown'}
+- Budget: ${context.slots.budget || 'unknown'}
+
+Extract information and return JSON:
+{
+  "intent": "search" | "refine" | "question" | "small_talk" | "greeting",
+  "extractedSlots": {
+    "occasion": "date" | "friends" | "family" | "solo" | "work" | "celebration" | null,
+    "location": "walking" | "nearby" | "willing_to_travel" | "tel_aviv" | null,
+    "cuisine": "<cuisine type or null>",
+    "vibe": "romantic" | "casual" | "upscale" | "lively" | "cozy" | "trendy" | null,
+    "budget": "cheap" | "moderate" | "expensive" | null,
+    "timing": "now" | "tonight" | "tomorrow" | "weekend" | null
+  },
+  "sentiment": "positive" | "neutral" | "negative",
+  "isComplete": <true if user gave enough info for meaningful search>,
+  "keywords": ["relevant", "keywords", "from", "message"]
+}
+
+Rules:
+- "דייט" / "בת זוג" / "זוגי" → occasion: "date"
+- "חברים" / "בנים" / "חבר'ה" → occasion: "friends"  
+- "משפחה" / "הורים" / "ילדים" → occasion: "family"
+- "לבד" → occasion: "solo"
+- "עבודה" / "פגישה" / "עסקי" → occasion: "work"
+- "יום הולדת" / "חגיגה" / "אירוע" → occasion: "celebration"
+- "הליכה" / "קרוב" → location: "walking"
+- "נסוע" / "לנסוע" / "רחוק" → location: "willing_to_travel"
+- "תל אביב" → location: "tel_aviv"
+- "איטלקי" / "פסטה" / "פיצה" → cuisine: "Italian"
+- "אסייתי" / "סושי" / "סיני" → cuisine: "Asian"
+- "בשרים" / "סטייק" → cuisine: "Steakhouse"
+- "בירה" / "בר" / "משקאות" → vibe: "lively" (and cuisine could be "Bar")
+- "רומנטי" / "אינטימי" → vibe: "romantic"
+- "זול" / "תקציב נמוך" → budget: "cheap"
+- "יקר" / "מפנק" → budget: "expensive"
+- Small talk: greetings, thanks, how are you, etc.
+- isComplete = true if we have at least occasion OR cuisine
+
+Return ONLY valid JSON.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+      max_tokens: 400,
+    });
+
+    const text = response.choices[0].message.content || '{}';
+    const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error('Intent parsing failed:', e);
+    return {
+      intent: 'search',
+      extractedSlots: {},
+      sentiment: 'neutral',
+      isComplete: false,
+      keywords: [],
+    };
+  }
+}
+
+// ============================================
+// STATE DETERMINATION
+// ============================================
+
+function determineState(
+  context: ConversationContext, 
+  understanding: IntentUnderstanding
+): ConversationState {
+  
+  // If small talk detected
+  if (understanding.intent === 'small_talk' || understanding.intent === 'greeting') {
+    return 'small_talk';
+  }
+
+  // Check if we have minimum required info
+  const slots = context.slots;
+  const hasOccasion = !!slots.occasion;
+  const hasLocation = !!slots.location;
+  const hasCuisine = !!slots.cuisine;
+  
+  // Ready to search if we have: occasion + location OR occasion + cuisine OR cuisine + location
+  const canSearch = (hasOccasion && hasLocation) || 
+                    (hasOccasion && hasCuisine) || 
+                    (hasCuisine && hasLocation) ||
+                    understanding.isComplete;
+
+  if (canSearch) {
+    return 'ready_to_search';
+  }
+
+  return 'gathering_info';
+}
+
+// ============================================
+// RESPONSE HANDLERS
+// ============================================
+
+async function handleSmallTalk(
+  message: string, 
+  profile: UserProfile,
+  isFirst: boolean
+): Promise<AgentResponse> {
+  
+  const greeting = profile.firstName 
+    ? `היי ${profile.firstName}! ` 
+    : 'היי! ';
+
+  // Generate friendly response
+  const prompt = `You are Pachu, a friendly restaurant recommendation assistant. 
+User said: "${message}"
+${isFirst ? `This is the first message. Greet them warmly${profile.firstName ? ` and use their name "${profile.firstName}"` : ''}.` : ''}
+
+Respond naturally in Hebrew (1-2 sentences). Be warm and friendly.
+Then gently steer towards restaurant recommendations.
+
+Return JSON:
+{
+  "message": "your response",
+  "suggestion": "a follow-up question about what they want to eat"
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8,
+      max_tokens: 200,
+    });
+
+    const text = response.choices[0].message.content || '';
+    const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    return {
+      message: parsed.message + (parsed.suggestion ? '\n\n' + parsed.suggestion : ''),
+      chips: [
+        { label: 'דייט', value: 'date', emoji: '💕' },
+        { label: 'עם חברים', value: 'friends', emoji: '👥' },
+        { label: 'ארוחה משפחתית', value: 'family', emoji: '👨‍👩‍👧' },
+      ],
+      questionType: 'occasion',
+    };
+  } catch {
+    return {
+      message: isFirst && profile.firstName 
+        ? `${greeting}מה בא לך לאכול היום?`
+        : 'מה בא לך לאכול?',
+      chips: [
+        { label: 'דייט', value: 'date', emoji: '💕' },
+        { label: 'עם חברים', value: 'friends', emoji: '👥' },
+        { label: 'משפחה', value: 'family', emoji: '👨‍👩‍👧' },
+      ],
+      questionType: 'occasion',
+    };
+  }
+}
+
+async function handleGathering(
+  context: ConversationContext,
+  profile: UserProfile,
+  isFirst: boolean,
+  understanding: IntentUnderstanding
+): Promise<AgentResponse> {
+  
+  const slots = context.slots;
+  
+  // Determine what to ask next (priority order)
+  let questionType: string;
+  let question: string;
+  let chips: Chip[];
+
+  // Priority 1: Occasion (who/why)
+  if (!slots.occasion) {
+    questionType = 'occasion';
+    question = isFirst && profile.firstName
+      ? `היי ${profile.firstName}! מה האירוע? 😊`
+      : 'עם מי יוצאים או מה האירוע?';
+    chips = [
+      { label: 'דייט', value: 'date', emoji: '💕' },
+      { label: 'חברים', value: 'friends', emoji: '👥' },
+      { label: 'משפחה', value: 'family', emoji: '👨‍👩‍👧' },
+      { label: 'לבד', value: 'solo', emoji: '🧘' },
+      { label: 'עבודה', value: 'work', emoji: '💼' },
+    ];
+  }
+  // Priority 2: Location
+  else if (!slots.location) {
+    questionType = 'location';
+    question = 'כמה מוכנים לנסוע? 🚗';
+    chips = [
+      { label: 'במרחק הליכה', value: 'walking', emoji: '🚶' },
+      { label: 'מוכן לנסוע', value: 'willing_to_travel', emoji: '🚗' },
+      { label: 'בכל תל אביב', value: 'tel_aviv', emoji: '🏙️' },
+    ];
+  }
+  // Priority 3: Cuisine (optional but helpful)
+  else if (!slots.cuisine) {
+    questionType = 'cuisine';
+    const occasionContext = slots.occasion === 'date' ? 'לדייט' : 
+                           slots.occasion === 'friends' ? 'עם החברים' : '';
+    question = `על מה חושבים ${occasionContext}? 🍽️`;
+    chips = [
+      { label: 'איטלקי', value: 'italian', emoji: '🍝' },
+      { label: 'אסייתי', value: 'asian', emoji: '🍜' },
+      { label: 'ישראלי', value: 'israeli', emoji: '🥙' },
+      { label: 'בשרים', value: 'steak', emoji: '🥩' },
+      { label: 'תפתיע אותי', value: 'surprise', emoji: '🎲' },
+    ];
+  }
+  // Have enough - but ask for vibe to improve results
+  else {
+    questionType = 'vibe';
+    question = 'איזה אווירה אתם מחפשים?';
+    chips = [
+      { label: 'רומנטי', value: 'romantic', emoji: '✨' },
+      { label: 'קז\'ואל', value: 'casual', emoji: '😎' },
+      { label: 'מפנק', value: 'upscale', emoji: '🥂' },
+      { label: 'חי ותוסס', value: 'lively', emoji: '🎉' },
+    ];
+  }
+
+  // Add acknowledgment of what we understood
+  let acknowledgment = '';
+  if (understanding.extractedSlots.occasion) {
+    const occasionText: Record<string, string> = {
+      'date': 'דייט',
+      'friends': 'יציאה עם חברים',
+      'family': 'ארוחה משפחתית',
+      'solo': 'אוכל לבד',
+      'work': 'פגישת עבודה',
+      'celebration': 'חגיגה',
+    };
+    acknowledgment = occasionText[understanding.extractedSlots.occasion] + '! ';
+  }
+  if (understanding.extractedSlots.cuisine) {
+    acknowledgment += `אוכל ${understanding.extractedSlots.cuisine} 👌 `;
+  }
+
+  const message = acknowledgment 
+    ? `${acknowledgment}\n${question}`
+    : question;
+
+  return {
+    message,
+    chips,
+    questionType,
+  };
+}
+
+async function handleSearch(
+  context: ConversationContext,
+  userLocation: { lat: number; lng: number } | null,
+  profile: UserProfile
+): Promise<AgentResponse> {
+  
+  // Default to Tel Aviv center if no location
+  const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
+  const effectiveLocation = userLocation && 
+    userLocation.lat >= 29.5 && userLocation.lat <= 33.5
+      ? userLocation 
+      : TEL_AVIV_CENTER;
+
+  // Build context for recommendation API
+  const recommendContext = {
+    where: mapLocationSlot(context.slots.location),
+    withWho: context.slots.occasion,
+    purpose: mapOccasionToPurpose(context.slots.occasion),
+    budget: context.slots.budget,
+    when: context.slots.timing,
+    cuisinePreference: context.slots.cuisine,
+  };
+
+  // Show searching message
+  const searchingMessages = [
+    'מחפש את המקומות המושלמים בשבילך... 🔍',
+    'רגע, בודק כמה מקומות מעולים... ✨',
+    'מסנן את ההמלצות הטובות ביותר... 🎯',
+  ];
+  const searchMsg = searchingMessages[Math.floor(Math.random() * searchingMessages.length)];
+
+  try {
+    // Call recommendation API
+    const recommendUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/agent/recommend`;
+    
+    const recommendResponse = await fetch(recommendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context: recommendContext,
+        userLocation: effectiveLocation,
+        conversationSummary: buildSearchSummary(context.slots),
+      }),
+    });
+
+    if (!recommendResponse.ok) {
+      throw new Error(`Recommend API error: ${recommendResponse.status}`);
+    }
+
+    const data = await recommendResponse.json();
+    const recommendations = data.recommendations || [];
+
+    if (recommendations.length === 0) {
+      return {
+        message: 'לא מצאתי מקומות שמתאימים בדיוק, אולי ננסה לחפש קצת אחרת? 🤔',
+        chips: [
+          { label: 'הרחב חיפוש', value: 'expand_search', emoji: '🔄' },
+          { label: 'סוג אוכל אחר', value: 'change_cuisine', emoji: '🍽️' },
+          { label: 'התחל מחדש', value: 'start_over', emoji: '🆕' },
+        ],
+      };
+    }
+
+    // Build success message
+    const successMessages = [
+      `מצאתי ${recommendations.length} מקומות מושלמים! 🎉`,
+      `הנה ${recommendations.length} המלצות מעולות! ✨`,
+      `יש לי ${recommendations.length} מקומות שתאהבו! 💫`,
+    ];
+    
+    const occasion = context.slots.occasion;
+    let personalizedMsg = successMessages[Math.floor(Math.random() * successMessages.length)];
+    
+    if (occasion === 'date') {
+      personalizedMsg = `מצאתי ${recommendations.length} מקומות מושלמים לדייט! 💕`;
+    } else if (occasion === 'friends') {
+      personalizedMsg = `יש לי ${recommendations.length} מקומות שווים ליציאה עם החברים! 🎉`;
+    } else if (occasion === 'family') {
+      personalizedMsg = `הנה ${recommendations.length} מקומות מעולים למשפחה! 👨‍👩‍👧`;
+    }
+
+    return {
+      message: personalizedMsg,
+      chips: [],
+      recommendations,
+    };
+
+  } catch (error) {
+    console.error('Search error:', error);
+    return {
+      message: 'אופס, משהו השתבש בחיפוש. בוא ננסה שוב? 🙏',
+      chips: [
+        { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
+        { label: 'התחל מחדש', value: 'start_over', emoji: '🆕' },
+      ],
+    };
+  }
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+function mapLocationSlot(location: string | null): string {
+  if (!location) return 'tel_aviv';
+  
+  const map: Record<string, string> = {
+    'walking': 'walking_distance',
+    'nearby': 'walking_distance',
+    'willing_to_travel': 'willing_to_travel',
+    'tel_aviv': 'tel_aviv',
+  };
+  
+  return map[location] || 'tel_aviv';
+}
+
+function mapOccasionToPurpose(occasion: string | null): string | null {
+  if (!occasion) return null;
+  
+  const map: Record<string, string> = {
+    'date': 'romantic_dinner',
+    'friends': 'casual_meal',
+    'family': 'casual_meal',
+    'solo': 'casual_meal',
+    'work': 'business',
+    'celebration': 'celebration',
+  };
+  
+  return map[occasion] || null;
+}
+
+function buildSearchSummary(slots: SearchSlots): string {
   const parts: string[] = [];
   
-  if (context.where) parts.push(`Looking for places in ${context.where}`);
-  if (context.withWho) parts.push(`Going with ${context.withWho}`);
-  if (context.purpose) parts.push(`Purpose: ${context.purpose}`);
-  if (context.cuisinePreference) parts.push(`Wants ${context.cuisinePreference} food`);
-  if (context.budget) parts.push(`Budget: ${context.budget}`);
+  if (slots.occasion) parts.push(`Looking for ${slots.occasion} dining`);
+  if (slots.cuisine) parts.push(`${slots.cuisine} food`);
+  if (slots.vibe) parts.push(`${slots.vibe} atmosphere`);
+  if (slots.budget) parts.push(`${slots.budget} budget`);
+  if (slots.location) parts.push(`in ${slots.location} area`);
   
-  return parts.length > 0 ? parts.join('. ') : null;
-}
-
-function buildResponsePrompt(
-  userName: string,
-  isFirstTurn: boolean,
-  context: ConversationContext,
-  nextQuestionType: 'where' | 'occasion' | 'cuisine' | 'none',
-  readyToRecommend: boolean
-): string {
-  
-  const knownInfo: string[] = [];
-  if (context.where) knownInfo.push(`מיקום: ${context.where}`);
-  if (context.withWho) knownInfo.push(`עם מי: ${context.withWho}`);
-  if (context.purpose) knownInfo.push(`מטרה: ${context.purpose}`);
-  if (context.cuisinePreference) knownInfo.push(`סוג אוכל: ${context.cuisinePreference}`);
-
-  // Name instruction - only for first turn
-  let nameInstruction = '';
-  if (isFirstTurn && userName) {
-    nameInstruction = `⚠️ CRITICAL: This is the FIRST message. Your message MUST start with a greeting that includes the name "${userName}".
-Since the response is in Hebrew (RTL) and the name "${userName}" is in English, you must write it like this:
-- "היי ${userName}! מה נשמע?"
-- "שלום ${userName}, מה בא לך?"
-- "הי ${userName}! איפה בא לך לאכול?"
-The name "${userName}" MUST appear in your response!`;
-  } else {
-    nameInstruction = 'Do NOT use any name in your response.';
-  }
-
-  // Question type instructions
-  let questionInstruction = '';
-  let chipsInstruction = '';
-
-  if (readyToRecommend) {
-    questionInstruction = 'The user has given enough info. Tell them you\'re searching for the perfect places.';
-    chipsInstruction = 'chips should be an empty array []';
-  } else {
-    switch (nextQuestionType) {
-      case 'occasion':
-        questionInstruction = 'Ask WHO they\'re going with or WHAT\'s the occasion. Be curious and friendly - ask what\'s the vibe/who\'s coming.';
-        chipsInstruction = `Generate 4-5 chips for who they're with / occasion:
-- "דייט 💕" (date)
-- "חברים 👥" (friends)  
-- "משפחה 👨‍👩‍👧" (family)
-- "לבד 🧘" (solo)
-- "עבודה 💼" (work)`;
-        break;
-      case 'where':
-        questionInstruction = 'Ask about location preference - how far are they willing to go.';
-        chipsInstruction = `Generate 3-4 chips about distance/location preference.
-Use these options: 
-- "במרחק הליכה 🚶" (walking distance)
-- "מוכן לנסוע 🚌" (willing to travel) 
-- "מחוץ לעיר 🌳" (outside the city)`;
-        break;
-      case 'cuisine':
-        questionInstruction = 'Ask what type of food/cuisine they\'re in the mood for.';
-        chipsInstruction = `Generate 4-5 chips for cuisine types.
-Examples: איטלקי 🍝, אסייתי 🍜, ישראלי 🥙, בשרים 🥩, מפתיע אותי 🎲`;
-        break;
-      default:
-        questionInstruction = 'Continue the conversation naturally.';
-        chipsInstruction = 'Generate relevant chips based on what makes sense to ask next.';
-    }
-  }
-
-  return `You are Pachu, a friendly restaurant recommendation assistant in Tel Aviv, Israel.
-You MUST respond in Hebrew. Be warm, casual, like texting a friend.
-
-${nameInstruction}
-
-${knownInfo.length > 0 ? `Already know about the user:\n${knownInfo.join('\n')}` : 'Don\'t know anything yet.'}
-
-Your task: ${questionInstruction}
-
-Return a JSON object with this EXACT structure:
-{
-  "message": "your response message in Hebrew (1-2 sentences, friendly and natural)",
-  "chips": [
-    {"label": "chip text", "value": "chip_value", "emoji": "emoji"}
-  ]
-}
-
-Chips rules:
-- ${chipsInstruction}
-- Each chip has: label (Hebrew), value (English snake_case), emoji
-- Chips MUST be relevant to the question you're asking
-- Keep labels short (1-3 words)
-
-Return ONLY the JSON, no other text.`;
+  return parts.join(', ') || 'restaurant in Tel Aviv';
 }

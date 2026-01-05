@@ -37,13 +37,17 @@ interface Message {
 }
 
 interface ConversationContext {
-  where: string | null;
-  withWho: string | null;
-  purpose: string | null;
-  budget: string | null;
-  when: string | null;
-  cuisinePreference: string | null;
-  additionalNotes: string[];
+  state: string;
+  slots: {
+    occasion: string | null;
+    location: string | null;
+    cuisine: string | null;
+    vibe: string | null;
+    budget: string | null;
+    timing: string | null;
+  };
+  turnCount: number;
+  lastQuestion: string | null;
 }
 
 interface ChatConversation {
