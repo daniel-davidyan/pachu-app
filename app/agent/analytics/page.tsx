@@ -76,9 +76,16 @@ const STORAGE_KEY = 'pachu-chat-history';
 const ANALYTICS_PASSWORD = '166149';
 const ACCESS_STORAGE_KEY = 'pachu-analytics-access';
 
+// Helper to check access from localStorage (runs on client only)
+function getInitialAccess(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(ACCESS_STORAGE_KEY) === 'granted';
+}
+
 export default function PipelineAnalyticsPage() {
   const router = useRouter();
-  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
@@ -87,33 +94,26 @@ export default function PipelineAnalyticsPage() {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Check access on mount (from localStorage)
+  // Initialize on client mount
   useEffect(() => {
-    const storedAccess = localStorage.getItem(ACCESS_STORAGE_KEY);
-    if (storedAccess === 'granted') {
-      setHasAccess(true);
-    } else {
-      setHasAccess(false);
-    }
+    setIsClient(true);
+    setHasAccess(getInitialAccess());
 
-    const loadChatHistory = () => {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const history = JSON.parse(stored);
-          console.log('📂 Loaded chat history:', history.map((c: ChatConversation) => ({
-            id: c.id,
-            title: c.title,
-            hasDebugData: !!c.debugData
-          })));
-          setChatHistory(history);
-        } catch (e) {
-          console.error('Failed to load chat history', e);
-        }
+    // Load chat history
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const history = JSON.parse(stored);
+        console.log('📂 Loaded chat history:', history.map((c: ChatConversation) => ({
+          id: c.id,
+          title: c.title,
+          hasDebugData: !!c.debugData
+        })));
+        setChatHistory(history);
+      } catch (e) {
+        console.error('Failed to load chat history', e);
       }
-    };
-
-    loadChatHistory();
+    }
   }, []);
 
   const handlePasswordSubmit = () => {
@@ -148,6 +148,15 @@ export default function PipelineAnalyticsPage() {
       setDebugData(null);
     }
   };
+
+  // Loading state (waiting for client-side hydration)
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // No access - show password prompt
   if (!hasAccess) {
