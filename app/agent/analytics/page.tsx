@@ -73,33 +73,21 @@ interface ChatConversation {
 
 const STORAGE_KEY = 'pachu-chat-history';
 
-const ANALYTICS_PASSWORD = '166149';
+const ANALYTICS_PASSWORD = '166147';
 const ACCESS_STORAGE_KEY = 'pachu-analytics-access';
-
-// Helper to check access from localStorage (runs on client only)
-function getInitialAccess(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(ACCESS_STORAGE_KEY) === 'granted';
-}
 
 export default function PipelineAnalyticsPage() {
   const router = useRouter();
-  const [hasAccess, setHasAccess] = useState(false);
-  const [isClient, setIsClient] = useState(false);
+  // Initialize access state lazily from localStorage
+  const [hasAccess, setHasAccess] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(ACCESS_STORAGE_KEY) === 'granted';
+  });
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
-  const [selectedChat, setSelectedChat] = useState<ChatConversation | null>(null);
-  const [debugData, setDebugData] = useState<DebugData | null>(null);
-  const [expandedStep, setExpandedStep] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Initialize on client mount
-  useEffect(() => {
-    setIsClient(true);
-    setHasAccess(getInitialAccess());
-
-    // Load chat history
+  // Initialize chat history lazily from localStorage
+  const [chatHistory, setChatHistory] = useState<ChatConversation[]>(() => {
+    if (typeof window === 'undefined') return [];
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
@@ -109,12 +97,18 @@ export default function PipelineAnalyticsPage() {
           title: c.title,
           hasDebugData: !!c.debugData
         })));
-        setChatHistory(history);
+        return history;
       } catch (e) {
         console.error('Failed to load chat history', e);
+        return [];
       }
     }
-  }, []);
+    return [];
+  });
+  const [selectedChat, setSelectedChat] = useState<ChatConversation | null>(null);
+  const [debugData, setDebugData] = useState<DebugData | null>(null);
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePasswordSubmit = () => {
     if (passwordInput === ANALYTICS_PASSWORD) {
@@ -148,15 +142,6 @@ export default function PipelineAnalyticsPage() {
       setDebugData(null);
     }
   };
-
-  // Loading state (waiting for client-side hydration)
-  if (!isClient) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   // No access - show password prompt
   if (!hasAccess) {
