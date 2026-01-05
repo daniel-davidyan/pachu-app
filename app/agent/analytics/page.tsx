@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Database, Filter, Sparkles, BarChart3, Trophy, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 
 interface PipelineStep {
@@ -36,7 +36,6 @@ interface DebugData {
 
 export default function PipelineAnalyticsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [debugData, setDebugData] = useState<DebugData | null>(null);
