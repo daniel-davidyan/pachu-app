@@ -491,6 +491,11 @@ export default function AgentPage() {
     } catch (error: any) {
       console.error('Agent error:', error);
       
+      // Get detailed error info for debugging
+      const errorName = error?.name || 'Unknown';
+      const errorMsg = error?.message || 'No message';
+      const errorStack = error?.stack?.split('\n')[0] || '';
+      
       let errorContent = "אופס, משהו השתבש. בוא ננסה שוב! 🙏";
       let errorChips: Chip[] = [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }];
       
@@ -506,10 +511,13 @@ export default function AgentPage() {
         errorChips = [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }];
       }
       
+      // Add debug info to error message (for troubleshooting)
+      const debugInfo = `\n\n🔧 Debug: [${errorName}] ${errorMsg.substring(0, 100)}`;
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: errorContent,
+        content: errorContent + debugInfo,
         chips: errorChips,
       };
       setMessages(prev => [...prev, errorMessage]);
