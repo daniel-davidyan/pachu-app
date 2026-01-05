@@ -165,6 +165,7 @@ interface AgentResponse {
   recommendations?: any[];
   questionType?: string;
   debugData?: any;
+  error?: string;
 }
 
 // ============================================
