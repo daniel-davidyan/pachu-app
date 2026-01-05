@@ -1,6 +1,6 @@
 'use client';
 
-import { Newspaper, Plus, User, Map, Bot } from 'lucide-react';
+import { Newspaper, Plus, User, Map, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -26,7 +26,7 @@ export function BottomNav({ show = true }: BottomNavProps) {
     {
       name: 'Agent',
       href: '/agent',
-      icon: Bot,
+      icon: Sparkles,
     },
     {
       name: 'Map',

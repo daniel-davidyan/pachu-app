@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Sparkles, Loader2, Plus, Clock, X, Trash2, BarChart3 } from 'lucide-react';
+import { Send, Sparkles, Loader2, Plus, Clock, X, Trash2, BarChart3, Laptop, Armchair, Coffee, Users, MapPin, Utensils, Heart, Wallet, Leaf, Pizza, Fish, Beef, Salad, IceCream, Wine, Beer, Soup, Sandwich, Egg, Apple, Globe, Sun, Moon, PartyPopper, Baby, Dog, Music, Wifi, Car, TreePine, Building, Home, Flame, Snowflake, Zap, Star, type LucideIcon } from 'lucide-react';
 import { BottomNav } from '@/components/layout/bottom-nav';
 
 interface Restaurant {
@@ -89,7 +89,70 @@ const getPriceLevel = (priceLevel?: number): string => {
   return '$'.repeat(priceLevel);
 };
 
-// Restaurant card component with image error handling
+// Helper function to get modern icon for chip based on content
+const getChipIcon = (label: string, value: string): LucideIcon => {
+  const text = (label + ' ' + value).toLowerCase();
+  
+  // Work & Study
+  if (text.includes('עבודה') || text.includes('לפטופ') || text.includes('work') || text.includes('laptop')) return Laptop;
+  if (text.includes('ישיבה') || text.includes('seat') || text.includes('מקום') || text.includes('הזמנ')) return Armchair;
+  if (text.includes('wifi') || text.includes('אינטרנט')) return Wifi;
+  
+  // Social
+  if (text.includes('חברים') || text.includes('friend') || text.includes('קבוצה') || text.includes('group')) return Users;
+  if (text.includes('רומנטי') || text.includes('דייט') || text.includes('date') || text.includes('זוג')) return Heart;
+  if (text.includes('משפחה') || text.includes('family') || text.includes('ילדים')) return Home;
+  if (text.includes('תינוק') || text.includes('baby')) return Baby;
+  if (text.includes('כלב') || text.includes('dog') || text.includes('חיות')) return Dog;
+  if (text.includes('מסיבה') || text.includes('party') || text.includes('חגיגה') || text.includes('יומהולדת')) return PartyPopper;
+  
+  // Location
+  if (text.includes('מיקום') || text.includes('location') || text.includes('איפה') || text.includes('קרוב')) return MapPin;
+  if (text.includes('חוץ') || text.includes('outdoor') || text.includes('גינה') || text.includes('מרפסת')) return TreePine;
+  if (text.includes('פנים') || text.includes('indoor')) return Building;
+  if (text.includes('חניה') || text.includes('parking') || text.includes('רכב')) return Car;
+  
+  // Food Types
+  if (text.includes('אסייתי') || text.includes('asian') || text.includes('סיני') || text.includes('יפני') || text.includes('תאילנדי')) return Globe;
+  if (text.includes('איטלקי') || text.includes('italian') || text.includes('פיצה') || text.includes('פסטה')) return Pizza;
+  if (text.includes('בשר') || text.includes('meat') || text.includes('סטייק') || text.includes('המבורגר')) return Beef;
+  if (text.includes('דג') || text.includes('fish') || text.includes('סושי') || text.includes('ים')) return Fish;
+  if (text.includes('סלט') || text.includes('salad') || text.includes('טרי')) return Salad;
+  if (text.includes('בריא') || text.includes('healthy') || text.includes('טבעוני') || text.includes('צמחוני')) return Leaf;
+  if (text.includes('קינוח') || text.includes('dessert') || text.includes('מתוק') || text.includes('גלידה')) return IceCream;
+  if (text.includes('מרק') || text.includes('soup')) return Soup;
+  if (text.includes('סנדוויץ') || text.includes('sandwich') || text.includes('כריך')) return Sandwich;
+  if (text.includes('ארוחת בוקר') || text.includes('breakfast') || text.includes('בוקר')) return Egg;
+  if (text.includes('פרי') || text.includes('fruit')) return Apple;
+  
+  // Drinks
+  if (text.includes('קפה') || text.includes('coffee') || text.includes('בית קפה')) return Coffee;
+  if (text.includes('יין') || text.includes('wine')) return Wine;
+  if (text.includes('בירה') || text.includes('beer') || text.includes('בר')) return Beer;
+  
+  // Vibe & Atmosphere  
+  if (text.includes('שקט') || text.includes('quiet') || text.includes('רגוע')) return Moon;
+  if (text.includes('חי') || text.includes('lively') || text.includes('אנרגטי') || text.includes('תוסס')) return Zap;
+  if (text.includes('מוזיקה') || text.includes('music') || text.includes('dj')) return Music;
+  if (text.includes('חם') || text.includes('hot') || text.includes('חורף')) return Flame;
+  if (text.includes('קר') || text.includes('cold') || text.includes('קיץ') || text.includes('מזגן')) return Snowflake;
+  if (text.includes('שמש') || text.includes('sun') || text.includes('צהריים')) return Sun;
+  if (text.includes('ערב') || text.includes('לילה') || text.includes('night')) return Moon;
+  
+  // Budget
+  if (text.includes('תקציב') || text.includes('מחיר') || text.includes('budget') || text.includes('זול') || text.includes('יקר')) return Wallet;
+  
+  // Food general
+  if (text.includes('אוכל') || text.includes('food') || text.includes('מסעדה') || text.includes('לאכול')) return Utensils;
+  
+  // Surprise / Other
+  if (text.includes('הפתע') || text.includes('surprise') || text.includes('תפתיע')) return Star;
+  
+  // Default
+  return Utensils;
+};
+
+// Restaurant card component - Modern design with full image overlay
 function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: { 
   restaurant: Restaurant; 
   messageId: string; 
@@ -107,25 +170,15 @@ function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: {
           onRestaurantClick(restaurant);
         }
       }}
-      className="group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] active:scale-[0.97]"
+      className="group relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.97]"
       style={{
         animation: `slideIn 0.5s ease-out ${index * 0.1}s both`,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
+        height: '160px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)'
       }}
     >
-      {/* Match percentage badge */}
-      <div 
-        className="absolute top-2 right-2 z-10 backdrop-blur-sm rounded-full px-2 py-0.5 font-bold text-[10px] shadow-md"
-        style={{
-          background: 'rgba(255, 255, 255, 0.9)',
-          color: '#6B7280'
-        }}
-      >
-        {matchPercentage}%
-      </div>
-      
-      {/* Restaurant Photo */}
-      <div className="relative w-full h-32 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+      {/* Full Background Image */}
+      <div className="absolute inset-0 w-full h-full">
         {restaurant.photoUrl && !imageError ? (
           <img
             src={restaurant.photoUrl}
@@ -137,39 +190,37 @@ function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: {
             }}
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-pink-100 to-orange-50 flex items-center justify-center">
-            <span className="text-5xl opacity-60">{getRestaurantIcon(restaurant)}</span>
+          <div className="w-full h-full bg-gradient-to-br from-primary/30 via-pink-200 to-orange-100 flex items-center justify-center">
+            <span className="text-5xl opacity-70">{getRestaurantIcon(restaurant)}</span>
           </div>
         )}
       </div>
       
-      {/* Restaurant Info */}
-      <div className="p-3">
-        <h3 className="font-bold text-gray-900 text-sm leading-tight mb-2 group-hover:text-primary transition-colors line-clamp-2">
+      {/* Dark gradient overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+      
+      {/* Match percentage badge - Top Right with Pink Background */}
+      <div 
+        className="absolute top-2 right-2 z-10 rounded-full px-2.5 py-1 font-bold text-xs shadow-lg"
+        style={{
+          background: 'linear-gradient(135deg, #EC4899, #C5459C)',
+          color: '#FFFFFF'
+        }}
+      >
+        {matchPercentage}%
+      </div>
+      
+      {/* Restaurant Name - Bottom with White Text */}
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <h3 className="font-bold text-white text-sm leading-tight line-clamp-2 drop-shadow-lg">
           {restaurant.name}
         </h3>
-        
         {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
-          <div className="mb-2">
-            <span className="text-xs bg-gradient-to-r from-primary/10 to-pink-50 text-primary font-semibold px-2 py-1 rounded-full border border-primary/20">
-              {restaurant.cuisineTypes[0].replace(/_/g, ' ').toLowerCase()}
-            </span>
-          </div>
-        )}
-        
-        {restaurant.priceLevel && (
-          <div className="text-left">
-            <span className="font-bold text-emerald-600 text-sm">
-              {getPriceLevel(restaurant.priceLevel)}
-            </span>
-          </div>
+          <p className="text-white/80 text-[11px] mt-0.5 font-medium">
+            {restaurant.cuisineTypes[0].replace(/_/g, ' ').toLowerCase()}
+          </p>
         )}
       </div>
-      
-      {/* Hover indicator bar */}
-      <div 
-        className="h-0.5 bg-gradient-to-r from-primary via-pink-500 to-orange-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
-      />
     </div>
   );
 }
@@ -331,11 +382,10 @@ export default function AgentPage() {
   };
 
   const handleChipClick = (chip: Chip) => {
-    // Construct a natural message from the chip
-    const chipMessage = chip.emoji ? `${chip.emoji} ${chip.label}` : chip.label;
-    setInputValue(chipMessage);
+    // Send just the label without emoji for cleaner messages
+    setInputValue(chip.label);
     // Immediately send the message
-    handleSendWithMessage(chipMessage);
+    handleSendWithMessage(chip.label);
   };
 
   const handleSendWithMessage = async (messageContent: string) => {
@@ -520,11 +570,12 @@ export default function AgentPage() {
 
   return (
     <div 
-      className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white flex flex-col overflow-hidden" 
+      className="fixed inset-0 flex flex-col overflow-hidden" 
       style={{ 
         height: '100dvh',
         touchAction: 'pan-y',
-        overscrollBehavior: 'none'
+        overscrollBehavior: 'none',
+        background: 'linear-gradient(135deg, #FCE7F3 0%, #FDF2F8 60%, #FFFFFF 100%)',
       }}
     >
       {/* Global styles for animations */}
@@ -574,59 +625,59 @@ export default function AgentPage() {
 
       {/* Header */}
       <div 
-        className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3"
+        className="flex-shrink-0 bg-white/80 backdrop-blur-sm border-b border-white/50 px-4 py-3"
         style={{
           paddingTop: 'calc(0.75rem + env(safe-area-inset-top))',
         }}
       >
         {showHistory ? (
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
-                <Clock className="w-4.5 h-4.5 text-white" strokeWidth={2} />
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                <Clock className="w-5 h-5 text-primary" strokeWidth={2} />
               </div>
-              <h2 className="font-bold text-gray-900 text-base">Chat History</h2>
+              <h2 className="font-bold text-gray-800 text-base">היסטוריית שיחות</h2>
             </div>
             <button
               onClick={() => setShowHistory(false)}
-              className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+              className="w-9 h-9 flex items-center justify-center bg-white/80 hover:bg-white rounded-full transition-all shadow-md hover:shadow-lg"
             >
-              <X className="w-5 h-5 text-gray-600" strokeWidth={2.5} />
+              <X className="w-5 h-5 text-gray-700" strokeWidth={2.5} />
             </button>
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="font-bold text-gray-900 text-base">Pachu Taste Model</h2>
-                  <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-primary/80 to-pink-500/80 text-white rounded shadow-sm">
+                  <h2 className="font-bold text-gray-800 text-base">Pachu Taste Model</h2>
+                  <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/80 text-primary rounded shadow-sm">
                     Beta
                   </span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={handleNewChat}
-                className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                className="w-9 h-9 flex items-center justify-center bg-white/80 hover:bg-white rounded-full transition-all shadow-md hover:shadow-lg"
                 title="New Chat"
               >
-                <Plus className="w-5 h-5 text-gray-600" strokeWidth={2.5} />
+                <Plus className="w-5 h-5 text-gray-700" strokeWidth={2.5} />
               </button>
               <button
                 onClick={() => setShowHistory(true)}
-                className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                className="w-9 h-9 flex items-center justify-center bg-white/80 hover:bg-white rounded-full transition-all shadow-md hover:shadow-lg"
                 title="Chat History"
               >
-                <Clock className="w-5 h-5 text-gray-600" strokeWidth={2} />
+                <Clock className="w-5 h-5 text-gray-700" strokeWidth={2} />
               </button>
               <button
                 onClick={() => router.push('/agent/analytics')}
-                className="w-9 h-9 flex items-center justify-center bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 rounded-full transition-colors"
+                className="w-9 h-9 flex items-center justify-center bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 rounded-full transition-colors shadow-md"
                 title="Pipeline Analytics"
               >
                 <BarChart3 className="w-5 h-5 text-white" strokeWidth={2} />
@@ -732,38 +783,50 @@ export default function AgentPage() {
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}
                   >
-                    {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
+                    {/* User message - Pink bubble aligned right */}
+                    {message.role === 'user' && (
                       <div
-                        className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                          message.role === 'user'
-                            ? 'bg-primary text-white rounded-br-md'
-                            : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
-                        }`}
+                        className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md shadow-md"
+                        style={{
+                          background: 'linear-gradient(135deg, #EC4899, #C5459C)',
+                        }}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p className="text-sm text-white whitespace-pre-wrap font-medium">{message.content}</p>
                       </div>
                     )}
                     
-                    {message.restaurants && message.restaurants.length > 0 && (
-                      <div className="w-full overflow-hidden">
-                        {message.content && (
-                          <div className="mb-3 bg-white text-gray-900 rounded-2xl rounded-bl-md shadow-sm border border-gray-100 px-4 py-3">
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    {/* Assistant message - Modern container */}
+                    {message.role === 'assistant' && (
+                      <div className="w-full">
+                        {/* Show restaurants FIRST if available */}
+                        {message.restaurants && message.restaurants.length > 0 && (
+                          <div className="mb-3">
+                            {/* Restaurant cards grid */}
+                            <div className={`grid gap-3 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                              {message.restaurants.map((restaurant, index) => (
+                                <RestaurantCard
+                                  key={`${message.id}-${restaurant.id || index}`}
+                                  restaurant={restaurant}
+                                  messageId={message.id}
+                                  index={index}
+                                  onRestaurantClick={handleRestaurantClick}
+                                />
+                              ))}
+                            </div>
                           </div>
                         )}
-                        <div className={`grid gap-3 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                          {message.restaurants.map((restaurant, index) => (
-                            <RestaurantCard
-                              key={`${message.id}-${restaurant.id || index}`}
-                              restaurant={restaurant}
-                              messageId={message.id}
-                              index={index}
-                              onRestaurantClick={handleRestaurantClick}
-                            />
-                          ))}
-                        </div>
+                        
+                        {/* Explanation/Reasoning text AFTER restaurants - in modern container */}
+                        {message.content && (
+                          <div
+                            className="bg-white/80 backdrop-blur-sm rounded-2xl rounded-tl-md px-4 py-3 shadow-md border border-white/50"
+                            style={{ maxWidth: '95%' }}
+                          >
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -777,22 +840,26 @@ export default function AgentPage() {
                   </div>
                 )}
 
-                {/* Chips - Show below messages */}
+                {/* Chips - Modern 2x2 grid */}
                 {currentChips.length > 0 && !isLoading && (
-                  <div className="flex flex-wrap gap-2 py-2">
-                    {currentChips.map((chip, index) => (
-                      <button
-                        key={`${chip.value}-${index}`}
-                        onClick={() => handleChipClick(chip)}
-                        className="px-4 py-2 bg-white border-2 border-primary/30 rounded-full text-sm font-medium text-gray-700 hover:bg-primary/10 hover:border-primary/50 transition-all active:scale-95 shadow-sm"
-                        style={{
-                          animation: `chipSlide 0.3s ease-out ${index * 0.05}s both`
-                        }}
-                      >
-                        {chip.emoji && <span className="mr-1.5">{chip.emoji}</span>}
-                        {chip.label}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2 py-2">
+                    {currentChips.slice(0, 4).map((chip, index) => {
+                      const IconComponent = getChipIcon(chip.label, chip.value);
+                      
+                      return (
+                        <button
+                          key={`${chip.value}-${index}`}
+                          onClick={() => handleChipClick(chip)}
+                          className="flex items-center gap-3 bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-lg transition-all active:scale-[0.98] shadow-md border border-gray-100"
+                          style={{
+                            animation: `chipSlide 0.3s ease-out ${index * 0.08}s both`
+                          }}
+                        >
+                          <IconComponent className="w-5 h-5 text-gray-400 flex-shrink-0" strokeWidth={1.5} />
+                          <span className="text-gray-600 text-right flex-1 text-xs leading-tight">{chip.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 

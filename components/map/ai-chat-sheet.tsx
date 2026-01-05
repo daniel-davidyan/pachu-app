@@ -111,7 +111,7 @@ const getMatchColor = (percentage: number): string => {
   return '#6B7280'; // Gray
 };
 
-// Restaurant card component with image error handling
+// Restaurant card component - Modern design with full image overlay
 function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: { 
   restaurant: Restaurant; 
   messageId: string; 
@@ -129,25 +129,16 @@ function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: {
           onRestaurantClick(restaurant);
         }
       }}
-      className="group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] active:scale-[0.97]"
+      className="group relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] flex-shrink-0"
       style={{
         animation: `slideIn 0.5s ease-out ${index * 0.1}s both`,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
+        width: '120px',
+        height: '150px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)'
       }}
     >
-      {/* Match percentage badge */}
-      <div 
-        className="absolute top-2 right-2 z-10 backdrop-blur-sm rounded-full px-2 py-0.5 font-bold text-[10px] shadow-md"
-        style={{
-          background: 'rgba(255, 255, 255, 0.9)',
-          color: '#6B7280'
-        }}
-      >
-        {matchPercentage}%
-      </div>
-      
-      {/* Restaurant Photo */}
-      <div className="relative w-full h-20 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+      {/* Full Background Image */}
+      <div className="absolute inset-0 w-full h-full">
         {restaurant.photoUrl && !imageError ? (
           <img
             src={restaurant.photoUrl}
@@ -159,39 +150,74 @@ function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: {
             }}
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-pink-100 to-orange-50 flex items-center justify-center">
-            <span className="text-3xl opacity-60">{getRestaurantIcon(restaurant)}</span>
+          <div className="w-full h-full bg-gradient-to-br from-primary/30 via-pink-200 to-orange-100 flex items-center justify-center">
+            <span className="text-4xl opacity-70">{getRestaurantIcon(restaurant)}</span>
           </div>
         )}
       </div>
       
-      {/* Restaurant Info */}
-      <div className="p-2">
-        <h3 className="font-bold text-gray-900 text-[11px] leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2">
+      {/* Dark gradient overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+      
+      {/* Match percentage badge - Top Right with Pink Background */}
+      <div 
+        className="absolute top-2 right-2 z-10 rounded-full px-2.5 py-1 font-bold text-xs shadow-lg"
+        style={{
+          background: 'linear-gradient(135deg, #EC4899, #C5459C)',
+          color: '#FFFFFF'
+        }}
+      >
+        {matchPercentage}%
+      </div>
+      
+      {/* Restaurant Name - Bottom with White Text */}
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <h3 className="font-bold text-white text-sm leading-tight line-clamp-2 drop-shadow-lg">
           {restaurant.name}
         </h3>
-        
         {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
-          <div className="mb-1">
-            <span className="text-[8px] bg-gradient-to-r from-primary/10 to-pink-50 text-primary font-semibold px-1.5 py-0.5 rounded-full border border-primary/20">
-              {restaurant.cuisineTypes[0].replace(/_/g, ' ').toLowerCase()}
-            </span>
-          </div>
-        )}
-        
-        {restaurant.priceLevel && (
-          <div className="text-left">
-            <span className="font-bold text-emerald-600 text-[11px]">
-              {getPriceLevel(restaurant.priceLevel)}
-            </span>
-          </div>
+          <p className="text-white/80 text-[10px] mt-0.5 font-medium">
+            {restaurant.cuisineTypes[0].replace(/_/g, ' ').toLowerCase()}
+          </p>
         )}
       </div>
-      
-      {/* Hover indicator bar */}
-      <div 
-        className="h-0.5 bg-gradient-to-r from-primary via-pink-500 to-orange-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
-      />
+    </div>
+  );
+}
+
+// Friends who visited component
+interface FriendAvatar {
+  name: string;
+  imageUrl?: string;
+}
+
+function FriendsWhoVisited({ friends, restaurantName }: { friends: FriendAvatar[]; restaurantName: string }) {
+  if (!friends || friends.length === 0) return null;
+  
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <div className="flex -space-x-2">
+        {friends.slice(0, 3).map((friend, idx) => (
+          <div
+            key={idx}
+            className="w-6 h-6 rounded-full border-2 border-white bg-gradient-to-br from-primary/20 to-pink-100 flex items-center justify-center overflow-hidden"
+          >
+            {friend.imageUrl ? (
+              <img src={friend.imageUrl} alt={friend.name} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[10px] font-bold text-primary">
+                {friend.name.charAt(0)}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <span className="text-[11px] text-gray-600">
+        {friends.length === 1 
+          ? `${friends[0].name} היה כאן`
+          : `${friends[0].name} ו-${friends.length - 1} נוספים היו כאן`
+        }
+      </span>
     </div>
   );
 }
@@ -388,7 +414,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
 
   const handleSendWithValue = async (value: string) => {
     if (!value.trim() || isLoading) return;
-    
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -479,14 +505,14 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
             website: rec.restaurant.website,
           }));
 
-          const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
             content: recommendData.explanation || agentData.message,
             restaurants,
-          };
+      };
 
-          setMessages(prev => [...prev, assistantMessage]);
+      setMessages(prev => [...prev, assistantMessage]);
           onRestaurantsFound?.(restaurants);
           setCurrentChips([]);
         } else {
@@ -499,7 +525,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
           };
           setMessages(prev => [...prev, assistantMessage]);
           setCurrentChips(agentData.chips || []);
-        }
+      }
       } else {
         // Not ready yet, show agent response with chips
         const assistantMessage: Message = {
@@ -666,22 +692,23 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
   return (
     <div
       ref={sheetRef}
-      className="fixed z-40 bg-gradient-to-b from-gray-50 to-white rounded-2xl shadow-2xl border border-gray-200 transition-all duration-200 ease-out overflow-hidden"
+      className="fixed z-40 rounded-3xl shadow-2xl border border-white/30 transition-all duration-200 ease-out overflow-hidden"
       style={{ 
         bottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
         left: 'max(0.75rem, env(safe-area-inset-left))',
         right: 'max(0.75rem, env(safe-area-inset-right))',
         height: sheetHeight,
         maxHeight: maxHeight,
+        background: 'linear-gradient(180deg, #FDF2F8 0%, #FCE7F3 30%, #FECDD3 70%, #FED7AA 100%)',
       }}
     >
       {/* Drag Handle */}
       <div
-        className="flex flex-col items-center pt-2 pb-2 cursor-grab active:cursor-grabbing touch-none bg-white/50"
+        className="flex flex-col items-center pt-2 pb-2 cursor-grab active:cursor-grabbing touch-none"
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
       >
-        <div className="w-10 h-1.5 bg-gray-300 rounded-full" />
+        <div className="w-10 h-1.5 bg-white/60 rounded-full shadow-sm" />
       </div>
 
       {/* Content */}
@@ -692,17 +719,17 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
           <>
             {/* History Header */}
             <div className="flex items-center justify-between mb-3 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
-                  <Clock className="w-4.5 h-4.5 text-white" strokeWidth={2} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                  <Clock className="w-5 h-5 text-primary" strokeWidth={2} />
                 </div>
-                <h2 className="font-bold text-gray-900 text-sm">Chat History</h2>
+                <h2 className="font-bold text-gray-800 text-sm">היסטוריית שיחות</h2>
               </div>
               <button
                 onClick={() => setShowHistory(false)}
-                className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                className="w-8 h-8 flex items-center justify-center bg-white/80 hover:bg-white rounded-full transition-all shadow-md hover:shadow-lg"
               >
-                <X className="w-4.5 h-4.5 text-gray-600" strokeWidth={2.5} />
+                <X className="w-4.5 h-4.5 text-gray-700" strokeWidth={2.5} />
               </button>
             </div>
 
@@ -712,32 +739,34 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
             }}>
               {chatHistory.length === 0 ? (
                 <div className="text-center py-8">
-                  <Clock className="w-12 h-12 text-gray-300 mx-auto mb-2" strokeWidth={1.5} />
-                  <p className="text-sm text-gray-500">No chat history yet</p>
+                  <div className="w-16 h-16 bg-white/60 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Clock className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-sm text-gray-600">אין היסטוריית שיחות עדיין</p>
                 </div>
               ) : (
                 chatHistory.map((chat) => (
                   <div
                     key={chat.id}
                     onClick={() => handleLoadChat(chat)}
-                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer group ${
+                    className={`p-3 rounded-2xl transition-all cursor-pointer group ${
                       chat.id === currentChatId
-                        ? 'bg-primary/5 border-primary shadow-sm'
-                        : 'bg-white border-gray-200 hover:border-primary/50 hover:shadow-sm'
+                        ? 'bg-white/90 shadow-lg'
+                        : 'bg-white/70 hover:bg-white/90 hover:shadow-md'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm text-gray-900 truncate mb-1">
+                        <h3 className="font-medium text-sm text-gray-800 truncate mb-1">
                           {chat.title}
                         </h3>
                         <p className="text-xs text-gray-500">
-                          {new Date(chat.timestamp).toLocaleDateString()} • {chat.messages.length} messages
+                          {new Date(chat.timestamp).toLocaleDateString()} • {chat.messages.length} הודעות
                         </p>
                       </div>
                       <button
                         onClick={(e) => handleDeleteChat(chat.id, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 rounded-full"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 rounded-full"
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </button>
@@ -751,10 +780,13 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
             <div className="mt-3 flex-shrink-0">
               <button
                 onClick={handleNewChat}
-                className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-primary/80 text-white rounded-full font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 text-white rounded-full font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                style={{
+                  background: 'linear-gradient(135deg, #EC4899, #C5459C)',
+                }}
               >
                 <Plus className="w-5 h-5" strokeWidth={2.5} />
-                Start New Chat
+                התחל שיחה חדשה
               </button>
             </div>
           </>
@@ -762,30 +794,30 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
           <>
             {/* Chat Header */}
             <div className="flex items-center justify-between mb-3 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-5 h-5 text-primary" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-gray-900 text-sm">Pachu Taste Model</h2>
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r from-primary/80 to-pink-500/80 text-white rounded shadow-sm">
+                    <h2 className="font-bold text-gray-800 text-sm">Pachu Taste Model</h2>
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/80 text-primary rounded shadow-sm">
                       Beta
                     </span>
                   </div>
                   {matchedCount > 0 && (
-                    <p className="text-xs text-gray-500">{matchedCount} places found</p>
+                    <p className="text-xs text-gray-600">{matchedCount} מקומות נמצאו</p>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 {/* New Chat Button */}
                 <button
                   onClick={handleNewChat}
-                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                  className="w-8 h-8 flex items-center justify-center bg-white/80 hover:bg-white rounded-full transition-all shadow-md hover:shadow-lg"
                   title="New Chat"
                 >
-                  <Plus className="w-4.5 h-4.5 text-gray-600" strokeWidth={2.5} />
+                  <Plus className="w-4.5 h-4.5 text-gray-700" strokeWidth={2.5} />
                 </button>
                 {/* History Button */}
                 <button
@@ -793,67 +825,85 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                     setShowHistory(true);
                     setSheetHeight(500);
                   }}
-                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                  className="w-8 h-8 flex items-center justify-center bg-white/80 hover:bg-white rounded-full transition-all shadow-md hover:shadow-lg"
                   title="Chat History"
                 >
-                  <Clock className="w-4.5 h-4.5 text-gray-600" strokeWidth={2} />
+                  <Clock className="w-4.5 h-4.5 text-gray-700" strokeWidth={2} />
                 </button>
                 {/* Close Button */}
                 <button
                   onClick={handleClose}
-                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                  className="w-8 h-8 flex items-center justify-center bg-white/80 hover:bg-white rounded-full transition-all shadow-md hover:shadow-lg"
                 >
-                  <ChevronDown className="w-4.5 h-4.5 text-gray-600" strokeWidth={2.5} />
+                  <ChevronDown className="w-4.5 h-4.5 text-gray-700" strokeWidth={2.5} />
                 </button>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto mb-3 space-y-3 hide-scrollbar" style={{
+            <div className="flex-1 overflow-y-auto mb-3 space-y-4 hide-scrollbar" style={{
               WebkitOverflowScrolling: 'touch'
             }}>
               {messages.length === 0 && (
                 <div className="text-center py-6">
-                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <div className="w-14 h-14 bg-white/80 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg backdrop-blur-sm">
                     <Sparkles className="w-7 h-7 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-gray-900 mb-1 text-sm">Your Personal Dining Expert</h3>
-                  <p className="text-xs text-gray-500">Tell me what you're craving, your budget, vibe, or even a specific restaurant name...</p>
+                  <h3 className="font-semibold text-gray-800 mb-1 text-sm">המומחה הקולינרי שלך</h3>
+                  <p className="text-xs text-gray-600">ספר לי מה בא לך, התקציב שלך, האווירה או אפילו שם של מסעדה ספציפית...</p>
                 </div>
               )}
 
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}
                 >
-                  {/* Only show message bubble if there's content or no restaurants */}
-                  {(message.content && (!message.restaurants || message.restaurants.length === 0)) && (
+                  {/* User message - Pink bubble aligned right */}
+                  {message.role === 'user' && (
                     <div
-                      className={`max-w-[80%] px-3 py-2 rounded-2xl ${
-                        message.role === 'user'
-                          ? 'bg-primary text-white rounded-br-md'
-                          : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
-                      }`}
+                      className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md shadow-md"
+                      style={{
+                        background: 'linear-gradient(135deg, #EC4899, #C5459C)',
+                      }}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-sm text-white whitespace-pre-wrap font-medium">{message.content}</p>
                     </div>
                   )}
                   
-                  {/* Show restaurants if available */}
-                  {message.restaurants && message.restaurants.length > 0 && (
-                    <div className="w-full max-w-full">
-                      <div className={`grid gap-2.5 px-2 pb-2 pt-1 ${message.restaurants.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                        {message.restaurants.map((restaurant, index) => (
-                          <RestaurantCard
-                            key={`${message.id}-${restaurant.id || index}`}
-                            restaurant={restaurant}
-                            messageId={message.id}
-                            index={index}
-                            onRestaurantClick={onRestaurantClick}
-                          />
-                        ))}
-                      </div>
+                  {/* Assistant message - Modern container */}
+                  {message.role === 'assistant' && (
+                    <div className="w-full">
+                      {/* Show restaurants FIRST if available */}
+                      {message.restaurants && message.restaurants.length > 0 && (
+                        <div className="mb-3">
+                          {/* Horizontal scrolling restaurant cards */}
+                          <div 
+                            className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar"
+                            style={{ WebkitOverflowScrolling: 'touch' }}
+                          >
+                            {message.restaurants.map((restaurant, index) => (
+                              <RestaurantCard
+                                key={`${message.id}-${restaurant.id || index}`}
+                                restaurant={restaurant}
+                                messageId={message.id}
+                                index={index}
+                                onRestaurantClick={onRestaurantClick}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Explanation/Reasoning text AFTER restaurants - in modern container */}
+                      {message.content && (
+                        <div
+                          className="bg-white/80 backdrop-blur-sm rounded-2xl rounded-tl-md px-4 py-3 shadow-md border border-white/50"
+                          style={{ maxWidth: '95%' }}
+                        >
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -861,7 +911,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
 
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-white shadow-sm border border-gray-100 px-3 py-2 rounded-2xl rounded-bl-md">
+                  <div className="bg-white/80 backdrop-blur-sm shadow-md px-4 py-3 rounded-2xl rounded-tl-md">
                     <Loader2 className="w-5 h-5 animate-spin text-primary" />
                   </div>
                 </div>
@@ -874,14 +924,14 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                     <button
                       key={`chip-${index}-${chip.value}`}
                       onClick={() => handleChipClick(chip)}
-                      className="px-3 py-1.5 bg-white border-2 border-primary/30 text-primary rounded-full text-sm font-medium 
-                        hover:bg-primary hover:text-white hover:border-primary 
-                        active:scale-95 transition-all duration-200 shadow-sm hover:shadow-md"
+                      className="px-4 py-2 bg-white/90 backdrop-blur-sm border border-white/50 text-gray-700 rounded-full text-sm font-medium 
+                        hover:bg-white hover:shadow-lg hover:scale-105
+                        active:scale-95 transition-all duration-200 shadow-md"
                       style={{
                         animation: `slideIn 0.3s ease-out ${index * 0.05}s both`
                       }}
                     >
-                      {chip.emoji && <span className="mr-1">{chip.emoji}</span>}
+                      {chip.emoji && <span className="mr-1.5">{chip.emoji}</span>}
                       {chip.label}
                     </button>
                   ))}
@@ -893,7 +943,7 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
 
             {/* Input Area */}
             <div className="flex-shrink-0">
-              <div className="flex items-end gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-2 focus-within:border-primary transition-colors shadow-md">
+              <div className="flex items-end gap-2 bg-white/90 backdrop-blur-sm border border-white/50 rounded-full px-4 py-2 focus-within:shadow-lg transition-all shadow-md">
                 <textarea
                   ref={inputRef}
                   value={inputValue}
@@ -904,9 +954,9 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                       handleSend();
                     }
                   }}
-                  placeholder="What are you craving?"
+                  placeholder="מה בא לך? 🍽️"
                   rows={1}
-                  className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 resize-none overflow-hidden py-0.5 max-h-32"
+                  className="flex-1 bg-transparent outline-none text-sm text-gray-800 placeholder-gray-500 resize-none overflow-hidden py-0.5 max-h-32"
                   style={{
                     minHeight: '20px'
                   }}
@@ -921,17 +971,17 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                   disabled={isLoading}
                   style={{
                     background: inputValue.trim() 
-                      ? 'linear-gradient(to right, #C5459C, rgba(197, 69, 156, 0.9))' 
-                      : '#E5E7EB'
+                      ? 'linear-gradient(135deg, #EC4899, #C5459C)' 
+                      : 'rgba(255,255,255,0.6)'
                   }}
-                  className="w-8 h-8 flex items-center justify-center rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all active:scale-95 flex-shrink-0"
+                  className="w-9 h-9 flex items-center justify-center rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all active:scale-95 flex-shrink-0"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
                   ) : (
                     <Send 
                       className="w-4 h-4 stroke-[2.5]"
-                      style={{ color: inputValue.trim() ? '#FFFFFF' : '#6B7280' }}
+                      style={{ color: inputValue.trim() ? '#FFFFFF' : '#9CA3AF' }}
                     />
                   )}
                 </button>
