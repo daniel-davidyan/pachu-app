@@ -73,26 +73,28 @@ interface ChatConversation {
 
 const STORAGE_KEY = 'pachu-chat-history';
 
+const ANALYTICS_PASSWORD = '166149';
+const ACCESS_STORAGE_KEY = 'pachu-analytics-access';
+
 export default function PipelineAnalyticsPage() {
   const router = useRouter();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
   const [selectedChat, setSelectedChat] = useState<ChatConversation | null>(null);
   const [debugData, setDebugData] = useState<DebugData | null>(null);
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Check access on mount
+  // Check access on mount (from localStorage)
   useEffect(() => {
-    const checkAccess = async () => {
-      try {
-        const response = await fetch('/api/admin/check-access');
-        const data = await response.json();
-        setHasAccess(data.hasAccess);
-      } catch {
-        setHasAccess(false);
-      }
-    };
+    const storedAccess = localStorage.getItem(ACCESS_STORAGE_KEY);
+    if (storedAccess === 'granted') {
+      setHasAccess(true);
+    } else {
+      setHasAccess(false);
+    }
 
     const loadChatHistory = () => {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -111,9 +113,18 @@ export default function PipelineAnalyticsPage() {
       }
     };
 
-    checkAccess();
     loadChatHistory();
   }, []);
+
+  const handlePasswordSubmit = () => {
+    if (passwordInput === ANALYTICS_PASSWORD) {
+      localStorage.setItem(ACCESS_STORAGE_KEY, 'granted');
+      setHasAccess(true);
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+    }
+  };
 
   const analyzeConversation = (chat: ChatConversation) => {
     console.log('📊 Analyzing conversation:', { 
@@ -138,30 +149,48 @@ export default function PipelineAnalyticsPage() {
     }
   };
 
-  // Access check loading
-  if (hasAccess === null) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // No access
+  // No access - show password prompt
   if (!hasAccess) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">🔒</span>
+        <div className="bg-white rounded-2xl shadow-lg p-6 max-w-sm w-full">
+          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">🔐</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-gray-600 mb-4">This feature is only available for developers.</p>
+          <h1 className="text-xl font-bold text-gray-900 mb-2 text-center">Pipeline Analytics</h1>
+          <p className="text-gray-600 mb-4 text-center text-sm">הכנס סיסמא כדי לצפות בנתונים</p>
+          
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => {
+              setPasswordInput(e.target.value);
+              setPasswordError(false);
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+            placeholder="סיסמא"
+            className={`w-full px-4 py-3 border rounded-xl text-center text-lg tracking-widest mb-3 ${
+              passwordError ? 'border-red-500 bg-red-50' : 'border-gray-200'
+            }`}
+            autoFocus
+          />
+          
+          {passwordError && (
+            <p className="text-red-500 text-sm text-center mb-3">סיסמא שגויה</p>
+          )}
+          
+          <button
+            onClick={handlePasswordSubmit}
+            className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-medium"
+          >
+            כניסה
+          </button>
+          
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 bg-primary text-white rounded-full"
+            className="w-full py-2 text-gray-500 text-sm mt-3"
           >
-            Go Back
+            חזרה
           </button>
         </div>
       </div>

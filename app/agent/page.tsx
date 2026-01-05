@@ -186,7 +186,6 @@ export default function AgentPage() {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [currentChips, setCurrentChips] = useState<Chip[]>([]);
   const [conversationContext, setConversationContext] = useState<ConversationContext | null>(null);
-  const [hasDevAccess, setHasDevAccess] = useState(false);
   const [latestDebugData, setLatestDebugData] = useState<any>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -210,20 +209,6 @@ export default function AgentPage() {
     } else {
       setUserLocation({ lat: 32.0853, lng: 34.7818 });
     }
-  }, []);
-
-  // Check dev access
-  useEffect(() => {
-    const checkAccess = async () => {
-      try {
-        const response = await fetch('/api/admin/check-access');
-        const data = await response.json();
-        setHasDevAccess(data.hasAccess);
-      } catch {
-        setHasDevAccess(false);
-      }
-    };
-    checkAccess();
   }, []);
 
   // Load chat history from localStorage on mount
@@ -639,15 +624,13 @@ export default function AgentPage() {
               >
                 <Clock className="w-5 h-5 text-gray-600" strokeWidth={2} />
               </button>
-              {hasDevAccess && (
-                <button
-                  onClick={() => router.push('/agent/analytics')}
-                  className="w-9 h-9 flex items-center justify-center bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 rounded-full transition-colors"
-                  title="Pipeline Analytics"
-                >
-                  <BarChart3 className="w-5 h-5 text-white" strokeWidth={2} />
-                </button>
-              )}
+              <button
+                onClick={() => router.push('/agent/analytics')}
+                className="w-9 h-9 flex items-center justify-center bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 rounded-full transition-colors"
+                title="Pipeline Analytics"
+              >
+                <BarChart3 className="w-5 h-5 text-white" strokeWidth={2} />
+              </button>
             </div>
           </div>
         )}
