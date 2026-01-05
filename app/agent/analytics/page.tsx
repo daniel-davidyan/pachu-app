@@ -84,31 +84,31 @@ export default function PipelineAnalyticsPage() {
 
   // Check access on mount
   useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const response = await fetch('/api/admin/check-access');
+        const data = await response.json();
+        setHasAccess(data.hasAccess);
+      } catch {
+        setHasAccess(false);
+      }
+    };
+
+    const loadChatHistory = () => {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const history = JSON.parse(stored);
+          setChatHistory(history);
+        } catch (e) {
+          console.error('Failed to load chat history', e);
+        }
+      }
+    };
+
     checkAccess();
     loadChatHistory();
   }, []);
-
-  const checkAccess = async () => {
-    try {
-      const response = await fetch('/api/admin/check-access');
-      const data = await response.json();
-      setHasAccess(data.hasAccess);
-    } catch {
-      setHasAccess(false);
-    }
-  };
-
-  const loadChatHistory = () => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const history = JSON.parse(stored);
-        setChatHistory(history);
-      } catch (e) {
-        console.error('Failed to load chat history', e);
-      }
-    }
-  };
 
   const analyzeConversation = (chat: ChatConversation) => {
     setSelectedChat(chat);
