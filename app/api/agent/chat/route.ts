@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
+    console.log('🔐 CHAT API - User auth:', { 
+      isLoggedIn: !!user, 
+      userId: user?.id || 'NOT_LOGGED_IN',
+      email: user?.email || 'N/A'
+    });
+    
     const body = await request.json();
     const {
       message,
@@ -119,7 +125,7 @@ export async function POST(request: NextRequest) {
       const requestUrl = new URL(request.url);
       const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
       const cookies = request.headers.get('cookie') || '';
-      response = await handleSearch(context, userLocation, userProfile, user?.email, { baseUrl, cookies });
+      response = await handleSearch(context, userLocation, userProfile, user, { baseUrl, cookies });
     } else if (context.state === 'small_talk') {
       // User is just chatting
       response = await handleSmallTalk(message, userProfile, isFirstTurn);
@@ -539,7 +545,7 @@ async function handleSearch(
   context: ConversationContext,
   userLocation: { lat: number; lng: number } | null,
   profile: UserProfile,
-  userEmail?: string,
+  user?: { id: string; email?: string } | null,
   requestInfo?: { baseUrl: string; cookies: string }
 ): Promise<AgentResponse> {
   
@@ -598,7 +604,8 @@ async function handleSearch(
         userLocation: effectiveLocation,
         conversationSummary: buildSearchSummary(context.slots),
         includeDebugData: true, // Always include debug data for analytics
-        userEmail: userEmail, // Pass email for debug access check
+        userEmail: user?.email, // Pass email for debug access check
+        userId: user?.id, // Pass userId directly for personalization
       }),
       signal: controller.signal,
     });

@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       conversationSummary, // Text summary of what user is looking for
       includeDebugData,   // If true, include full pipeline data
       userEmail: passedEmail, // Email passed from chat API (for internal calls)
+      userId: passedUserId, // UserId passed directly from chat API for personalization
     } = body;
 
     if (!context || !userLocation) {
@@ -79,7 +80,17 @@ export async function POST(request: NextRequest) {
     const userEmail = (passedEmail || user?.email)?.toLowerCase();
     const canDebug = includeDebugData === true; // Simply check if debug data was requested
 
+    // Use passedUserId if user auth didn't work (internal API calls)
+    const effectiveUserId = user?.id || passedUserId;
+    
     console.log('🔐 Debug access check:', { userEmail, includeDebugData, canDebug });
+    console.log('👤 USER AUTH:', { 
+      isLoggedIn: !!user, 
+      authUserId: user?.id || 'NOT_LOGGED_IN',
+      passedUserId: passedUserId || 'NOT_PASSED',
+      effectiveUserId: effectiveUserId || 'NONE',
+      userEmail: user?.email || 'N/A'
+    });
     console.log('🔍 Starting recommendation pipeline...');
     console.log('📍 Context:', context);
     console.log('📍 User location:', userLocation);
@@ -133,7 +144,7 @@ export async function POST(request: NextRequest) {
       supabase,
       filteredRestaurants,
       queryText,
-      user?.id
+      effectiveUserId
     );
 
     console.log(`📊 After vector search: ${vectorResults.length} restaurants scored`);
@@ -157,7 +168,7 @@ export async function POST(request: NextRequest) {
     const rerankedResults = await rerank(
       supabase,
       vectorResults,
-      user?.id,
+      effectiveUserId,
       context
     );
 
@@ -181,13 +192,15 @@ export async function POST(request: NextRequest) {
     } : undefined;
 
     // ========================================
-    // STEP 4: LLM FINAL SELECTION
+    // STEP 4: LLM FINAL SELECTION (with Personal Context)
     // ========================================
     const topCandidates = rerankedResults.slice(0, 15); // Send top 15 to LLM
     const recommendations = await selectWithLLM(
+      supabase,
       topCandidates,
       context,
-      conversationSummary
+      conversationSummary,
+      effectiveUserId
     );
 
     console.log(`✅ Final recommendations: ${recommendations.length}`);
@@ -324,24 +337,15 @@ async function applyHardFilters(
   console.log(`🎯 Final: radius=${radiusMeters}m, location=(${effectiveLocation.lat.toFixed(4)}, ${effectiveLocation.lng.toFixed(4)})`);
 
   // Build query - support both 'Tel Aviv' and 'Tel Aviv-Yafo'
+  // HARD FILTERS: Only distance and opening hours (budget moved to vector/rerank)
   let query = supabase
     .from('restaurant_cache')
     .select('*')
     .or('city.eq.Tel Aviv,city.eq.Tel Aviv-Yafo')
     .not('summary_embedding', 'is', null);
 
-  // Budget filter (price_level)
-  if (context.budget && context.budget !== 'any') {
-    const priceMap: Record<string, number[]> = {
-      'cheap': [1],
-      'moderate': [1, 2],
-      'expensive': [3, 4],
-    };
-    const priceLevels = priceMap[context.budget];
-    if (priceLevels) {
-      query = query.in('price_level', priceLevels);
-    }
-  }
+  // NOTE: Budget is NOT a hard filter - it's handled in vector search and reranking
+  // This allows restaurants slightly outside budget to still appear if they're perfect matches
 
   const { data: restaurants, error } = await query;
 
@@ -449,7 +453,7 @@ async function performVectorSearch(
 }
 
 // ============================================
-// STEP 3: Re-ranking
+// STEP 3: Re-ranking (Social + Budget Signals)
 // ============================================
 async function rerank(
   supabase: any,
@@ -468,7 +472,7 @@ async function rerank(
   const reranked = restaurants.map(r => {
     let socialScore = 0;
 
-    // Boost if friends visited
+    // Boost if friends visited (strong social signal)
     const friendsWhoVisited = friendsReviews.get(r.google_place_id) || [];
     if (friendsWhoVisited.length > 0) {
       socialScore += 0.2 * Math.min(friendsWhoVisited.length, 3); // Max 0.6 boost
@@ -489,6 +493,16 @@ async function rerank(
       socialScore -= distanceKm * 0.01; // Small penalty per km
     }
 
+    // Budget preference (soft filter - boost/penalty instead of hard filter)
+    if (context.budget && context.budget !== 'any' && r.price_level) {
+      const budgetMatch = {
+        'cheap': r.price_level === 1 ? 0.15 : r.price_level === 2 ? 0.05 : -0.1,
+        'moderate': r.price_level === 2 ? 0.1 : (r.price_level === 1 || r.price_level === 3) ? 0 : -0.05,
+        'expensive': r.price_level >= 3 ? 0.15 : r.price_level === 2 ? 0 : -0.1,
+      };
+      socialScore += budgetMatch[context.budget as keyof typeof budgetMatch] || 0;
+    }
+
     // Occasion-based boosts
     if (context.withWho === 'date' && r.google_rating >= 4.3) {
       socialScore += 0.1; // Prefer higher-rated for dates
@@ -507,17 +521,143 @@ async function rerank(
 }
 
 // ============================================
-// STEP 4: LLM Selection
+// STEP 4: LLM Selection (with Personal Context)
 // ============================================
+
+interface UserContext {
+  firstName: string;
+  onboarding: {
+    likes: string[];
+    dislikes: string[];
+    dietary: string[];
+    freeText: string;
+  } | null;
+  recentReviews: {
+    restaurantName: string;
+    rating: number;
+    content: string;
+  }[];
+  followingNames: string[];
+}
+
+async function getUserContextForLLM(
+  supabase: any,
+  userId?: string
+): Promise<UserContext> {
+  const emptyContext: UserContext = {
+    firstName: '',
+    onboarding: null,
+    recentReviews: [],
+    followingNames: [],
+  };
+
+  if (!userId) return emptyContext;
+
+  try {
+    // Get user profile and name
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, username')
+      .eq('id', userId)
+      .single();
+
+    const firstName = (profile?.full_name || profile?.username || '').split(' ')[0];
+
+    // Get onboarding preferences
+    const { data: tasteProfile } = await supabase
+      .from('user_taste_profiles')
+      .select('likes, dislikes, is_kosher, is_vegetarian, is_vegan, gluten_free, free_text')
+      .eq('user_id', userId)
+      .single();
+
+    let onboarding = null;
+    if (tasteProfile) {
+      const dietary: string[] = [];
+      if (tasteProfile.is_kosher) dietary.push('כשר');
+      if (tasteProfile.is_vegetarian) dietary.push('צמחוני');
+      if (tasteProfile.is_vegan) dietary.push('טבעוני');
+      if (tasteProfile.gluten_free) dietary.push('ללא גלוטן');
+
+      onboarding = {
+        likes: tasteProfile.likes || [],
+        dislikes: tasteProfile.dislikes || [],
+        dietary,
+        freeText: tasteProfile.free_text || '',
+      };
+    }
+
+    // Get user's recent reviews (last 10)
+    const { data: reviews } = await supabase
+      .from('reviews')
+      .select(`
+        rating,
+        content,
+        restaurants (name)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const recentReviews = (reviews || []).map((r: any) => ({
+      restaurantName: r.restaurants?.name || 'Unknown',
+      rating: r.rating,
+      content: r.content || '',
+    }));
+
+    // Get names of people user follows
+    const { data: following } = await supabase
+      .from('follows')
+      .select(`
+        following:following_id (
+          full_name,
+          username
+        )
+      `)
+      .eq('follower_id', userId)
+      .limit(20);
+
+    const followingNames = (following || [])
+      .map((f: any) => f.following?.full_name || f.following?.username)
+      .filter(Boolean);
+
+    return {
+      firstName,
+      onboarding,
+      recentReviews,
+      followingNames,
+    };
+  } catch (error) {
+    console.error('Error fetching user context:', error);
+    return emptyContext;
+  }
+}
+
 async function selectWithLLM(
+  supabase: any,
   candidates: Restaurant[],
   context: RecommendationContext,
-  conversationSummary?: string
+  conversationSummary?: string,
+  userId?: string
 ): Promise<Recommendation[]> {
   
   if (candidates.length === 0) return [];
 
-  // Build prompt
+  // Get user personal context
+  const userContext = await getUserContextForLLM(supabase, userId);
+  
+  // DEBUG: Log what we got for the user
+  console.log('🧑 User context for LLM:', {
+    userId,
+    firstName: userContext.firstName,
+    hasOnboarding: !!userContext.onboarding,
+    likesCount: userContext.onboarding?.likes?.length || 0,
+    dislikesCount: userContext.onboarding?.dislikes?.length || 0,
+    dietaryCount: userContext.onboarding?.dietary?.length || 0,
+    reviewsCount: userContext.recentReviews.length,
+    followingCount: userContext.followingNames.length,
+  });
+
+  // Build restaurant list
   const restaurantList = candidates.map((r, i) => {
     const parts = [
       `${i + 1}. ${r.name}`,
@@ -528,39 +668,93 @@ async function selectWithLLM(
       `   Summary: ${r.summary || 'No description'}`,
     ];
     if (r.friendsWhoVisited?.length) {
-      parts.push(`   Friends who visited: ${r.friendsWhoVisited.join(', ')}`);
+      parts.push(`   👥 Friends who visited: ${r.friendsWhoVisited.join(', ')}`);
     }
     return parts.join('\n');
   }).join('\n\n');
 
+  // Build user profile section
+  let userProfileSection = '';
+  
+  if (userContext.onboarding || userContext.recentReviews.length > 0) {
+    userProfileSection = '\n\n=== USER PROFILE (IMPORTANT - USE THIS TO PERSONALIZE!) ===\n';
+    
+    if (userContext.firstName) {
+      userProfileSection += `Name: ${userContext.firstName}\n`;
+    }
+
+    if (userContext.onboarding) {
+      if (userContext.onboarding.likes.length > 0) {
+        userProfileSection += `❤️ Likes: ${userContext.onboarding.likes.join(', ')}\n`;
+      }
+      if (userContext.onboarding.dislikes.length > 0) {
+        userProfileSection += `👎 Dislikes: ${userContext.onboarding.dislikes.join(', ')}\n`;
+      }
+      if (userContext.onboarding.dietary.length > 0) {
+        userProfileSection += `🥗 Dietary: ${userContext.onboarding.dietary.join(', ')}\n`;
+      }
+      if (userContext.onboarding.freeText) {
+        userProfileSection += `📝 Notes: ${userContext.onboarding.freeText}\n`;
+      }
+    }
+
+    if (userContext.recentReviews.length > 0) {
+      userProfileSection += `\n📋 User's Recent Reviews:\n`;
+      userContext.recentReviews.slice(0, 5).forEach(review => {
+        const stars = '⭐'.repeat(review.rating);
+        userProfileSection += `  - ${review.restaurantName}: ${stars} ${review.content ? `"${review.content.substring(0, 80)}..."` : ''}\n`;
+      });
+    }
+
+    if (userContext.followingNames.length > 0) {
+      userProfileSection += `\n👥 Friends they follow: ${userContext.followingNames.slice(0, 5).join(', ')}\n`;
+    }
+  }
+
   const contextDesc = buildContextDescription(context);
 
-  const prompt = `You are a restaurant recommendation expert in Tel Aviv.
-
-User is looking for: ${contextDesc}
+  const prompt = `You are Pachu, a PERSONAL restaurant recommendation expert in Tel Aviv.
+Your job is to select the 3 BEST restaurants that match this specific user.
+${userProfileSection}
+=== CURRENT SEARCH ===
+Looking for: ${contextDesc}
 ${conversationSummary ? `Additional context: ${conversationSummary}` : ''}
 
-Here are the top candidates:
-
+=== TOP 15 CANDIDATES ===
 ${restaurantList}
 
-Select the TOP 3 best matches and explain why each is a good fit.
-Be specific about why each restaurant matches what the user is looking for.
+=== YOUR TASK ===
+Select the TOP 3 restaurants that are the BEST PERSONAL MATCH for this user.
+
+IMPORTANT RULES:
+1. If user has dietary requirements (kosher/vegan/etc) - PRIORITIZE restaurants that fit
+2. If user likes certain cuisines - explain how the restaurant matches their taste
+3. If user dislikes something - AVOID restaurants with those elements
+4. If friends visited a restaurant - MENTION IT in the reason (social proof!)
+5. Reference the user's past reviews if relevant (e.g., "Based on your love for Italian at X...")
+6. Be PERSONAL - use their name if available, reference their preferences
+7. Write reasons in Hebrew, make them feel understood
 
 Return ONLY a JSON array:
 [
   {
     "index": 1,
-    "reason": "Hebrew explanation why this is perfect for them (1-2 sentences)"
+    "reason": "Hebrew PERSONAL explanation why this is perfect for THIS user (2-3 sentences, reference their preferences/reviews/friends)"
   },
   ...
 ]`;
+
+  // DEBUG: Log if we have user profile section
+  console.log('📝 LLM Prompt has user profile section:', userProfileSection.length > 10 ? 'YES ✅' : 'NO ❌');
+  if (userProfileSection.length > 10) {
+    console.log('📝 User profile section preview:', userProfileSection.substring(0, 300));
+  }
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.7,
-    max_tokens: 500,
+    max_tokens: 800,
   });
 
   try {
@@ -570,13 +764,18 @@ Return ONLY a JSON array:
 
     return selections.slice(0, 3).map((sel: any) => {
       const restaurant = candidates[sel.index - 1];
+      if (!restaurant) {
+        console.error(`Invalid index ${sel.index} in LLM response`);
+        return null;
+      }
       return {
         restaurant,
         reason: sel.reason,
         matchScore: Math.round((restaurant.finalScore || 0.5) * 100),
       };
-    });
+    }).filter(Boolean);
   } catch (e) {
+    console.error('LLM response parsing error:', e);
     // Fallback: return top 3 with generic reasons
     return candidates.slice(0, 3).map(r => ({
       restaurant: r,
@@ -760,18 +959,17 @@ function isOpenNow(openingHours: any): boolean {
 async function getFriendsReviews(supabase: any, userId: string): Promise<Map<string, string[]>> {
   const result = new Map<string, string[]>();
   
-  // Get user's friends
-  const { data: friendships } = await supabase
-    .from('friendships')
-    .select('friend_id')
-    .eq('user_id', userId)
-    .eq('status', 'accepted');
+  // Get people the user follows (using follows table)
+  const { data: following } = await supabase
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', userId);
   
-  if (!friendships?.length) return result;
+  if (!following?.length) return result;
   
-  const friendIds = friendships.map((f: any) => f.friend_id);
+  const followingIds = following.map((f: any) => f.following_id);
   
-  // Get friends' reviews
+  // Get reviews from people user follows
   const { data: reviews } = await supabase
     .from('reviews')
     .select(`
@@ -779,7 +977,7 @@ async function getFriendsReviews(supabase: any, userId: string): Promise<Map<str
       restaurants (google_place_id),
       profiles:user_id (full_name, username)
     `)
-    .in('user_id', friendIds)
+    .in('user_id', followingIds)
     .gte('rating', 4); // Only positive reviews
   
   if (!reviews) return result;
