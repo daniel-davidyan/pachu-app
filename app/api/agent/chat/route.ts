@@ -293,9 +293,11 @@ Rules:
 - "נסוע" / "לנסוע" / "רחוק" → location: "willing_to_travel"
 - "תל אביב" → location: "tel_aviv"
 - "איטלקי" / "פסטה" / "פיצה" → cuisine: "Italian"
-- "אסייתי" / "סושי" / "סיני" → cuisine: "Asian"
-- "בשרים" / "סטייק" → cuisine: "Steakhouse"
-- "בירה" / "בר" / "משקאות" → vibe: "lively" (and cuisine could be "Bar")
+- "אסייתי" / "סושי" / "סיני" / "תאילנדי" → cuisine: "Asian"
+- "בשרים" / "סטייק" / "המבורגר" → cuisine: "Steakhouse"
+- "בריא" / "סלט" / "טבעוני" / "צמחוני" → cuisine: "Healthy"
+- "ים תיכוני" / "ישראלי" / "מזרחי" → cuisine: "Israeli"
+- "בירה" / "בר" / "משקאות" / "קוקטיילים" → cuisine: "Bar"
 - "רומנטי" / "אינטימי" → vibe: "romantic"
 - "זול" / "תקציב נמוך" → budget: "cheap"
 - "יקר" / "מפנק" → budget: "expensive"
@@ -370,58 +372,28 @@ async function handleSmallTalk(
   isFirst: boolean
 ): Promise<AgentResponse> {
   
-  const greeting = profile.firstName 
-    ? `היי ${profile.firstName}! ` 
-    : 'היי! ';
+  // For greetings/small talk, always ask about occasion first
+  // This keeps chips consistent with the question
+  const greeting = profile.firstName ? `היי ${profile.firstName}!` : 'היי!';
+  
+  const messages = [
+    `${greeting} מה קורה? עם מי יוצאים לאכול? 😊`,
+    `${greeting} מה נשמע? מחפש מקום לדייט או יציאה עם חברים?`,
+    `${greeting} איזה כיף! מה האירוע - דייט, חברים, או משהו אחר?`,
+  ];
+  
+  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
 
-  // Generate friendly response
-  const prompt = `You are Pachu, a friendly restaurant recommendation assistant. 
-User said: "${message}"
-${isFirst ? `This is the first message. Greet them warmly${profile.firstName ? ` and use their name "${profile.firstName}"` : ''}.` : ''}
-
-Respond naturally in Hebrew (1-2 sentences). Be warm and friendly.
-Then gently steer towards restaurant recommendations.
-
-Return JSON:
-{
-  "message": "your response",
-  "suggestion": "a follow-up question about what they want to eat"
-}`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.8,
-      max_tokens: 200,
-    });
-
-    const text = response.choices[0].message.content || '';
-    const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-
-    return {
-      message: parsed.message + (parsed.suggestion ? '\n\n' + parsed.suggestion : ''),
-      chips: [
-        { label: 'דייט', value: 'date', emoji: '💕' },
-        { label: 'עם חברים', value: 'friends', emoji: '👥' },
-        { label: 'ארוחה משפחתית', value: 'family', emoji: '👨‍👩‍👧' },
-      ],
-      questionType: 'occasion',
-    };
-  } catch {
-    return {
-      message: isFirst && profile.firstName 
-        ? `${greeting}מה בא לך לאכול היום?`
-        : 'מה בא לך לאכול?',
-      chips: [
-        { label: 'דייט', value: 'date', emoji: '💕' },
-        { label: 'עם חברים', value: 'friends', emoji: '👥' },
-        { label: 'משפחה', value: 'family', emoji: '👨‍👩‍👧' },
-      ],
-      questionType: 'occasion',
-    };
-  }
+  return {
+    message: randomMessage,
+    chips: [
+      { label: 'דייט', value: 'date', emoji: '💕' },
+      { label: 'חברים', value: 'friends', emoji: '👥' },
+      { label: 'משפחה', value: 'family', emoji: '👨‍👩‍👧' },
+      { label: 'לבד', value: 'solo', emoji: '🧘' },
+    ],
+    questionType: 'occasion',
+  };
 }
 
 async function handleGathering(
@@ -441,9 +413,8 @@ async function handleGathering(
   // Priority 1: Occasion (who/why)
   if (!slots.occasion) {
     questionType = 'occasion';
-    question = isFirst && profile.firstName
-      ? `היי ${profile.firstName}! מה האירוע? 😊`
-      : 'עם מי יוצאים או מה האירוע?';
+    const greetingPrefix = isFirst && profile.firstName ? `היי ${profile.firstName}! ` : '';
+    question = greetingPrefix + 'עם מי יוצאים או מה האירוע? 😊';
     chips = [
       { label: 'דייט', value: 'date', emoji: '💕' },
       { label: 'חברים', value: 'friends', emoji: '👥' },
@@ -455,7 +426,10 @@ async function handleGathering(
   // Priority 2: Location
   else if (!slots.location) {
     questionType = 'location';
-    question = 'כמה מוכנים לנסוע? 🚗';
+    const occasionText = slots.occasion === 'date' ? 'לדייט' :
+                        slots.occasion === 'friends' ? 'עם החברים' :
+                        slots.occasion === 'family' ? 'למשפחה' : '';
+    question = `איפה תרצו לחפש ${occasionText}? 📍`;
     chips = [
       { label: 'במרחק הליכה', value: 'walking', emoji: '🚶' },
       { label: 'מוכן לנסוע', value: 'willing_to_travel', emoji: '🚗' },
@@ -467,11 +441,11 @@ async function handleGathering(
     questionType = 'cuisine';
     const occasionContext = slots.occasion === 'date' ? 'לדייט' : 
                            slots.occasion === 'friends' ? 'עם החברים' : '';
-    question = `על מה חושבים ${occasionContext}? 🍽️`;
+    question = `איזה סוג אוכל בא לכם ${occasionContext}? 🍽️`;
     chips = [
       { label: 'איטלקי', value: 'italian', emoji: '🍝' },
       { label: 'אסייתי', value: 'asian', emoji: '🍜' },
-      { label: 'ישראלי', value: 'israeli', emoji: '🥙' },
+      { label: 'בריא', value: 'healthy', emoji: '🥗' },
       { label: 'בשרים', value: 'steak', emoji: '🥩' },
       { label: 'תפתיע אותי', value: 'surprise', emoji: '🎲' },
     ];
@@ -492,21 +466,31 @@ async function handleGathering(
   let acknowledgment = '';
   if (understanding.extractedSlots.occasion) {
     const occasionText: Record<string, string> = {
-      'date': 'דייט',
-      'friends': 'יציאה עם חברים',
-      'family': 'ארוחה משפחתית',
-      'solo': 'אוכל לבד',
-      'work': 'פגישת עבודה',
-      'celebration': 'חגיגה',
+      'date': 'דייט! 💕',
+      'friends': 'יציאה עם חברים! 🎉',
+      'family': 'ארוחה משפחתית! 👨‍👩‍👧',
+      'solo': 'לאכול לבד! 🧘',
+      'work': 'פגישת עבודה! 💼',
+      'celebration': 'חגיגה! 🎊',
     };
-    acknowledgment = occasionText[understanding.extractedSlots.occasion] + '! ';
+    acknowledgment = occasionText[understanding.extractedSlots.occasion] || '';
   }
   if (understanding.extractedSlots.cuisine) {
-    acknowledgment += `אוכל ${understanding.extractedSlots.cuisine} 👌 `;
+    const cuisineAck = acknowledgment ? ' ' : '';
+    acknowledgment += `${cuisineAck}אוכל ${understanding.extractedSlots.cuisine} 👌`;
+  }
+  if (understanding.extractedSlots.location) {
+    const locationText: Record<string, string> = {
+      'walking': 'במרחק הליכה 🚶',
+      'willing_to_travel': 'מוכנים לנסוע 🚗',
+      'tel_aviv': 'בתל אביב 🏙️',
+    };
+    const locAck = acknowledgment ? ' ' : '';
+    acknowledgment += `${locAck}${locationText[understanding.extractedSlots.location] || ''}`;
   }
 
   const message = acknowledgment 
-    ? `${acknowledgment}\n${question}`
+    ? `${acknowledgment}\n\n${question}`
     : question;
 
   return {
