@@ -147,6 +147,16 @@ export async function POST(request: NextRequest) {
 // ============================================
 // STEP 1: Hard Filters
 // ============================================
+
+// Tel Aviv city center coordinates
+const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
+
+// Check if location is valid (in Israel area)
+function isValidIsraelLocation(lat: number, lng: number): boolean {
+  // Israel bounding box approximately
+  return lat >= 29.5 && lat <= 33.5 && lng >= 34 && lng <= 36;
+}
+
 async function applyHardFilters(
   supabase: any,
   userLocation: { lat: number; lng: number },
@@ -155,15 +165,31 @@ async function applyHardFilters(
   
   // Determine radius based on "where"
   let radiusMeters = 10000; // Default 10km
-  if (context.where === 'walking_distance') {
+  let effectiveLocation = userLocation;
+  
+  // Handle different "where" values
+  const whereValue = context.where?.toLowerCase() || '';
+  
+  // Check for Hebrew or English city names
+  if (whereValue.includes('תל אביב') || whereValue.includes('tel aviv')) {
+    // User specified Tel Aviv - use city center
+    effectiveLocation = TEL_AVIV_CENTER;
+    radiusMeters = 15000; // 15km to cover all of Tel Aviv
+  } else if (whereValue === 'walking_distance' || whereValue.includes('הליכה')) {
     radiusMeters = 3000; // 3km - reasonable walking distance
-  } else if (context.where === 'willing_to_travel') {
+  } else if (whereValue === 'willing_to_travel' || whereValue.includes('נסוע') || whereValue.includes('לנסוע')) {
     radiusMeters = 20000; // 20km
-  } else if (context.where === 'outside_city') {
+  } else if (whereValue === 'outside_city' || whereValue.includes('מחוץ') || whereValue.includes('חוץ')) {
     radiusMeters = 50000; // 50km
   }
   
-  console.log(`🎯 Using radius: ${radiusMeters}m`);
+  // If user location is not in Israel, use Tel Aviv center
+  if (!isValidIsraelLocation(effectiveLocation.lat, effectiveLocation.lng)) {
+    console.log(`⚠️ Invalid location detected, using Tel Aviv center`);
+    effectiveLocation = TEL_AVIV_CENTER;
+  }
+  
+  console.log(`🎯 Using radius: ${radiusMeters}m, location: (${effectiveLocation.lat}, ${effectiveLocation.lng})`);
 
   // Build query - support both 'Tel Aviv' and 'Tel Aviv-Yafo'
   let query = supabase
@@ -199,8 +225,8 @@ async function applyHardFilters(
     if (!r.latitude || !r.longitude) return false;
     
     const distance = calculateDistance(
-      userLocation.lat,
-      userLocation.lng,
+      effectiveLocation.lat,
+      effectiveLocation.lng,
       r.latitude,
       r.longitude
     );

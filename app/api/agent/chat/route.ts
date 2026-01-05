@@ -193,9 +193,18 @@ Return ONLY a valid JSON object. Use null for anything not clearly mentioned:
     // STEP 6: If ready to recommend, get recommendations!
     // ========================================
     let recommendations = null;
-    if (readyToRecommend && userLocation) {
+    
+    // Default to Tel Aviv center if no valid location
+    const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
+    const effectiveLocation = userLocation && 
+      userLocation.lat >= 29.5 && userLocation.lat <= 33.5 &&
+      userLocation.lng >= 34 && userLocation.lng <= 36
+        ? userLocation 
+        : TEL_AVIV_CENTER;
+    
+    if (readyToRecommend) {
       console.log('🚀 Ready to recommend! Calling recommend API...');
-      console.log('📍 User location:', userLocation);
+      console.log('📍 User location:', effectiveLocation);
       console.log('📋 Context:', context);
       
       try {
@@ -207,7 +216,7 @@ Return ONLY a valid JSON object. Use null for anything not clearly mentioned:
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             context,
-            userLocation,
+            userLocation: effectiveLocation,
             conversationSummary: buildChatSignalContent(context),
           }),
         });
@@ -234,9 +243,6 @@ Return ONLY a valid JSON object. Use null for anything not clearly mentioned:
         console.error('❌ Failed to get recommendations:', err);
         responseMessage = 'משהו השתבש בחיפוש, בוא ננסה שוב';
       }
-    } else if (readyToRecommend && !userLocation) {
-      console.log('⚠️ Ready to recommend but no userLocation!');
-      responseMessage = 'אני צריך את המיקום שלך כדי להמליץ. אפשר לרענן את הדף?';
     }
 
     return NextResponse.json({
