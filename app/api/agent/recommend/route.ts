@@ -105,11 +105,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 After hard filters: ${filteredRestaurants.length} restaurants`);
 
-    // Debug data for step 1
+    // Debug data for step 1 - return ALL restaurants
     const step1Data = canDebug ? {
       totalInDb,
       afterFilter: filteredRestaurants.length,
-      sampleRestaurants: filteredRestaurants.slice(0, 10).map(r => ({
+      sampleRestaurants: filteredRestaurants.map(r => ({
+        id: r.id,
         name: r.name,
         city: r.city,
         distance: r.distance ? Math.round(r.distance) : null,
@@ -138,14 +139,16 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 After vector search: ${vectorResults.length} restaurants scored`);
 
-    // Debug data for step 2
+    // Debug data for step 2 - return ALL scored restaurants
     const step2Data = canDebug ? {
       queryText,
       totalScored: vectorResults.length,
-      topByVector: vectorResults.slice(0, 20).map(r => ({
+      topByVector: vectorResults.map(r => ({
+        id: r.id,
         name: r.name,
-        vectorScore: r.vectorScore ? Math.round(r.vectorScore * 1000) / 1000 : 0,
+        vectorScore: r.vectorScore ? Math.round(r.vectorScore * 10000) / 10000 : 0,
         categories: r.categories,
+        city: r.city,
       })),
     } : undefined;
 
@@ -161,17 +164,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 After re-ranking: ${rerankedResults.length} restaurants`);
 
-    // Debug data for step 3
+    // Debug data for step 3 - return ALL reranked restaurants
     const step3Data = canDebug ? {
       totalReranked: rerankedResults.length,
-      topByRerank: rerankedResults.slice(0, 20).map(r => ({
+      topByRerank: rerankedResults.map(r => ({
+        id: r.id,
         name: r.name,
-        vectorScore: r.vectorScore ? Math.round(r.vectorScore * 1000) / 1000 : 0,
-        socialScore: r.socialScore ? Math.round(r.socialScore * 1000) / 1000 : 0,
-        finalScore: r.finalScore ? Math.round(r.finalScore * 1000) / 1000 : 0,
+        city: r.city,
+        vectorScore: r.vectorScore ? Math.round(r.vectorScore * 10000) / 10000 : 0,
+        socialScore: r.socialScore ? Math.round(r.socialScore * 10000) / 10000 : 0,
+        finalScore: r.finalScore ? Math.round(r.finalScore * 10000) / 10000 : 0,
         googleRating: r.google_rating,
         reviewCount: r.google_reviews_count,
         friendsWhoVisited: r.friendsWhoVisited,
+        categories: r.categories,
       })),
     } : undefined;
 
@@ -187,16 +193,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Final recommendations: ${recommendations.length}`);
 
-    // Debug data for step 4
+    // Debug data for step 4 - include full info for LLM candidates
     const step4Data = canDebug ? {
       candidatesSentToLLM: topCandidates.map(r => ({
+        id: r.id,
         name: r.name,
-        finalScore: r.finalScore ? Math.round(r.finalScore * 1000) / 1000 : 0,
+        city: r.city,
+        finalScore: r.finalScore ? Math.round(r.finalScore * 10000) / 10000 : 0,
         categories: r.categories,
-        summary: r.summary?.substring(0, 100),
+        summary: r.summary,
+        googleRating: r.google_rating,
+        reviewCount: r.google_reviews_count,
       })),
       finalRecommendations: recommendations.map(r => ({
+        id: r.restaurant.id,
         name: r.restaurant.name,
+        city: r.restaurant.city,
         matchScore: r.matchScore,
         reason: r.reason,
       })),
@@ -230,6 +242,20 @@ export async function POST(request: NextRequest) {
 // Tel Aviv city center coordinates
 const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
 
+// Tel Aviv approximate bounding box
+const TEL_AVIV_BOUNDS = {
+  minLat: 32.02,
+  maxLat: 32.15,
+  minLng: 34.73,
+  maxLng: 34.85,
+};
+
+// Check if location is in Tel Aviv area
+function isInTelAviv(lat: number, lng: number): boolean {
+  return lat >= TEL_AVIV_BOUNDS.minLat && lat <= TEL_AVIV_BOUNDS.maxLat &&
+         lng >= TEL_AVIV_BOUNDS.minLng && lng <= TEL_AVIV_BOUNDS.maxLng;
+}
+
 // Check if location is valid (in Israel area)
 function isValidIsraelLocation(lat: number, lng: number): boolean {
   // Israel bounding box approximately
@@ -249,29 +275,50 @@ async function applyHardFilters(
   // Handle different "where" values
   const whereValue = context.where?.toLowerCase() || '';
   
+  // Check if user is actually in Tel Aviv
+  const userInTelAviv = isInTelAviv(userLocation.lat, userLocation.lng);
+  
+  console.log(`📍 User location: (${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}) - In Tel Aviv: ${userInTelAviv}`);
+  
   // Map various location preferences to radius
   if (whereValue.includes('walking') || whereValue.includes('הליכה') || whereValue === 'nearby') {
-    radiusMeters = 3000; // 3km - reasonable walking distance
+    if (userInTelAviv) {
+      // User is in Tel Aviv - search from their location
+      radiusMeters = 3000; // 3km - reasonable walking distance
+    } else {
+      // User is OUTSIDE Tel Aviv - they want to walk IN Tel Aviv
+      // Use Tel Aviv center with a larger radius to show options
+      console.log(`⚠️ User outside Tel Aviv but wants walking distance - using Tel Aviv center`);
+      effectiveLocation = TEL_AVIV_CENTER;
+      radiusMeters = 5000; // Show central Tel Aviv options
+    }
   } else if (whereValue.includes('willing') || whereValue.includes('travel') || 
              whereValue.includes('נסוע') || whereValue.includes('לנסוע')) {
-    radiusMeters = 25000; // 25km
+    // User willing to travel - use Tel Aviv center with large radius
+    effectiveLocation = TEL_AVIV_CENTER;
+    radiusMeters = 25000; // 25km - all of Tel Aviv and surroundings
   } else if (whereValue.includes('outside') || whereValue.includes('מחוץ') || 
              whereValue.includes('חוץ')) {
     radiusMeters = 50000; // 50km
+    effectiveLocation = TEL_AVIV_CENTER;
   } else if (whereValue.includes('tel_aviv') || whereValue.includes('תל אביב')) {
     // All of Tel Aviv
     effectiveLocation = TEL_AVIV_CENTER;
     radiusMeters = 15000;
+  } else {
+    // No specific preference - use Tel Aviv center to ensure results
+    effectiveLocation = TEL_AVIV_CENTER;
+    radiusMeters = 15000;
   }
   
-  // If user location is not in Israel, use Tel Aviv center
+  // Final safety check - if location is not in Israel, use Tel Aviv center
   if (!isValidIsraelLocation(effectiveLocation.lat, effectiveLocation.lng)) {
     console.log(`⚠️ Invalid location detected, using Tel Aviv center`);
     effectiveLocation = TEL_AVIV_CENTER;
     radiusMeters = Math.max(radiusMeters, 15000); // At least 15km from center
   }
   
-  console.log(`🎯 Using radius: ${radiusMeters}m, location: (${effectiveLocation.lat.toFixed(4)}, ${effectiveLocation.lng.toFixed(4)})`);
+  console.log(`🎯 Final: radius=${radiusMeters}m, location=(${effectiveLocation.lat.toFixed(4)}, ${effectiveLocation.lng.toFixed(4)})`);
 
   // Build query - support both 'Tel Aviv' and 'Tel Aviv-Yafo'
   let query = supabase

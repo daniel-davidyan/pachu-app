@@ -2,53 +2,90 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Database, Filter, Sparkles, BarChart3, Trophy, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ArrowLeft, Database, Filter, Sparkles, BarChart3, Trophy, ChevronDown, ChevronUp, Loader2, MessageSquare } from 'lucide-react';
 
-interface PipelineStep {
-  title: string;
-  icon: React.ReactNode;
-  count: number;
-  percentage: number;
-  color: string;
-  data: any;
+interface Restaurant {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  categories?: string[];
+  vectorScore?: number;
+  socialScore?: number;
+  finalScore?: number;
+  googleRating?: number;
+  reviewCount?: number;
+  distance?: number;
+  friendsWhoVisited?: string[];
+  summary?: string;
+  matchScore?: number;
+  reason?: string;
 }
 
 interface DebugData {
   step1: {
     totalInDb: number;
     afterFilter: number;
-    sampleRestaurants: any[];
+    sampleRestaurants: Restaurant[];
   };
   step2: {
     queryText: string;
     totalScored: number;
-    topByVector: any[];
+    topByVector: Restaurant[];
   };
   step3: {
     totalReranked: number;
-    topByRerank: any[];
+    topByRerank: Restaurant[];
   };
   step4: {
-    candidatesSentToLLM: any[];
-    finalRecommendations: any[];
+    candidatesSentToLLM: Restaurant[];
+    finalRecommendations: Restaurant[];
   };
 }
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  restaurants?: Restaurant[];
+}
+
+interface ConversationContext {
+  state: string;
+  slots: {
+    occasion: string | null;
+    location: string | null;
+    cuisine: string | null;
+    vibe: string | null;
+    budget: string | null;
+    timing: string | null;
+  };
+}
+
+interface ChatConversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  timestamp: number;
+  context?: ConversationContext;
+}
+
+const STORAGE_KEY = 'pachu-chat-history';
 
 export default function PipelineAnalyticsPage() {
   const router = useRouter();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatConversation[]>([]);
+  const [selectedChat, setSelectedChat] = useState<ChatConversation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [debugData, setDebugData] = useState<DebugData | null>(null);
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
-  const [testContext, setTestContext] = useState({
-    occasion: 'friends',
-    location: 'walking',
-    cuisine: '',
-  });
+  const [error, setError] = useState<string | null>(null);
 
   // Check access on mount
   useEffect(() => {
     checkAccess();
+    loadChatHistory();
   }, []);
 
   const checkAccess = async () => {
@@ -61,36 +98,109 @@ export default function PipelineAnalyticsPage() {
     }
   };
 
-  const runPipelineAnalysis = async () => {
+  const loadChatHistory = () => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const history = JSON.parse(stored);
+        setChatHistory(history);
+      } catch (e) {
+        console.error('Failed to load chat history', e);
+      }
+    }
+  };
+
+  const extractContextFromMessages = (messages: Message[]): ConversationContext => {
+    // Try to extract context from the conversation
+    const context: ConversationContext = {
+      state: 'ready_to_search',
+      slots: {
+        occasion: null,
+        location: null,
+        cuisine: null,
+        vibe: null,
+        budget: null,
+        timing: null,
+      }
+    };
+
+    // Look for keywords in user messages
+    messages.forEach(msg => {
+      if (msg.role !== 'user') return;
+      const content = msg.content.toLowerCase();
+
+      // Occasion detection
+      if (content.includes('דייט') || content.includes('date')) context.slots.occasion = 'date';
+      else if (content.includes('חברים') || content.includes('friends')) context.slots.occasion = 'friends';
+      else if (content.includes('משפחה') || content.includes('family')) context.slots.occasion = 'family';
+      else if (content.includes('לבד') || content.includes('solo')) context.slots.occasion = 'solo';
+      else if (content.includes('עבודה') || content.includes('work')) context.slots.occasion = 'work';
+
+      // Location detection
+      if (content.includes('הליכה') || content.includes('walking')) context.slots.location = 'walking';
+      else if (content.includes('נסוע') || content.includes('travel')) context.slots.location = 'willing_to_travel';
+      else if (content.includes('תל אביב')) context.slots.location = 'tel_aviv';
+
+      // Cuisine detection
+      if (content.includes('איטלקי') || content.includes('italian')) context.slots.cuisine = 'Italian';
+      else if (content.includes('אסייתי') || content.includes('asian') || content.includes('סושי')) context.slots.cuisine = 'Asian';
+      else if (content.includes('בשרים') || content.includes('steak')) context.slots.cuisine = 'Steakhouse';
+      else if (content.includes('בריא') || content.includes('healthy')) context.slots.cuisine = 'Healthy';
+    });
+
+    return context;
+  };
+
+  const analyzeConversation = async (chat: ChatConversation) => {
     setIsLoading(true);
     setDebugData(null);
+    setError(null);
+    setSelectedChat(chat);
 
     try {
+      // Extract context from messages
+      const context = extractContextFromMessages(chat.messages);
+      
+      // Build recommend context
+      const recommendContext = {
+        where: context.slots.location || 'tel_aviv',
+        withWho: context.slots.occasion || 'friends',
+        purpose: context.slots.occasion === 'date' ? 'romantic_dinner' : 'casual_meal',
+        budget: context.slots.budget,
+        when: context.slots.timing,
+        cuisinePreference: context.slots.cuisine,
+      };
+
+      // Build conversation summary
+      const summary = chat.messages
+        .filter(m => m.role === 'user')
+        .map(m => m.content)
+        .join(' ');
+
       const response = await fetch('/api/agent/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          context: {
-            where: testContext.location === 'walking' ? 'walking_distance' : 
-                   testContext.location === 'travel' ? 'willing_to_travel' : 'tel_aviv',
-            withWho: testContext.occasion,
-            purpose: testContext.occasion === 'date' ? 'romantic_dinner' : 'casual_meal',
-            budget: null,
-            when: null,
-            cuisinePreference: testContext.cuisine || null,
-          },
-          userLocation: { lat: 32.0853, lng: 34.7818 },
-          conversationSummary: `Looking for ${testContext.cuisine || 'food'} with ${testContext.occasion}`,
+          context: recommendContext,
+          userLocation: { lat: 32.0853, lng: 34.7818 }, // Default Tel Aviv
+          conversationSummary: summary,
           includeDebugData: true,
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
       const data = await response.json();
       if (data.debugData) {
         setDebugData(data.debugData);
+      } else {
+        setError('No debug data returned. Make sure you are logged in with a developer account.');
       }
-    } catch (error) {
-      console.error('Pipeline analysis error:', error);
+    } catch (err: any) {
+      console.error('Pipeline analysis error:', err);
+      setError(err.message || 'Failed to analyze pipeline');
     } finally {
       setIsLoading(false);
     }
@@ -126,54 +236,42 @@ export default function PipelineAnalyticsPage() {
     );
   }
 
-  const steps: PipelineStep[] = debugData ? [
+  const steps = debugData ? [
     {
-      title: 'Database',
+      title: 'Database Total',
       icon: <Database className="w-5 h-5" />,
       count: debugData.step1?.totalInDb || 0,
-      percentage: 100,
       color: 'bg-blue-500',
-      data: debugData.step1,
     },
     {
-      title: 'SQL Filters',
+      title: 'After Hard Filters',
       icon: <Filter className="w-5 h-5" />,
       count: debugData.step1?.afterFilter || 0,
-      percentage: debugData.step1 ? Math.round((debugData.step1.afterFilter / debugData.step1.totalInDb) * 100) : 0,
       color: 'bg-purple-500',
-      data: debugData.step1,
     },
     {
       title: 'Vector Search',
       icon: <Sparkles className="w-5 h-5" />,
       count: debugData.step2?.totalScored || 0,
-      percentage: debugData.step2 && debugData.step1 ? Math.round((debugData.step2.totalScored / debugData.step1.afterFilter) * 100) : 0,
       color: 'bg-pink-500',
-      data: debugData.step2,
     },
     {
       title: 'Re-ranking',
       icon: <BarChart3 className="w-5 h-5" />,
       count: debugData.step3?.topByRerank?.length || 0,
-      percentage: 100,
       color: 'bg-orange-500',
-      data: debugData.step3,
     },
     {
       title: 'Sent to LLM',
       icon: <Sparkles className="w-5 h-5" />,
       count: debugData.step4?.candidatesSentToLLM?.length || 0,
-      percentage: debugData.step4 && debugData.step3 ? Math.round((debugData.step4.candidatesSentToLLM.length / Math.min(debugData.step3.topByRerank?.length || 15, 15)) * 100) : 0,
       color: 'bg-indigo-500',
-      data: debugData.step4?.candidatesSentToLLM,
     },
     {
       title: 'Final Results',
       icon: <Trophy className="w-5 h-5" />,
       count: debugData.step4?.finalRecommendations?.length || 0,
-      percentage: 100,
       color: 'bg-green-500',
-      data: debugData.step4?.finalRecommendations,
     },
   ] : [];
 
@@ -190,131 +288,206 @@ export default function PipelineAnalyticsPage() {
           </button>
           <div>
             <h1 className="font-bold text-gray-900">Pipeline Analytics</h1>
-            <p className="text-xs text-gray-500">Developer tools</p>
+            <p className="text-xs text-gray-500">Select a conversation to analyze</p>
           </div>
         </div>
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Test Parameters */}
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold text-gray-900 mb-3">Test Parameters</h2>
-          
+        {/* Conversation Selection */}
+        {!selectedChat && (
           <div className="space-y-3">
-            <div>
-              <label className="text-sm text-gray-600 mb-1 block">Occasion</label>
-              <select
-                value={testContext.occasion}
-                onChange={(e) => setTestContext(prev => ({ ...prev, occasion: e.target.value }))}
-                className="w-full p-2 border border-gray-200 rounded-lg text-sm"
-              >
-                <option value="date">Date 💕</option>
-                <option value="friends">Friends 👥</option>
-                <option value="family">Family 👨‍👩‍👧</option>
-                <option value="solo">Solo 🧘</option>
-                <option value="work">Work 💼</option>
-              </select>
-            </div>
+            <h2 className="font-semibold text-gray-900">Recent Conversations</h2>
+            
+            {chatHistory.length === 0 ? (
+              <div className="bg-white rounded-xl p-6 text-center shadow-sm">
+                <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No conversations yet</p>
+                <p className="text-sm text-gray-400 mt-1">Start chatting with the agent first</p>
+              </div>
+            ) : (
+              chatHistory.map(chat => (
+                <button
+                  key={chat.id}
+                  onClick={() => analyzeConversation(chat)}
+                  className="w-full bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-left hover:border-primary/50 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <MessageSquare className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 truncate">{chat.title}</h3>
+                      <p className="text-sm text-gray-500">
+                        {new Date(chat.timestamp).toLocaleDateString('he-IL')} · {chat.messages.length} messages
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {chat.messages
+                          .filter(m => m.restaurants && m.restaurants.length > 0)
+                          .slice(-1)
+                          .map(m => (
+                            <span key={m.id} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                              {m.restaurants?.length} recommendations
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                    <ChevronDown className="w-5 h-5 text-gray-400 transform -rotate-90" />
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
 
-            <div>
-              <label className="text-sm text-gray-600 mb-1 block">Location</label>
-              <select
-                value={testContext.location}
-                onChange={(e) => setTestContext(prev => ({ ...prev, location: e.target.value }))}
-                className="w-full p-2 border border-gray-200 rounded-lg text-sm"
-              >
-                <option value="walking">Walking Distance 🚶</option>
-                <option value="travel">Willing to Travel 🚗</option>
-                <option value="tel_aviv">All Tel Aviv 🏙️</option>
-              </select>
-            </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="bg-white rounded-xl p-8 shadow-sm text-center">
+            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-gray-600 font-medium">Analyzing pipeline...</p>
+            <p className="text-sm text-gray-400 mt-1">This may take a few seconds</p>
+          </div>
+        )}
 
-            <div>
-              <label className="text-sm text-gray-600 mb-1 block">Cuisine (optional)</label>
-              <input
-                type="text"
-                value={testContext.cuisine}
-                onChange={(e) => setTestContext(prev => ({ ...prev, cuisine: e.target.value }))}
-                placeholder="e.g., Italian, Asian..."
-                className="w-full p-2 border border-gray-200 rounded-lg text-sm"
-              />
-            </div>
-
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-red-700 font-medium">Error</p>
+            <p className="text-sm text-red-600 mt-1">{error}</p>
             <button
-              onClick={runPipelineAnalysis}
-              disabled={isLoading}
-              className="w-full py-3 bg-primary text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+              onClick={() => {
+                setError(null);
+                setSelectedChat(null);
+              }}
+              className="mt-3 text-sm text-red-700 underline"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Running Pipeline...
-                </>
-              ) : (
-                <>
-                  <BarChart3 className="w-5 h-5" />
-                  Run Pipeline Analysis
-                </>
-              )}
+              Try again
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Pipeline Visualization */}
-        {debugData && (
-          <div className="space-y-3">
-            <h2 className="font-semibold text-gray-900">Pipeline Flow</h2>
-            
+        {/* Pipeline Results */}
+        {debugData && selectedChat && (
+          <div className="space-y-4">
+            {/* Selected Chat Info */}
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-gray-900">{selectedChat.title}</h2>
+                  <p className="text-sm text-gray-500">
+                    {new Date(selectedChat.timestamp).toLocaleString('he-IL')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedChat(null);
+                    setDebugData(null);
+                  }}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Choose another
+                </button>
+              </div>
+            </div>
+
+            {/* Query Text */}
+            {debugData.step2?.queryText && (
+              <div className="bg-blue-50 rounded-xl p-4">
+                <p className="text-xs text-blue-600 font-medium mb-1">Query sent to vector search:</p>
+                <p className="text-sm text-blue-900">{debugData.step2.queryText}</p>
+              </div>
+            )}
+
             {/* Visual Flow */}
             <div className="bg-white rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between overflow-x-auto pb-2">
+              <h3 className="font-semibold text-gray-900 mb-4">Pipeline Flow</h3>
+              <div className="flex items-center justify-between overflow-x-auto pb-2 gap-1">
                 {steps.map((step, index) => (
                   <div key={index} className="flex items-center">
-                    <div className="flex flex-col items-center min-w-[60px]">
-                      <div className={`w-10 h-10 ${step.color} rounded-full flex items-center justify-center text-white`}>
+                    <div className="flex flex-col items-center min-w-[50px]">
+                      <div className={`w-9 h-9 ${step.color} rounded-full flex items-center justify-center text-white`}>
                         {step.icon}
                       </div>
-                      <span className="text-lg font-bold text-gray-900 mt-1">{step.count.toLocaleString()}</span>
-                      <span className="text-[10px] text-gray-500 text-center">{step.title}</span>
+                      <span className="text-base font-bold text-gray-900 mt-1">{step.count.toLocaleString()}</span>
+                      <span className="text-[9px] text-gray-500 text-center leading-tight">{step.title}</span>
                     </div>
                     {index < steps.length - 1 && (
-                      <div className="w-6 h-0.5 bg-gray-300 mx-1" />
+                      <div className="w-4 h-0.5 bg-gray-300 mx-0.5" />
                     )}
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Step Details */}
-            {steps.map((step, index) => (
-              <div key={index} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <button
-                  onClick={() => setExpandedStep(expandedStep === index ? null : index)}
-                  className="w-full p-4 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 ${step.color} rounded-full flex items-center justify-center text-white`}>
-                      {step.icon}
-                    </div>
-                    <div className="text-left">
-                      <span className="font-medium text-gray-900">{step.title}</span>
-                      <span className="text-sm text-gray-500 ml-2">({step.count.toLocaleString()} items)</span>
-                    </div>
-                  </div>
-                  {expandedStep === index ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  )}
-                </button>
+            {/* Step Details - ALL RESTAURANTS */}
+            <StepCard 
+              title="1. Hard Filters (SQL)" 
+              subtitle={`${debugData.step1?.afterFilter || 0} passed from ${debugData.step1?.totalInDb || 0}`}
+              color="bg-purple-500"
+              icon={<Filter className="w-5 h-5" />}
+              isExpanded={expandedStep === 1}
+              onToggle={() => setExpandedStep(expandedStep === 1 ? null : 1)}
+            >
+              <RestaurantList 
+                restaurants={debugData.step1?.sampleRestaurants || []} 
+                showDistance 
+              />
+            </StepCard>
 
-                {expandedStep === index && (
-                  <div className="px-4 pb-4 border-t border-gray-100">
-                    <StepDetails step={step} index={index} debugData={debugData} />
-                  </div>
-                )}
-              </div>
-            ))}
+            <StepCard 
+              title="2. Vector Search" 
+              subtitle={`${debugData.step2?.totalScored || 0} restaurants scored`}
+              color="bg-pink-500"
+              icon={<Sparkles className="w-5 h-5" />}
+              isExpanded={expandedStep === 2}
+              onToggle={() => setExpandedStep(expandedStep === 2 ? null : 2)}
+            >
+              <RestaurantList 
+                restaurants={debugData.step2?.topByVector || []} 
+                showVectorScore 
+              />
+            </StepCard>
+
+            <StepCard 
+              title="3. Re-ranking" 
+              subtitle={`Top ${debugData.step3?.topByRerank?.length || 0} after social signals`}
+              color="bg-orange-500"
+              icon={<BarChart3 className="w-5 h-5" />}
+              isExpanded={expandedStep === 3}
+              onToggle={() => setExpandedStep(expandedStep === 3 ? null : 3)}
+            >
+              <RestaurantList 
+                restaurants={debugData.step3?.topByRerank || []} 
+                showAllScores 
+              />
+            </StepCard>
+
+            <StepCard 
+              title="4. Sent to LLM" 
+              subtitle={`${debugData.step4?.candidatesSentToLLM?.length || 0} candidates`}
+              color="bg-indigo-500"
+              icon={<Sparkles className="w-5 h-5" />}
+              isExpanded={expandedStep === 4}
+              onToggle={() => setExpandedStep(expandedStep === 4 ? null : 4)}
+            >
+              <RestaurantList 
+                restaurants={debugData.step4?.candidatesSentToLLM || []} 
+                showSummary 
+              />
+            </StepCard>
+
+            <StepCard 
+              title="5. Final Recommendations" 
+              subtitle={`${debugData.step4?.finalRecommendations?.length || 0} selected by LLM`}
+              color="bg-green-500"
+              icon={<Trophy className="w-5 h-5" />}
+              isExpanded={expandedStep === 5}
+              onToggle={() => setExpandedStep(expandedStep === 5 ? null : 5)}
+            >
+              <FinalRecommendations 
+                recommendations={debugData.step4?.finalRecommendations || []} 
+              />
+            </StepCard>
           </div>
         )}
       </div>
@@ -322,137 +495,141 @@ export default function PipelineAnalyticsPage() {
   );
 }
 
-function StepDetails({ step, index, debugData }: { step: PipelineStep; index: number; debugData: DebugData }) {
-  if (index === 0) {
-    // Database total
-    return (
-      <div className="pt-3 space-y-2">
-        <p className="text-sm text-gray-600">
-          Total restaurants in database: <span className="font-bold text-gray-900">{debugData.step1?.totalInDb?.toLocaleString()}</span>
-        </p>
-      </div>
-    );
+// Step Card Component
+function StepCard({ 
+  title, 
+  subtitle, 
+  color, 
+  icon, 
+  isExpanded, 
+  onToggle, 
+  children 
+}: {
+  title: string;
+  subtitle: string;
+  color: string;
+  icon: React.ReactNode;
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full p-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 ${color} rounded-full flex items-center justify-center text-white`}>
+            {icon}
+          </div>
+          <div className="text-left">
+            <span className="font-medium text-gray-900">{title}</span>
+            <p className="text-sm text-gray-500">{subtitle}</p>
+          </div>
+        </div>
+        {isExpanded ? (
+          <ChevronUp className="w-5 h-5 text-gray-400" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-gray-400" />
+        )}
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-gray-100 max-h-[60vh] overflow-y-auto">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Restaurant List Component - shows ALL restaurants
+function RestaurantList({ 
+  restaurants, 
+  showDistance = false,
+  showVectorScore = false,
+  showAllScores = false,
+  showSummary = false,
+}: {
+  restaurants: Restaurant[];
+  showDistance?: boolean;
+  showVectorScore?: boolean;
+  showAllScores?: boolean;
+  showSummary?: boolean;
+}) {
+  if (restaurants.length === 0) {
+    return <p className="text-sm text-gray-400 py-4 text-center">No restaurants</p>;
   }
 
-  if (index === 1) {
-    // SQL Filters
-    return (
-      <div className="pt-3 space-y-3">
-        <p className="text-sm text-gray-600">
-          After location & filters: <span className="font-bold text-gray-900">{debugData.step1?.afterFilter}</span>
-        </p>
-        <div className="text-xs text-gray-500">Sample restaurants:</div>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {debugData.step1?.sampleRestaurants?.map((r: any, i: number) => (
-            <div key={i} className="p-2 bg-gray-50 rounded-lg text-sm">
-              <div className="font-medium text-gray-900">{r.name}</div>
-              <div className="text-xs text-gray-500">
-                {r.city} • {r.distance ? `${(r.distance / 1000).toFixed(1)}km` : 'N/A'}
-              </div>
+  return (
+    <div className="space-y-2 pt-3">
+      <p className="text-xs text-gray-500 mb-2">Showing all {restaurants.length} restaurants:</p>
+      {restaurants.map((r, i) => (
+        <div key={r.id || i} className="p-3 bg-gray-50 rounded-lg text-sm">
+          <div className="flex justify-between items-start">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-900 truncate">
+                {i + 1}. {r.name}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {r.city} {r.categories?.slice(0, 2).join(', ')}
+              </p>
             </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (index === 2) {
-    // Vector Search
-    return (
-      <div className="pt-3 space-y-3">
-        <div className="p-2 bg-blue-50 rounded-lg">
-          <div className="text-xs text-blue-600 font-medium">Query Text:</div>
-          <div className="text-sm text-blue-900">{debugData.step2?.queryText}</div>
-        </div>
-        <div className="text-xs text-gray-500">Top by vector similarity:</div>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {debugData.step2?.topByVector?.map((r: any, i: number) => (
-            <div key={i} className="p-2 bg-gray-50 rounded-lg text-sm flex justify-between">
-              <div>
-                <div className="font-medium text-gray-900">{r.name}</div>
-                <div className="text-xs text-gray-500">{r.categories?.slice(0, 2).join(', ')}</div>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-xs text-purple-600">{r.vectorScore?.toFixed(3)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (index === 3) {
-    // Re-ranking
-    return (
-      <div className="pt-3 space-y-3">
-        <div className="text-xs text-gray-500">Top after re-ranking (vector + social signals):</div>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {debugData.step3?.topByRerank?.map((r: any, i: number) => (
-            <div key={i} className="p-2 bg-gray-50 rounded-lg text-sm">
-              <div className="flex justify-between">
-                <div className="font-medium text-gray-900">{r.name}</div>
-                <div className="font-mono text-xs text-green-600">{r.finalScore?.toFixed(3)}</div>
-              </div>
-              <div className="flex gap-3 text-xs text-gray-500 mt-1">
-                <span>Vector: {r.vectorScore?.toFixed(3)}</span>
-                <span>Social: {r.socialScore?.toFixed(3)}</span>
-                <span>⭐ {r.googleRating}</span>
-                <span>({r.reviewCount})</span>
-              </div>
-              {r.friendsWhoVisited?.length > 0 && (
-                <div className="text-xs text-primary mt-1">
-                  👥 Friends: {r.friendsWhoVisited.join(', ')}
+            <div className="text-right flex-shrink-0 ml-2">
+              {showDistance && r.distance && (
+                <p className="text-xs text-blue-600">{(r.distance / 1000).toFixed(1)}km</p>
+              )}
+              {showVectorScore && r.vectorScore !== undefined && (
+                <p className="font-mono text-xs text-purple-600">{r.vectorScore.toFixed(4)}</p>
+              )}
+              {showAllScores && (
+                <div className="space-y-0.5">
+                  <p className="font-mono text-xs text-green-600">Final: {r.finalScore?.toFixed(3)}</p>
+                  <p className="font-mono text-xs text-gray-400">Vec: {r.vectorScore?.toFixed(3)}</p>
+                  <p className="font-mono text-xs text-gray-400">Social: {r.socialScore?.toFixed(3)}</p>
                 </div>
               )}
             </div>
-          ))}
+          </div>
+          {showAllScores && r.friendsWhoVisited && r.friendsWhoVisited.length > 0 && (
+            <p className="text-xs text-primary mt-1">👥 {r.friendsWhoVisited.join(', ')}</p>
+          )}
+          {showSummary && r.summary && (
+            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{r.summary}</p>
+          )}
         </div>
-      </div>
-    );
+      ))}
+    </div>
+  );
+}
+
+// Final Recommendations Component
+function FinalRecommendations({ recommendations }: { recommendations: Restaurant[] }) {
+  if (recommendations.length === 0) {
+    return <p className="text-sm text-gray-400 py-4 text-center">No recommendations</p>;
   }
 
-  if (index === 4) {
-    // Sent to LLM
-    return (
-      <div className="pt-3 space-y-3">
-        <div className="text-xs text-gray-500">15 candidates sent to LLM for final selection:</div>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {debugData.step4?.candidatesSentToLLM?.map((r: any, i: number) => (
-            <div key={i} className="p-2 bg-gray-50 rounded-lg text-sm">
-              <div className="flex justify-between">
-                <div className="font-medium text-gray-900">{i + 1}. {r.name}</div>
-                <div className="font-mono text-xs text-indigo-600">{r.finalScore?.toFixed(3)}</div>
-              </div>
-              <div className="text-xs text-gray-500 mt-1 line-clamp-2">{r.summary}</div>
+  return (
+    <div className="space-y-3 pt-3">
+      {recommendations.map((r, i) => (
+        <div key={r.id || i} className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <p className="font-bold text-gray-900">{i + 1}. {r.name}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{r.categories?.slice(0, 3).join(', ')}</p>
             </div>
-          ))}
+            {r.matchScore && (
+              <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
+                {r.matchScore}%
+              </span>
+            )}
+          </div>
+          {r.reason && (
+            <p className="text-sm text-gray-700 mt-2 leading-relaxed">{r.reason}</p>
+          )}
         </div>
-      </div>
-    );
-  }
-
-  if (index === 5) {
-    // Final Results
-    return (
-      <div className="pt-3 space-y-3">
-        <div className="text-xs text-gray-500">Final 3 recommendations with LLM reasons:</div>
-        <div className="space-y-3">
-          {debugData.step4?.finalRecommendations?.map((r: any, i: number) => (
-            <div key={i} className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-              <div className="flex justify-between items-start">
-                <div className="font-bold text-gray-900">{i + 1}. {r.name}</div>
-                <div className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
-                  {r.matchScore}%
-                </div>
-              </div>
-              <div className="text-sm text-gray-700 mt-2">{r.reason}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+      ))}
+    </div>
+  );
 }

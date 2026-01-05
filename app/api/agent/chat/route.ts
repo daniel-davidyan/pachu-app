@@ -349,13 +349,15 @@ function determineState(
   const hasOccasion = !!slots.occasion;
   const hasLocation = !!slots.location;
   const hasCuisine = !!slots.cuisine;
+  const hasBudget = !!slots.budget;
   
-  // Count filled slots (excluding vibe which is optional)
-  const filledSlots = [hasOccasion, hasLocation, hasCuisine].filter(Boolean).length;
+  // Count filled slots 
+  const coreSlots = [hasOccasion, hasLocation, hasCuisine, hasBudget].filter(Boolean).length;
   
-  // Need at least 2 out of 3 core slots (occasion, location, cuisine) to search
-  // This ensures we ask at least 2 questions before recommending
-  const canSearch = filledSlots >= 2;
+  // Need at least 3 out of 4 core slots (occasion, location, cuisine, budget) to search
+  // This ensures we ask at least 3 questions before recommending for better results
+  // MUST have occasion + location at minimum
+  const canSearch = coreSlots >= 3 && hasOccasion && hasLocation;
 
   if (canSearch) {
     return 'ready_to_search';
@@ -438,7 +440,7 @@ async function handleGathering(
       { label: 'בכל תל אביב', value: 'tel_aviv', emoji: '🏙️' },
     ];
   }
-  // Priority 3: Cuisine (optional but helpful)
+  // Priority 3: Cuisine
   else if (!slots.cuisine) {
     questionType = 'cuisine';
     const occasionContext = slots.occasion === 'date' ? 'לדייט' : 
@@ -449,15 +451,27 @@ async function handleGathering(
       { label: 'אסייתי', value: 'asian', emoji: '🍜' },
       { label: 'בריא', value: 'healthy', emoji: '🥗' },
       { label: 'בשרים', value: 'steak', emoji: '🥩' },
+      { label: 'ים תיכוני', value: 'mediterranean', emoji: '🫒' },
       { label: 'תפתיע אותי', value: 'surprise', emoji: '🎲' },
+    ];
+  }
+  // Priority 4: Budget
+  else if (!slots.budget) {
+    questionType = 'budget';
+    question = 'מה התקציב? 💰';
+    chips = [
+      { label: 'חסכוני', value: 'cheap', emoji: '💵' },
+      { label: 'בינוני', value: 'moderate', emoji: '💳' },
+      { label: 'מפנק', value: 'expensive', emoji: '💎' },
+      { label: 'לא משנה', value: 'any', emoji: '🤷' },
     ];
   }
   // Have enough - but ask for vibe to improve results
   else {
     questionType = 'vibe';
-    question = 'איזה אווירה אתם מחפשים?';
+    question = 'איזה אווירה אתם מחפשים? ✨';
     chips = [
-      { label: 'רומנטי', value: 'romantic', emoji: '✨' },
+      { label: 'רומנטי', value: 'romantic', emoji: '💕' },
       { label: 'קז\'ואל', value: 'casual', emoji: '😎' },
       { label: 'מפנק', value: 'upscale', emoji: '🥂' },
       { label: 'חי ותוסס', value: 'lively', emoji: '🎉' },
@@ -489,6 +503,19 @@ async function handleGathering(
     };
     const locAck = acknowledgment ? ' ' : '';
     acknowledgment += `${locAck}${locationText[understanding.extractedSlots.location] || ''}`;
+  }
+  if (understanding.extractedSlots.budget) {
+    const budgetText: Record<string, string> = {
+      'cheap': 'תקציב חסכוני 💵',
+      'moderate': 'תקציב בינוני 💳',
+      'expensive': 'מפנקים! 💎',
+      'any': '',
+    };
+    const budgetAck = budgetText[understanding.extractedSlots.budget];
+    if (budgetAck) {
+      const sep = acknowledgment ? ' ' : '';
+      acknowledgment += `${sep}${budgetAck}`;
+    }
   }
 
   const message = acknowledgment 
