@@ -382,19 +382,23 @@ export default function AgentPage() {
         })
       });
 
+      // Check if response is OK first
+      if (!agentResponse.ok) {
+        const errorText = await agentResponse.text();
+        console.error('Agent API error:', agentResponse.status, errorText);
+        throw new Error(`API error: ${agentResponse.status}`);
+      }
+
       const agentData = await agentResponse.json();
       console.log('Agent response:', agentData);
 
-      if (agentData.error) {
-        throw new Error(agentData.error);
-      }
-
-      // Update conversation context
+      // Update conversation context first
       if (agentData.context) {
         setConversationContext(agentData.context);
       }
 
-      // If recommendations are returned, display them
+      // PRIORITY: Check for recommendations FIRST (even if there's an error field)
+      // This ensures we show results if we have them
       if (agentData.recommendations && agentData.recommendations.length > 0) {
         const restaurants = agentData.recommendations.map((rec: any) => ({
           id: rec.restaurant.id || rec.restaurant.google_place_id,
@@ -425,6 +429,17 @@ export default function AgentPage() {
 
         setMessages(prev => [...prev, assistantMessage]);
         setCurrentChips([]);
+      } else if (agentData.error) {
+        // API returned an error - show it
+        console.error('Agent returned error:', agentData.error);
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentData.message || "משהו לא עבד, בוא ננסה שוב 🙏",
+          chips: agentData.chips || [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }],
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setCurrentChips(agentData.chips || []);
       } else if (agentData.readyToRecommend) {
         // Ready but no recommendations found
         const assistantMessage: Message = {
@@ -440,7 +455,7 @@ export default function AgentPage() {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: agentData.message,
+          content: agentData.message || "איך אפשר לעזור?",
           chips: agentData.chips,
         };
         setMessages(prev => [...prev, assistantMessage]);

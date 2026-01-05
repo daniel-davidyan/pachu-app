@@ -242,18 +242,15 @@ export async function POST(request: NextRequest) {
 // Tel Aviv city center coordinates
 const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
 
-// Tel Aviv approximate bounding box
-const TEL_AVIV_BOUNDS = {
-  minLat: 32.02,
-  maxLat: 32.15,
-  minLng: 34.73,
-  maxLng: 34.85,
-};
+// Our DB coverage area - restaurants we have mapped (central Tel Aviv area)
+// ~2km radius from center covers most of our data
+const DB_COVERAGE_CENTER = TEL_AVIV_CENTER;
+const DB_COVERAGE_RADIUS_KM = 8; // Our restaurants are within ~8km of Tel Aviv center
 
-// Check if location is in Tel Aviv area
-function isInTelAviv(lat: number, lng: number): boolean {
-  return lat >= TEL_AVIV_BOUNDS.minLat && lat <= TEL_AVIV_BOUNDS.maxLat &&
-         lng >= TEL_AVIV_BOUNDS.minLng && lng <= TEL_AVIV_BOUNDS.maxLng;
+// Check if user is within our DB coverage area
+function isWithinDbCoverage(lat: number, lng: number): boolean {
+  const distance = calculateDistance(lat, lng, DB_COVERAGE_CENTER.lat, DB_COVERAGE_CENTER.lng);
+  return distance <= DB_COVERAGE_RADIUS_KM * 1000; // Convert km to meters
 }
 
 // Check if location is valid (in Israel area)
@@ -275,47 +272,54 @@ async function applyHardFilters(
   // Handle different "where" values
   const whereValue = context.where?.toLowerCase() || '';
   
-  // Check if user is actually in Tel Aviv
-  const userInTelAviv = isInTelAviv(userLocation.lat, userLocation.lng);
+  // Check if user is within our DB coverage (where we have restaurants)
+  const userInCoverage = isWithinDbCoverage(userLocation.lat, userLocation.lng);
   
-  console.log(`📍 User location: (${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}) - In Tel Aviv: ${userInTelAviv}`);
+  console.log(`📍 User location: (${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}) - In DB coverage: ${userInCoverage}`);
   
-  // Map various location preferences to radius
+  // LOGIC:
+  // 1. User in Tel Aviv + "walking" → search from their location, 2km radius
+  // 2. User outside + "Tel Aviv" → search from Tel Aviv center, 15km radius
+  // 3. User outside + "walking" → search from their location, 2km radius → will return 0 results (correct!)
+  // 4. User outside + "willing to travel" → search from Tel Aviv center
+  
   if (whereValue.includes('walking') || whereValue.includes('הליכה') || whereValue === 'nearby') {
-    if (userInTelAviv) {
-      // User is in Tel Aviv - search from their location
-      radiusMeters = 3000; // 3km - reasonable walking distance
-    } else {
-      // User is OUTSIDE Tel Aviv - they want to walk IN Tel Aviv
-      // Use Tel Aviv center with a larger radius to show options
-      console.log(`⚠️ User outside Tel Aviv but wants walking distance - using Tel Aviv center`);
-      effectiveLocation = TEL_AVIV_CENTER;
-      radiusMeters = 5000; // Show central Tel Aviv options
-    }
+    // User wants walking distance - search from THEIR location
+    // If they're not in Tel Aviv, this will correctly return 0 results
+    radiusMeters = 2000; // 2km - actual walking distance
+    // Keep effectiveLocation = userLocation
+    console.log(`🚶 Walking distance mode - searching from user's actual location`);
+    
   } else if (whereValue.includes('willing') || whereValue.includes('travel') || 
              whereValue.includes('נסוע') || whereValue.includes('לנסוע')) {
-    // User willing to travel - use Tel Aviv center with large radius
+    // User willing to travel - search from Tel Aviv center
     effectiveLocation = TEL_AVIV_CENTER;
-    radiusMeters = 25000; // 25km - all of Tel Aviv and surroundings
-  } else if (whereValue.includes('outside') || whereValue.includes('מחוץ') || 
-             whereValue.includes('חוץ')) {
-    radiusMeters = 50000; // 50km
-    effectiveLocation = TEL_AVIV_CENTER;
+    radiusMeters = 25000; // 25km
+    console.log(`🚗 Travel mode - searching from Tel Aviv center`);
+    
   } else if (whereValue.includes('tel_aviv') || whereValue.includes('תל אביב')) {
-    // All of Tel Aviv
+    // User explicitly wants Tel Aviv
     effectiveLocation = TEL_AVIV_CENTER;
-    radiusMeters = 15000;
+    radiusMeters = 15000; // All of Tel Aviv
+    console.log(`🏙️ Tel Aviv mode - searching from Tel Aviv center`);
+    
   } else {
-    // No specific preference - use Tel Aviv center to ensure results
-    effectiveLocation = TEL_AVIV_CENTER;
-    radiusMeters = 15000;
+    // No specific preference
+    if (userInCoverage) {
+      // User is in our coverage area - search from their location
+      radiusMeters = 5000;
+    } else {
+      // User is outside - default to Tel Aviv center
+      effectiveLocation = TEL_AVIV_CENTER;
+      radiusMeters = 15000;
+    }
   }
   
-  // Final safety check - if location is not in Israel, use Tel Aviv center
+  // Safety check - if location is completely invalid, use Tel Aviv center
   if (!isValidIsraelLocation(effectiveLocation.lat, effectiveLocation.lng)) {
     console.log(`⚠️ Invalid location detected, using Tel Aviv center`);
     effectiveLocation = TEL_AVIV_CENTER;
-    radiusMeters = Math.max(radiusMeters, 15000); // At least 15km from center
+    radiusMeters = 15000;
   }
   
   console.log(`🎯 Final: radius=${radiusMeters}m, location=(${effectiveLocation.lat.toFixed(4)}, ${effectiveLocation.lng.toFixed(4)})`);
