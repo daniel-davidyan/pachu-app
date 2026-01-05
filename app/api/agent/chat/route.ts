@@ -532,8 +532,14 @@ async function handleSearch(
   const searchMsg = searchingMessages[Math.floor(Math.random() * searchingMessages.length)];
 
   try {
-    // Call recommendation API
+    // Call recommendation API with timeout
     const recommendUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/agent/recommend`;
+    
+    console.log('🔍 Calling recommend API...');
+    console.log('📋 Recommend context:', recommendContext);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
     const recommendResponse = await fetch(recommendUrl, {
       method: 'POST',
@@ -543,14 +549,21 @@ async function handleSearch(
         userLocation: effectiveLocation,
         conversationSummary: buildSearchSummary(context.slots),
       }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     if (!recommendResponse.ok) {
+      const errorText = await recommendResponse.text();
+      console.error('❌ Recommend API error:', recommendResponse.status, errorText);
       throw new Error(`Recommend API error: ${recommendResponse.status}`);
     }
 
     const data = await recommendResponse.json();
     const recommendations = data.recommendations || [];
+    
+    console.log(`✅ Got ${recommendations.length} recommendations`);
 
     if (recommendations.length === 0) {
       return {
@@ -587,10 +600,22 @@ async function handleSearch(
       recommendations,
     };
 
-  } catch (error) {
-    console.error('Search error:', error);
+  } catch (error: any) {
+    console.error('❌ Search error:', error?.message || error);
+    
+    // Check if it was a timeout
+    if (error?.name === 'AbortError') {
+      return {
+        message: 'החיפוש לקח יותר מדי זמן 😅 בוא ננסה שוב?',
+        chips: [
+          { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
+          { label: 'חיפוש פשוט יותר', value: 'simpler', emoji: '✨' },
+        ],
+      };
+    }
+    
     return {
-      message: 'אופס, משהו השתבש בחיפוש. בוא ננסה שוב? 🙏',
+      message: 'אופס, משהו השתבש. בוא ננסה שוב? 🙏',
       chips: [
         { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
         { label: 'התחל מחדש', value: 'start_over', emoji: '🆕' },
