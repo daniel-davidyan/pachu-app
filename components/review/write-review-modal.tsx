@@ -152,32 +152,71 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     }
   };
 
-  // Generate video thumbnail
+  // Generate video thumbnail with iOS support
   const generateVideoThumbnail = (file: File): Promise<string> => {
     return new Promise((resolve) => {
+      // Timeout after 5 seconds to prevent infinite loading on iOS
+      const timeoutId = setTimeout(() => {
+        console.log('[WriteReviewModal] Thumbnail generation timed out');
+        resolve('');
+      }, 5000);
+      
       const video = document.createElement('video');
       video.preload = 'metadata';
-      video.src = URL.createObjectURL(file);
+      video.muted = true; // Required for iOS
+      video.playsInline = true; // Required for iOS
+      video.crossOrigin = 'anonymous';
+      
+      const blobUrl = URL.createObjectURL(file);
+      video.src = blobUrl;
+      
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        URL.revokeObjectURL(blobUrl);
+      };
+      
+      video.onloadedmetadata = () => {
+        // For iOS, we need to use a different approach
+        video.currentTime = Math.min(1, video.duration / 2); // Seek to 1 second or middle
+      };
       
       video.onloadeddata = () => {
-        video.currentTime = 1; // Seek to 1 second
+        // Fallback for browsers that don't fire onseeked properly
+        if (video.readyState >= 2) {
+          video.currentTime = Math.min(1, video.duration / 2);
+        }
       };
       
       video.onseeked = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
-        URL.revokeObjectURL(video.src);
-        resolve(thumbnailUrl);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 320;
+          canvas.height = video.videoHeight || 240;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
+            cleanup();
+            resolve(thumbnailUrl);
+          } else {
+            cleanup();
+            resolve('');
+          }
+        } catch (e) {
+          console.error('[WriteReviewModal] Thumbnail generation error:', e);
+          cleanup();
+          resolve('');
+        }
       };
       
-      video.onerror = () => {
-        URL.revokeObjectURL(video.src);
-        resolve(''); // Return empty string on error
+      video.onerror = (e) => {
+        console.error('[WriteReviewModal] Video load error:', e);
+        cleanup();
+        resolve('');
       };
+      
+      // Start loading
+      video.load();
     });
   };
 
@@ -231,6 +270,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
+    console.log('[WriteReviewModal] Video files selected:', files.length, files.map(f => ({ name: f.name, type: f.type, size: f.size })));
+    
     // Reset the file input
     if (videoInputRef.current) {
       videoInputRef.current.value = '';
@@ -245,11 +286,16 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       return;
     }
     
-    // Validate video duration (max 30 seconds)
+    // Validate video files
     for (const file of files) {
       // Check file size (max 50MB)
       if (file.size > 50 * 1024 * 1024) {
         showToast('Video must be under 50MB', 'error');
+        return;
+      }
+      // Check if it's actually a video
+      if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|mov|webm|m4v|quicktime)$/i)) {
+        showToast('Please select a video file', 'error');
         return;
       }
     }
@@ -259,23 +305,36 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     const newMediaItems: MediaItem[] = [];
     
     for (const file of files) {
-      const fileKey = `video-${Date.now()}-${Math.random()}`;
-      const url = URL.createObjectURL(file);
-      const thumbnailUrl = await generateVideoThumbnail(file);
-      
-      // Store file in ref to prevent garbage collection
-      filesRef.current.set(fileKey, file);
-      
-      newMediaItems.push({
-        id: fileKey,
-        type: 'video',
-        url,
-        thumbnailUrl,
-        fileKey,
-      });
+      try {
+        const fileKey = `video-${Date.now()}-${Math.random()}`;
+        const url = URL.createObjectURL(file);
+        
+        console.log('[WriteReviewModal] Creating blob URL for video:', url);
+        
+        // Generate thumbnail with timeout protection
+        const thumbnailUrl = await generateVideoThumbnail(file);
+        console.log('[WriteReviewModal] Thumbnail generated:', thumbnailUrl ? 'success' : 'failed/empty');
+        
+        // Store file in ref to prevent garbage collection
+        filesRef.current.set(fileKey, file);
+        console.log('[WriteReviewModal] File stored in ref with key:', fileKey);
+        
+        newMediaItems.push({
+          id: fileKey,
+          type: 'video',
+          url,
+          thumbnailUrl,
+          fileKey,
+        });
+      } catch (error) {
+        console.error('[WriteReviewModal] Error processing video:', error);
+        showToast('Failed to process video', 'error');
+      }
     }
     
-    setMediaItems(prev => [...prev, ...newMediaItems]);
+    if (newMediaItems.length > 0) {
+      setMediaItems(prev => [...prev, ...newMediaItems]);
+    }
     setGeneratingThumbnail(false);
   };
 
@@ -766,8 +825,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 <input
                   ref={videoInputRef}
                   type="file"
-                  accept="video/mp4,video/quicktime,video/webm"
-                  multiple
+                  accept="video/*"
+                  capture="environment"
                   onChange={handleVideoSelect}
                   className="hidden"
                 />
