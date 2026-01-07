@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { VideoPlayer } from './video-player';
 
 interface MediaItem {
@@ -24,13 +24,17 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevMediaRef = useRef<MediaItem[]>(media);
 
   const minSwipeDistance = 50;
 
-  // Reset index when media changes
-  useEffect(() => {
-    setCurrentIndex(0);
-  }, [media]);
+  // Reset index when media changes (using ref to avoid direct setState in effect)
+  if (prevMediaRef.current !== media) {
+    prevMediaRef.current = media;
+    if (currentIndex !== 0) {
+      setCurrentIndex(0);
+    }
+  }
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     setTouchEnd(null);
