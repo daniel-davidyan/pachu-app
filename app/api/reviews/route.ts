@@ -266,6 +266,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Add videos
+    let videosInserted = 0;
+    let videoInsertError: string | null = null;
+    
     if (videoUrls?.length > 0) {
       const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
         review_id: newReview.id,
@@ -276,13 +279,17 @@ export async function POST(request: NextRequest) {
 
       console.log('[API reviews] Inserting videos:', JSON.stringify(videoInserts));
       
-      const { error: videoError } = await supabase.from('review_videos').insert(videoInserts);
+      const { data: insertedVideos, error: videoError } = await supabase
+        .from('review_videos')
+        .insert(videoInserts)
+        .select();
       
       if (videoError) {
         console.error('[API reviews] Video insert error:', videoError);
-        // Don't fail the whole review, but log the error
+        videoInsertError = videoError.message;
       } else {
-        console.log('[API reviews] Videos inserted successfully');
+        videosInserted = insertedVideos?.length || 0;
+        console.log('[API reviews] Videos inserted successfully:', videosInserted);
       }
     }
 
@@ -317,7 +324,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       reviewId: newReview.id,
-      message: 'Review created'
+      message: 'Review created',
+      videosInserted,
+      videoInsertError,
     });
   } catch (error) {
     console.error('Error in reviews API:', error);

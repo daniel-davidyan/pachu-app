@@ -142,33 +142,54 @@ export function FilterBottomSheet({
     }
   }, [showCitySelector]);
 
-  // Drag handlers
+  // Drag handlers - using refs to track state for non-passive event listener
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+  const currentYRef = useRef(0);
+
   const handleTouchStart = (e: React.TouchEvent) => {
+    isDraggingRef.current = true;
+    startYRef.current = e.touches[0].clientY;
+    currentYRef.current = e.touches[0].clientY;
     setIsDragging(true);
     setStartY(e.touches[0].clientY);
     setCurrentY(e.touches[0].clientY);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return;
-    const content = contentRef.current;
-    const newY = e.touches[0].clientY;
-    const deltaY = newY - startY;
-    
-    // For top sheet, close on swipe up (negative deltaY)
-    if (content && content.scrollTop === 0 && deltaY < 0) {
-      e.preventDefault();
-      setCurrentY(newY);
-    } else if (content && content.scrollTop > 0) {
-      setIsDragging(false);
-    }
-  };
+  // Use effect to add non-passive touchmove listener
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    if (!sheet || !isOpen) return;
+
+    const handleTouchMoveNative = (e: TouchEvent) => {
+      if (!isDraggingRef.current) return;
+      const content = contentRef.current;
+      const newY = e.touches[0].clientY;
+      const deltaY = newY - startYRef.current;
+      
+      // For top sheet, close on swipe up (negative deltaY)
+      if (content && content.scrollTop === 0 && deltaY < 0) {
+        e.preventDefault();
+        currentYRef.current = newY;
+        setCurrentY(newY);
+      } else if (content && content.scrollTop > 0) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+      }
+    };
+
+    sheet.addEventListener('touchmove', handleTouchMoveNative, { passive: false });
+    return () => {
+      sheet.removeEventListener('touchmove', handleTouchMoveNative);
+    };
+  }, [isOpen]);
 
   const handleTouchEnd = () => {
-    if (!isDragging) return;
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
     setIsDragging(false);
     
-    const deltaY = currentY - startY;
+    const deltaY = currentYRef.current - startYRef.current;
     // Close on swipe up (negative deltaY)
     if (deltaY < -100) {
       onClose();
@@ -208,7 +229,6 @@ export function FilterBottomSheet({
           transition: isDragging ? 'none' : 'transform 0.3s ease-out',
         }}
         onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         {/* Header */}

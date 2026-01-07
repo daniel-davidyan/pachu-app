@@ -649,6 +649,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       });
 
       const data = await response.json();
+      console.log('[WriteReviewModal] API response:', data);
 
       if (data.error) {
         showToast(data.error, 'error');
@@ -658,6 +659,14 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       if (!data.success) {
         showToast('Failed to submit experience. Please try again.', 'error');
         return;
+      }
+      
+      // Log video insert status
+      if (data.videosInserted !== undefined) {
+        console.log('[WriteReviewModal] Videos inserted:', data.videosInserted);
+        if (data.videoInsertError) {
+          console.error('[WriteReviewModal] Video insert error:', data.videoInsertError);
+        }
       }
 
       // Success
