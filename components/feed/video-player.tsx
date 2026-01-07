@@ -25,18 +25,18 @@ export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPla
 
     if (isVisible) {
       // Auto-play when visible
-      video.play().then(() => {
-        setIsPlaying(true);
-      }).catch(() => {
+      video.play().catch(() => {
         // Auto-play was prevented, user needs to interact
-        setIsPlaying(false);
       });
     } else {
       // Pause when not visible
       video.pause();
-      setIsPlaying(false);
     }
   }, [isVisible]);
+
+  // Sync playing state with video events
+  const handlePlay = useCallback(() => setIsPlaying(true), []);
+  const handlePause = useCallback(() => setIsPlaying(false), []);
 
   // Update progress
   useEffect(() => {
@@ -125,6 +125,8 @@ export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPla
         playsInline
         preload="auto"
         onEnded={handleVideoEnded}
+        onPlay={handlePlay}
+        onPause={handlePause}
         className="w-full h-full object-cover"
       />
 

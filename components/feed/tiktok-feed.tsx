@@ -58,9 +58,10 @@ interface TikTokFeedProps {
   onLoadMore: () => void;
   hasMore: boolean;
   isLoading: boolean;
+  onCommentsVisibilityChange?: (isOpen: boolean) => void;
 }
 
-export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading }: TikTokFeedProps) {
+export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onCommentsVisibilityChange }: TikTokFeedProps) {
   const router = useRouter();
   const { user } = useUser();
   const { showToast } = useToast();
@@ -150,6 +151,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading }: TikTokFe
   const handleOpenComments = useCallback(async (reviewId: string) => {
     setActiveReviewId(reviewId);
     setShowComments(true);
+    onCommentsVisibilityChange?.(true);
     setLoadingComments(true);
     
     try {
@@ -177,7 +179,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading }: TikTokFe
     } finally {
       setLoadingComments(false);
     }
-  }, [showToast]);
+  }, [showToast, onCommentsVisibilityChange]);
 
   // Post comment
   const handlePostComment = useCallback(async () => {
@@ -343,6 +345,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading }: TikTokFe
         isOpen={showComments}
         onClose={() => {
           setShowComments(false);
+          onCommentsVisibilityChange?.(false);
           setActiveReviewId(null);
           setComments([]);
         }}

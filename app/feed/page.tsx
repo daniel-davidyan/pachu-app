@@ -64,6 +64,7 @@ export default function FeedPage() {
   const [activeTab, setActiveTab] = useState<'following' | 'foryou'>('foryou');
   const [showFilters, setShowFilters] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [distanceKm, setDistanceKm] = useState(5);
   
@@ -218,12 +219,13 @@ export default function FeedPage() {
             onLoadMore={handleLoadMore}
             hasMore={hasMore}
             isLoading={loadingMore}
+            onCommentsVisibilityChange={setShowComments}
           />
         )}
       </div>
 
       {/* Bottom Navigation */}
-      <BottomNav show={!showFilters} variant="feed" />
+      <BottomNav show={!showFilters && !showComments} variant="feed" />
 
       {/* Filter Bottom Sheet */}
       <FilterBottomSheet
