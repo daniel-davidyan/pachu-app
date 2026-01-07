@@ -170,13 +170,13 @@ export function TikTokReviewCard({
 
       if (!response.ok) {
         setIsSaved(!newSavedState);
-        showToast('Failed to update wishlist', 'error');
+        showToast('Failed to save', 'error');
       } else {
-        showToast(newSavedState ? 'Added to wishlist' : 'Removed from wishlist', 'success');
+        showToast(newSavedState ? 'Saved' : 'Removed', 'success');
       }
     } catch (error) {
       setIsSaved(!newSavedState);
-      showToast('Failed to update wishlist', 'error');
+      showToast('Failed to save', 'error');
     }
   }, [user, isSaved, review.restaurant.id, showToast]);
 
