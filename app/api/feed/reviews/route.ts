@@ -227,18 +227,19 @@ export async function GET(request: NextRequest) {
       .in('review_id', reviewIds)
       .order('sort_order', { ascending: true });
 
-    // Get videos for all reviews (if table exists)
+    // Get videos for all reviews
     let videosData: any[] = [];
-    try {
-      const { data } = await supabase
-        .from('review_videos')
-        .select('review_id, id, video_url, thumbnail_url, duration_seconds, sort_order')
-        .in('review_id', reviewIds)
-        .order('sort_order', { ascending: true });
-      videosData = data || [];
-    } catch (e) {
-      // Table might not exist yet
-      console.log('review_videos table not found, skipping');
+    const { data: videosResult, error: videosError } = await supabase
+      .from('review_videos')
+      .select('review_id, id, video_url, thumbnail_url, duration_seconds, sort_order')
+      .in('review_id', reviewIds)
+      .order('sort_order', { ascending: true });
+    
+    if (videosError) {
+      console.error('[Feed Reviews] Error fetching videos:', videosError);
+    } else {
+      videosData = videosResult || [];
+      console.log('[Feed Reviews] Videos fetched:', videosData.length);
     }
 
     // Group media by review

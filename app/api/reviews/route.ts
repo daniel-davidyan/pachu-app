@@ -265,20 +265,24 @@ export async function POST(request: NextRequest) {
       await supabase.from('review_photos').insert(photoInserts);
     }
 
-    // Add videos (if review_videos table exists)
+    // Add videos
     if (videoUrls?.length > 0) {
-      try {
-        const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
-          review_id: newReview.id,
-          video_url: video.url,
-          thumbnail_url: video.thumbnailUrl,
-          sort_order: index,
-        }));
+      const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
+        review_id: newReview.id,
+        video_url: video.url,
+        thumbnail_url: video.thumbnailUrl,
+        sort_order: index,
+      }));
 
-        await supabase.from('review_videos').insert(videoInserts);
-      } catch (videoError) {
-        // Video table may not exist yet, continue without error
-        console.log('[API reviews] Video insert skipped:', videoError);
+      console.log('[API reviews] Inserting videos:', JSON.stringify(videoInserts));
+      
+      const { error: videoError } = await supabase.from('review_videos').insert(videoInserts);
+      
+      if (videoError) {
+        console.error('[API reviews] Video insert error:', videoError);
+        // Don't fail the whole review, but log the error
+      } else {
+        console.log('[API reviews] Videos inserted successfully');
       }
     }
 

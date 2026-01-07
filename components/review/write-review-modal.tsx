@@ -547,6 +547,14 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
         const item = mediaItems[i];
         const file = item.fileKey ? filesRef.current.get(item.fileKey) : undefined;
         
+        console.log(`[WriteReviewModal] Processing item ${i}:`, {
+          type: item.type,
+          fileKey: item.fileKey,
+          hasFile: !!file,
+          urlStartsWithBlob: item.url.startsWith('blob:'),
+          filesRefSize: filesRef.current.size,
+        });
+        
         if (item.url.startsWith('blob:') && file) {
           // This is a new file that needs to be uploaded
           const fileExt = file.name.split('.').pop() || (item.type === 'video' ? 'mp4' : 'jpg');
@@ -605,24 +613,39 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           } else {
             finalPhotoUrls.push(item.url);
           }
+        } else if (item.url.startsWith('blob:') && !file) {
+          // Blob URL but file was lost - this is a bug
+          console.error(`[WriteReviewModal] ERROR: Blob URL but no file found for item ${i}!`, {
+            type: item.type,
+            fileKey: item.fileKey,
+            url: item.url,
+          });
+          showToast(`Failed to upload ${item.type} - file reference lost`, 'error');
+          setSubmitting(false);
+          return;
         }
       }
       
       console.log('[WriteReviewModal] Final uploads:', finalPhotoUrls.length, 'photos,', finalVideoUrls.length, 'videos');
+      console.log('[WriteReviewModal] Video URLs to send:', JSON.stringify(finalVideoUrls));
 
       // Submit experience
+      const requestBody = {
+        restaurant: selectedRestaurant,
+        rating,
+        content: experienceText,
+        photoUrls: finalPhotoUrls,
+        videoUrls: finalVideoUrls,
+        reviewId: existingReview?.id, // Include reviewId when editing
+        isPublished: publish,
+      };
+      
+      console.log('[WriteReviewModal] Sending request body:', JSON.stringify(requestBody));
+      
       const response = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurant: selectedRestaurant,
-          rating,
-          content: experienceText,
-          photoUrls: finalPhotoUrls,
-          videoUrls: finalVideoUrls,
-          reviewId: existingReview?.id, // Include reviewId when editing
-          isPublished: publish,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
