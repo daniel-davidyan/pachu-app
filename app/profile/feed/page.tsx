@@ -2,7 +2,7 @@
 
 import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { PostCard, PostCardData } from '@/components/post/post-card';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -41,7 +41,22 @@ interface Profile {
   avatar_url: string | null;
 }
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function ProfileFeedPage() {
+  return (
+    <Suspense fallback={
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      </MainLayout>
+    }>
+      <ProfileFeedContent />
+    </Suspense>
+  );
+}
+
+function ProfileFeedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useUser();
