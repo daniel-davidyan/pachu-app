@@ -153,6 +153,7 @@ export function CollectionPicker({
       title="Save to..."
       zIndex={10000}
       height="auto"
+      skipBodyLock
     >
       {loading ? (
         <div className="flex items-center justify-center py-8">

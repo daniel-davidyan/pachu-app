@@ -20,9 +20,10 @@ interface BottomSheetProps {
   title?: string;
   zIndex?: number;
   height?: string;
+  skipBodyLock?: boolean;
 }
 
-export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, height = '70vh' }: BottomSheetProps) {
+export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, height = '70vh', skipBodyLock = false }: BottomSheetProps) {
   const mounted = useIsMounted();
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -33,6 +34,9 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   const scrollPositionRef = useRef<number>(0);
 
   useEffect(() => {
+    // Skip body lock for fixed-position contexts like TikTok feed
+    if (skipBodyLock) return;
+    
     if (isOpen) {
       // Save the current scroll position
       scrollPositionRef.current = window.scrollY;
@@ -58,12 +62,13 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
     
     return () => {
       // Cleanup on unmount
+      if (skipBodyLock) return;
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
     };
-  }, [isOpen]);
+  }, [isOpen, skipBodyLock]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setIsDragging(true);
