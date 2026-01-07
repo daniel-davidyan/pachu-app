@@ -47,6 +47,7 @@ export interface PostCardData {
     avatarUrl?: string;
   };
   photos: string[];
+  videos?: Array<{ url: string; thumbnailUrl?: string }>;
   restaurant?: {
     id: string;
     name: string;
@@ -672,31 +673,64 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
           </Link>
         )}
 
-        {/* Photos - Carousel with 20% peek OR Placeholder */}
-        {post.photos && post.photos.length > 0 ? (
+        {/* Photos & Videos - Carousel with 20% peek OR Placeholder */}
+        {((post.photos && post.photos.length > 0) || (post.videos && post.videos.length > 0)) ? (
           <div className="relative">
-            {post.photos.length === 1 ? (
-              <img
-                src={post.photos[0]}
-                alt="Experience photo"
-                className="w-full h-64 object-cover"
-              />
-            ) : (
-              <div className="overflow-hidden">
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
-                  {post.photos.map((photo, index) => (
-                    <img
-                      key={index}
-                      src={photo}
-                      alt={`Experience photo ${index + 1}`}
-                      className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
-                      style={{ width: 'calc(80vw - 2rem)' }}
-                    />
-                  ))}
-                  <div className="w-4 flex-shrink-0" />
+            {(() => {
+              // Combine photos and videos into a single media array
+              const mediaItems: Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string }> = [
+                ...(post.videos || []).map(v => ({ type: 'video' as const, url: v.url, thumbnailUrl: v.thumbnailUrl })),
+                ...(post.photos || []).map(p => ({ type: 'photo' as const, url: p })),
+              ];
+              
+              if (mediaItems.length === 1) {
+                const item = mediaItems[0];
+                return item.type === 'video' ? (
+                  <video
+                    src={item.url}
+                    poster={item.thumbnailUrl}
+                    controls
+                    playsInline
+                    className="w-full h-64 object-cover bg-black"
+                  />
+                ) : (
+                  <img
+                    src={item.url}
+                    alt="Experience photo"
+                    className="w-full h-64 object-cover"
+                  />
+                );
+              }
+              
+              return (
+                <div className="overflow-hidden">
+                  <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
+                    {mediaItems.map((item, index) => (
+                      item.type === 'video' ? (
+                        <video
+                          key={index}
+                          src={item.url}
+                          poster={item.thumbnailUrl}
+                          controls
+                          playsInline
+                          className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start bg-black"
+                          style={{ width: 'calc(80vw - 2rem)' }}
+                        />
+                      ) : (
+                        <img
+                          key={index}
+                          src={item.url}
+                          alt={`Experience photo ${index + 1}`}
+                          className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start"
+                          style={{ width: 'calc(80vw - 2rem)' }}
+                        />
+                      )
+                    ))}
+                    <div className="w-4 flex-shrink-0" />
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         ) : (
           /* Placeholder when no photos - Different for Google reviews vs user posts */

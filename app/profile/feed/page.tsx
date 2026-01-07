@@ -222,6 +222,7 @@ function ProfileFeedContent() {
                   avatarUrl: profile?.avatar_url || undefined,
                 },
                 photos: review.review_photos?.map(p => p.photo_url) || [],
+                videos: review.review_videos?.map(v => ({ url: v.video_url, thumbnailUrl: v.thumbnail_url })) || [],
                 restaurant: {
                   id: review.restaurants?.id || '',
                   name: review.restaurants?.name || 'Restaurant',
