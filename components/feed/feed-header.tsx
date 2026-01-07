@@ -21,7 +21,7 @@ export function FeedHeader({
 }: FeedHeaderProps) {
   return (
     <div 
-      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 bg-black/30 backdrop-blur-sm"
+      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4"
       style={{
         paddingTop: 'max(12px, env(safe-area-inset-top))',
         paddingBottom: '12px',
@@ -30,11 +30,11 @@ export function FeedHeader({
       {/* Filter Button */}
       <button
         onClick={onOpenFilters}
-        className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center transition-transform active:scale-95"
+        className="relative w-10 h-10 flex items-center justify-center transition-transform active:scale-95"
       >
-        <SlidersHorizontal className="w-5 h-5 text-white" />
+        <SlidersHorizontal className="w-6 h-6 text-white drop-shadow-lg" />
         {hasActiveFilters && (
-          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-primary rounded-full border-2 border-black/40" />
+          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-primary rounded-full" />
         )}
       </button>
 
@@ -71,11 +71,11 @@ export function FeedHeader({
       {/* Notifications Button */}
       <button
         onClick={onOpenNotifications}
-        className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center transition-transform active:scale-95"
+        className="relative w-10 h-10 flex items-center justify-center transition-transform active:scale-95"
       >
-        <Bell className="w-5 h-5 text-white" />
+        <Bell className="w-6 h-6 text-white drop-shadow-lg" />
         {notificationCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-primary rounded-full border-2 border-black/40 flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-primary rounded-full flex items-center justify-center">
             <span className="text-[10px] font-bold text-white">
               {notificationCount > 9 ? '9+' : notificationCount}
             </span>

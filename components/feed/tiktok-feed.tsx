@@ -277,7 +277,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
     <>
       <div
         ref={containerRef}
-        className="w-full h-full overflow-hidden bg-black"
+        className="fixed inset-0 overflow-hidden bg-black"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

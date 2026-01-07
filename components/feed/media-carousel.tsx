@@ -131,7 +131,7 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
                 className="w-full h-full"
               />
             ) : (
-              <div className="w-full h-full bg-black flex items-center justify-center">
+              <div className="w-full h-full bg-black">
                 <img
                   src={item.url}
                   alt=""

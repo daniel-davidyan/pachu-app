@@ -203,20 +203,20 @@ export function TikTokReviewCard({
 
   return (
     <div 
-      className="relative w-full h-full bg-black"
+      className="relative w-full h-full bg-black overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Media Carousel (Full Screen) */}
+      {/* Media Carousel (Full Screen - covers entire viewport) */}
       <MediaCarousel
         media={review.media}
         isVisible={isVisible}
-        className="absolute inset-0"
+        className="absolute inset-0 w-full h-full"
       />
 
-      {/* Gradient Overlays */}
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+      {/* Gradient Overlays - subtle like TikTok */}
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-96 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
 
       {/* Bottom Left Info - positioned above the bottom navigation */}
       <div 
