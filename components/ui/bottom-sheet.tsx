@@ -1,8 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+
+// Client-side mount detection using useSyncExternalStore (React 19 compatible)
+const emptySubscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+function useIsMounted() {
+  return useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
+}
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -14,7 +23,7 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, height = '70vh' }: BottomSheetProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsMounted();
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
@@ -22,12 +31,6 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
-
-  // Mount check for portal
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
 
   useEffect(() => {
     if (isOpen) {

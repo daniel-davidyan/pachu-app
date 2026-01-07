@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       max_tokens: 500,
     });
 
-    let agentResponse = completion.choices[0].message.content || '';
+    const agentResponse = completion.choices[0].message.content || '';
     console.log('📝 Agent raw response:', agentResponse);
 
     // ========================================
