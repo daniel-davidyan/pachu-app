@@ -28,7 +28,7 @@ interface MediaItem {
   type: 'photo' | 'video';
   url: string;
   thumbnailUrl?: string;
-  file?: File;
+  fileKey?: string; // Key to look up file in filesRef
 }
 
 interface WriteReviewModalProps {
@@ -72,6 +72,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<Map<string, File>>(new Map()); // Store files by key to prevent garbage collection
   const supabase = createClient();
   const { showToast } = useToast();
 
@@ -120,6 +121,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       setPhotos([]);
       setPhotoUrlToFileMap(new Map()); // Clear the map
       setMediaItems([]);
+      filesRef.current.clear(); // Clear files ref
     }
     
     setInitialized(true);
@@ -204,13 +206,18 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     
     files.forEach(file => {
       const url = URL.createObjectURL(file);
+      const fileKey = `photo-${Date.now()}-${Math.random()}`;
       newUrls.push(url);
       newMap.set(url, file);
+      
+      // Store file in ref to prevent garbage collection
+      filesRef.current.set(fileKey, file);
+      
       newMediaItems.push({
-        id: `photo-${Date.now()}-${Math.random()}`,
+        id: fileKey,
         type: 'photo',
         url,
-        file,
+        fileKey,
       });
     });
     
@@ -252,15 +259,19 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     const newMediaItems: MediaItem[] = [];
     
     for (const file of files) {
+      const fileKey = `video-${Date.now()}-${Math.random()}`;
       const url = URL.createObjectURL(file);
       const thumbnailUrl = await generateVideoThumbnail(file);
       
+      // Store file in ref to prevent garbage collection
+      filesRef.current.set(fileKey, file);
+      
       newMediaItems.push({
-        id: `video-${Date.now()}-${Math.random()}`,
+        id: fileKey,
         type: 'video',
         url,
         thumbnailUrl,
-        file,
+        fileKey,
       });
     }
     
@@ -276,14 +287,20 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     if (itemToRemove.url.startsWith('blob:')) {
       URL.revokeObjectURL(itemToRemove.url);
       
+      // Clean up from filesRef
+      if (itemToRemove.fileKey) {
+        filesRef.current.delete(itemToRemove.fileKey);
+      }
+      
       // Also update legacy photo states
       if (itemToRemove.type === 'photo') {
         const newMap = new Map(photoUrlToFileMap);
         newMap.delete(itemToRemove.url);
         setPhotoUrlToFileMap(newMap);
         
-        if (itemToRemove.file) {
-          setPhotos(prev => prev.filter(p => p !== itemToRemove.file));
+        const file = itemToRemove.fileKey ? filesRef.current.get(itemToRemove.fileKey) : undefined;
+        if (file) {
+          setPhotos(prev => prev.filter(p => p !== file));
         }
         setPhotoUrls(prev => prev.filter(url => url !== itemToRemove.url));
       }
@@ -469,10 +486,11 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       
       for (let i = 0; i < mediaItems.length; i++) {
         const item = mediaItems[i];
+        const file = item.fileKey ? filesRef.current.get(item.fileKey) : undefined;
         
-        if (item.url.startsWith('blob:') && item.file) {
+        if (item.url.startsWith('blob:') && file) {
           // This is a new file that needs to be uploaded
-          const fileExt = item.file.name.split('.').pop() || (item.type === 'video' ? 'mp4' : 'jpg');
+          const fileExt = file.name.split('.').pop() || (item.type === 'video' ? 'mp4' : 'jpg');
           const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
           const bucket = item.type === 'video' ? 'review-videos' : 'review-photos';
           
@@ -480,7 +498,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           
           const { data, error } = await supabase.storage
             .from(bucket)
-            .upload(`reviews/${fileName}`, item.file);
+            .upload(`reviews/${fileName}`, file);
           
           if (error) {
             console.error(`${item.type} upload error:`, error);
