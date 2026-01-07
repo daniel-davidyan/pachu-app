@@ -67,6 +67,8 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
   const { showToast } = useToast();
   
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [comments, setComments] = useState<any[]>([]);
@@ -77,60 +79,70 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
   const touchStartTime = useRef<number>(0);
-  const isScrolling = useRef(false);
 
-  // Preload next reviews
+  // Preload next reviews - increased threshold to 5
   useEffect(() => {
-    // When near the end, load more
-    if (currentIndex >= reviews.length - 3 && hasMore && !isLoading) {
+    if (currentIndex >= reviews.length - 5 && hasMore && !isLoading) {
       onLoadMore();
     }
   }, [currentIndex, reviews.length, hasMore, isLoading, onLoadMore]);
 
-  // Handle vertical swipe
+  // Handle vertical swipe - TikTok style smooth scrolling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     touchStartTime.current = Date.now();
-    isScrolling.current = false;
+    setIsDragging(true);
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (touchStartY.current === null) return;
     
-    const deltaY = e.touches[0].clientY - touchStartY.current;
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY.current;
     
-    // If moved more than threshold, consider it scrolling
-    if (Math.abs(deltaY) > 10) {
-      isScrolling.current = true;
+    // Apply resistance at edges
+    let adjustedDelta = deltaY;
+    if ((currentIndex === 0 && deltaY > 0) || 
+        (currentIndex === reviews.length - 1 && deltaY < 0)) {
+      adjustedDelta = deltaY * 0.3; // Reduced movement at edges
     }
-  }, []);
+    
+    setDragOffset(adjustedDelta);
+  }, [currentIndex, reviews.length]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartY.current === null || !isScrolling.current) return;
+    if (touchStartY.current === null) {
+      setIsDragging(false);
+      setDragOffset(0);
+      return;
+    }
     
     const touchEndY = e.changedTouches[0].clientY;
     const deltaY = touchEndY - touchStartY.current;
     const timeDelta = Date.now() - touchStartTime.current;
     const velocity = Math.abs(deltaY) / timeDelta;
     
-    const minSwipeDistance = 50;
-    const minVelocity = 0.3;
+    // Threshold for changing slides - 20% of screen height or high velocity
+    const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
+    const threshold = containerHeight * 0.2;
+    const minVelocity = 0.5;
 
     // Swipe up = next review
-    if ((deltaY < -minSwipeDistance || velocity > minVelocity) && deltaY < 0) {
+    if ((deltaY < -threshold || (velocity > minVelocity && deltaY < -30)) && deltaY < 0) {
       if (currentIndex < reviews.length - 1) {
         setCurrentIndex(prev => prev + 1);
       }
     }
     // Swipe down = previous review
-    else if ((deltaY > minSwipeDistance || velocity > minVelocity) && deltaY > 0) {
+    else if ((deltaY > threshold || (velocity > minVelocity && deltaY > 30)) && deltaY > 0) {
       if (currentIndex > 0) {
         setCurrentIndex(prev => prev - 1);
       }
     }
 
+    setDragOffset(0);
+    setIsDragging(false);
     touchStartY.current = null;
-    isScrolling.current = false;
   }, [currentIndex, reviews.length]);
 
   // Handle swipe right to restaurant
@@ -282,12 +294,13 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Reviews Stack */}
+        {/* Reviews Stack - Smooth TikTok-style scrolling */}
         <div 
-          className="relative w-full transition-transform duration-300 ease-out"
+          className="relative w-full"
           style={{
             height: `${reviews.length * 100}%`,
-            transform: `translateY(-${currentIndex * (100 / reviews.length)}%)`,
+            transform: `translateY(calc(-${currentIndex * (100 / reviews.length)}% + ${dragOffset}px))`,
+            transition: isDragging ? 'none' : 'transform 0.3s ease-out',
           }}
         >
           {reviews.map((review, index) => (
@@ -301,7 +314,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
             >
               <TikTokReviewCard
                 review={review}
-                isVisible={index === currentIndex}
+                isVisible={index === currentIndex || Math.abs(index - currentIndex) === 1}
                 onSwipeRight={() => handleSwipeRight(review)}
                 onSwipeLeft={() => handleSwipeLeft(review)}
                 onOpenComments={() => handleOpenComments(review.id)}
@@ -312,30 +325,8 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
 
         {/* Loading indicator */}
         {isLoading && (
-          <div className="absolute bottom-24 left-0 right-0 flex justify-center">
+          <div className="absolute bottom-24 left-0 right-0 flex justify-center z-20">
             <Loader2 className="w-8 h-8 animate-spin text-white" />
-          </div>
-        )}
-
-        {/* Position indicator */}
-        {reviews.length > 1 && (
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-10">
-            {reviews.slice(
-              Math.max(0, currentIndex - 2),
-              Math.min(reviews.length, currentIndex + 3)
-            ).map((_, idx) => {
-              const actualIndex = Math.max(0, currentIndex - 2) + idx;
-              return (
-                <div
-                  key={actualIndex}
-                  className={`w-1 rounded-full transition-all duration-200 ${
-                    actualIndex === currentIndex
-                      ? 'h-6 bg-white'
-                      : 'h-2 bg-white/30'
-                  }`}
-                />
-              );
-            })}
           </div>
         )}
       </div>

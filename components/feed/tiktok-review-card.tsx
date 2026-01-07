@@ -221,7 +221,7 @@ export function TikTokReviewCard({
       {/* Bottom Left Info - positioned above the bottom navigation */}
       <div 
         className="absolute left-4 right-20 z-10"
-        style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}
+        style={{ bottom: 'calc(75px + env(safe-area-inset-bottom))' }}
       >
         {/* Status Badges */}
         <div className="flex items-center gap-2 mb-2">
@@ -320,7 +320,7 @@ export function TikTokReviewCard({
       {/* Right Action Bar - positioned above the bottom navigation */}
       <div 
         className="absolute right-3 flex flex-col items-center gap-5 z-10"
-        style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}
+        style={{ bottom: 'calc(75px + env(safe-area-inset-bottom))' }}
       >
         {/* User Avatar with Rating */}
         <div className="flex flex-col items-center gap-1">
