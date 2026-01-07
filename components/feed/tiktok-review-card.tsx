@@ -7,6 +7,8 @@ import { Heart, MessageCircle, Bookmark, Share2, MapPin } from 'lucide-react';
 import { MediaCarousel } from './media-carousel';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
+import { CollectionPicker } from '@/components/collections/collection-picker';
+import { CollectionModal } from '@/components/collections/collection-modal';
 
 interface MediaItem {
   id: string;
@@ -77,6 +79,8 @@ export function TikTokReviewCard({
   const [isSaved, setIsSaved] = useState(review.isSaved);
   const [isExpanded, setIsExpanded] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
 
   // Prefetch pages when card becomes visible for faster navigation
   useEffect(() => {
@@ -91,12 +95,27 @@ export function TikTokReviewCard({
     }
   }, [isVisible, review.restaurant.googlePlaceId, review.restaurant.id, review.user.id, user, router]);
 
-  // Handle horizontal swipe for navigation
+  // Handle horizontal swipe for navigation - only from screen edges
+  // Edge zone width in pixels - swipes starting from this zone trigger navigation
+  const EDGE_ZONE_WIDTH = 50;
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    setTouchStart({
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-    });
+    const touchX = e.touches[0].clientX;
+    const screenWidth = window.innerWidth;
+    
+    // Only track swipes that start from the edge zones
+    const isFromLeftEdge = touchX <= EDGE_ZONE_WIDTH;
+    const isFromRightEdge = touchX >= screenWidth - EDGE_ZONE_WIDTH;
+    
+    if (isFromLeftEdge || isFromRightEdge) {
+      setTouchStart({
+        x: touchX,
+        y: e.touches[0].clientY,
+      });
+    } else {
+      // Not from edge - don't track for navigation (let carousel handle it)
+      setTouchStart(null);
+    }
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
@@ -110,15 +129,17 @@ export function TikTokReviewCard({
     const deltaX = touchEnd.x - touchStart.x;
     const deltaY = touchEnd.y - touchStart.y;
     const minSwipeDistance = 80;
+    const screenWidth = window.innerWidth;
 
     // Only handle horizontal swipes (ignore if vertical movement is greater)
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
-      if (deltaX > 0 && onSwipeRight) {
-        // Swipe right -> Restaurant page
-        onSwipeRight();
-      } else if (deltaX < 0 && onSwipeLeft) {
-        // Swipe left -> User profile
+      // Swipe started from right edge, moving left -> User profile
+      if (touchStart.x >= screenWidth - EDGE_ZONE_WIDTH && deltaX < 0 && onSwipeLeft) {
         onSwipeLeft();
+      }
+      // Swipe started from left edge, moving right -> Restaurant page
+      else if (touchStart.x <= EDGE_ZONE_WIDTH && deltaX > 0 && onSwipeRight) {
+        onSwipeRight();
       }
     }
 
@@ -158,27 +179,68 @@ export function TikTokReviewCard({
       return;
     }
 
-    const newSavedState = !isSaved;
-    setIsSaved(newSavedState);
+    if (isSaved) {
+      // If already saved, remove from wishlist
+      setIsSaved(false);
+      try {
+        // First get the wishlist to find the restaurant_id
+        const wishlistResponse = await fetch('/api/wishlist');
+        const wishlistData = await wishlistResponse.json();
+        
+        const wishlistItem = wishlistData.wishlist?.find((item: any) => {
+          const itemGooglePlaceId = item.restaurants?.google_place_id;
+          const itemId = item.restaurants?.id;
+          const restaurantGooglePlaceId = review.restaurant.googlePlaceId;
+          const restaurantId = review.restaurant.id;
+          
+          if (restaurantGooglePlaceId && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurantGooglePlaceId;
+          }
+          if (restaurantId && itemId) {
+            return itemId === restaurantId;
+          }
+          if (restaurantId && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurantId;
+          }
+          return false;
+        });
 
-    try {
-      const response = await fetch('/api/wishlist', {
-        method: newSavedState ? 'POST' : 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId: review.restaurant.id }),
-      });
+        if (wishlistItem) {
+          const deleteId = wishlistItem.restaurant_id || wishlistItem.restaurants?.id;
+          const response = await fetch(`/api/wishlist?restaurantId=${deleteId}`, {
+            method: 'DELETE',
+          });
 
-      if (!response.ok) {
-        setIsSaved(!newSavedState);
-        showToast('Failed to save', 'error');
-      } else {
-        showToast(newSavedState ? 'Saved' : 'Removed', 'success');
+          if (!response.ok) {
+            setIsSaved(true);
+            showToast('Failed to remove', 'error');
+          } else {
+            showToast('Removed from saved', 'success');
+          }
+        }
+      } catch (error) {
+        setIsSaved(true);
+        showToast('Failed to remove', 'error');
       }
-    } catch (error) {
-      setIsSaved(!newSavedState);
-      showToast('Failed to save', 'error');
+    } else {
+      // If not saved, open collection picker
+      setShowCollectionPicker(true);
     }
-  }, [user, isSaved, review.restaurant.id, showToast]);
+  }, [user, isSaved, review.restaurant, showToast]);
+
+  const handleSavedToCollection = useCallback((collectionId: string | null) => {
+    setIsSaved(true);
+  }, []);
+
+  const handleCreateNewCollection = useCallback(() => {
+    setShowCollectionPicker(false);
+    setShowCollectionModal(true);
+  }, []);
+
+  const handleCollectionCreated = useCallback(() => {
+    // Re-open collection picker after creating a collection
+    setShowCollectionPicker(true);
+  }, []);
 
   const handleShare = useCallback(async () => {
     const shareUrl = `${window.location.origin}/restaurant/${review.restaurant.googlePlaceId || review.restaurant.id}`;
@@ -215,6 +277,7 @@ export function TikTokReviewCard({
   const needsExpansion = review.content && review.content.length > 100;
 
   return (
+    <>
     <div 
       className="relative w-full h-full bg-black overflow-hidden"
       onTouchStart={handleTouchStart}
@@ -442,6 +505,28 @@ export function TikTokReviewCard({
       </div>
 
     </div>
+
+    {/* Collection Picker - Outside overflow-hidden container */}
+    <CollectionPicker
+      isOpen={showCollectionPicker}
+      onClose={() => setShowCollectionPicker(false)}
+      restaurant={{
+        id: review.restaurant.id,
+        googlePlaceId: review.restaurant.googlePlaceId,
+        name: review.restaurant.name,
+        address: review.restaurant.address,
+      }}
+      onSaved={handleSavedToCollection}
+      onCreateNew={handleCreateNewCollection}
+    />
+
+    {/* Create Collection Modal */}
+    <CollectionModal
+      isOpen={showCollectionModal}
+      onClose={() => setShowCollectionModal(false)}
+      onSuccess={handleCollectionCreated}
+    />
+    </>
   );
 }
 

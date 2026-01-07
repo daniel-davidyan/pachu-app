@@ -38,6 +38,8 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
   }
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Stop propagation to prevent parent navigation handlers from triggering
+    e.stopPropagation();
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
     setIsDragging(true);
@@ -45,6 +47,9 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isDragging || touchStart === null) return;
+    
+    // Stop propagation to prevent parent handlers from interfering
+    e.stopPropagation();
     
     const currentTouch = e.targetTouches[0].clientX;
     setTouchEnd(currentTouch);
@@ -61,7 +66,10 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
     }
   }, [isDragging, touchStart, currentIndex, media.length]);
 
-  const handleTouchEnd = useCallback(() => {
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    // Stop propagation to prevent parent handlers from triggering
+    e.stopPropagation();
+    
     if (!touchStart || !touchEnd) {
       setIsDragging(false);
       setDragOffset(0);

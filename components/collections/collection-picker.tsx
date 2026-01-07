@@ -71,12 +71,29 @@ export function CollectionPicker({
       const data = await response.json();
       
       if (data.wishlist) {
-        const item = data.wishlist.find((w: any) => 
-          w.restaurants?.google_place_id === restaurant.googlePlaceId ||
-          w.restaurant_id === restaurant.id
-        );
+        const item = data.wishlist.find((w: any) => {
+          const itemGooglePlaceId = w.restaurants?.google_place_id;
+          const itemId = w.restaurants?.id;
+          
+          // Match by google_place_id first
+          if (restaurant.googlePlaceId && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurant.googlePlaceId;
+          }
+          // Then try matching by id
+          if (restaurant.id && itemId) {
+            return itemId === restaurant.id;
+          }
+          // Also try matching restaurant.id with google_place_id
+          if (restaurant.id && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurant.id;
+          }
+          return false;
+        });
+        
         if (item) {
           setCurrentCollectionId(item.collection_id);
+        } else {
+          setCurrentCollectionId(null);
         }
       }
     } catch (error) {

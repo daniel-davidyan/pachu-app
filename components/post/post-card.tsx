@@ -131,9 +131,29 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       try {
         const response = await fetch('/api/wishlist');
         const data = await response.json();
-        const saved = data.wishlist?.some(
-          (item: any) => item.restaurants?.google_place_id === (post.restaurant?.googlePlaceId || post.restaurant?.id)
-        );
+        
+        const restaurantGooglePlaceId = post.restaurant?.googlePlaceId;
+        const restaurantId = post.restaurant?.id;
+        
+        const saved = data.wishlist?.some((item: any) => {
+          const itemGooglePlaceId = item.restaurants?.google_place_id;
+          const itemId = item.restaurants?.id;
+          
+          // Match by google_place_id first
+          if (restaurantGooglePlaceId && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurantGooglePlaceId;
+          }
+          // Then try matching by id
+          if (restaurantId && itemId) {
+            return itemId === restaurantId;
+          }
+          // Also try matching restaurantId with google_place_id
+          if (restaurantId && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurantId;
+          }
+          return false;
+        });
+        
         setIsSaved(saved || false);
       } catch (error) {
         console.error('Error checking saved status:', error);
@@ -545,27 +565,67 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
       try {
         const wishlistResponse = await fetch('/api/wishlist');
         const wishlistData = await wishlistResponse.json();
-        const wishlistItem = wishlistData.wishlist?.find(
-          (item: any) => item.restaurants?.google_place_id === (post.restaurant?.googlePlaceId || post.restaurant?.id)
-        );
+        
+        // Find the wishlist item - check both googlePlaceId and regular id
+        const restaurantGooglePlaceId = post.restaurant?.googlePlaceId;
+        const restaurantId = post.restaurant?.id;
+        
+        const wishlistItem = wishlistData.wishlist?.find((item: any) => {
+          const itemGooglePlaceId = item.restaurants?.google_place_id;
+          const itemId = item.restaurants?.id;
+          
+          // Match by google_place_id first, then by id
+          if (restaurantGooglePlaceId && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurantGooglePlaceId;
+          }
+          if (restaurantId && itemId) {
+            return itemId === restaurantId;
+          }
+          // Also try matching restaurantId with google_place_id (in case they're the same)
+          if (restaurantId && itemGooglePlaceId) {
+            return itemGooglePlaceId === restaurantId;
+          }
+          return false;
+        });
 
         if (wishlistItem) {
-          const response = await fetch(`/api/wishlist?restaurantId=${wishlistItem.restaurants.id}`, {
+          // Use restaurant_id from the wishlist item, or fallback to nested restaurants.id
+          const deleteId = wishlistItem.restaurant_id || wishlistItem.restaurants?.id;
+          
+          if (!deleteId) {
+            showToast('Cannot find restaurant to remove', 'error');
+            return;
+          }
+          
+          const response = await fetch(`/api/wishlist?restaurantId=${deleteId}`, {
             method: 'DELETE',
           });
 
           if (response.ok) {
             setIsSaved(false);
             showToast('Removed from saved', 'success');
+          } else {
+            const errorData = await response.json();
+            console.error('Delete error:', errorData);
+            showToast('Failed to remove', 'error');
           }
+        } else {
+          // Item not found, but we thought it was saved - reset state
+          setIsSaved(false);
+          showToast('Already removed', 'success');
         }
       } catch (error) {
         console.error('Error removing from saved:', error);
         showToast('Failed to remove', 'error');
       }
     } else {
-      // If not saved, open collection picker
-      setShowCollectionPicker(true);
+      // If not saved, close other sheets first then open collection picker
+      setShowComments(false);
+      setShowLikes(false);
+      // Small delay to ensure other sheets close first
+      setTimeout(() => {
+        setShowCollectionPicker(true);
+      }, 50);
     }
   };
 
