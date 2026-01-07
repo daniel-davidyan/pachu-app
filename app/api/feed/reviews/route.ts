@@ -390,7 +390,7 @@ export async function GET(request: NextRequest) {
       .map((r: any) => r.restaurants?.google_place_id)
       .filter(Boolean);
     
-    let openingHoursMap = new Map<string, any>();
+    const openingHoursMap = new Map<string, any>();
     if (googlePlaceIds.length > 0) {
       const { data: cacheData } = await supabase
         .from('restaurant_cache')

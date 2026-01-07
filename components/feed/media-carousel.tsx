@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { VideoPlayer } from './video-player';
 
 interface MediaItem {
@@ -18,28 +18,24 @@ interface MediaCarouselProps {
 }
 
 export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouselProps) {
+  // Create a stable key for the media array to detect changes
+  const mediaKey = useMemo(() => media.map(m => m.id).join(','), [media]);
+  
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [lastMediaKey, setLastMediaKey] = useState(mediaKey);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isFirstRender = useRef(true);
 
   const minSwipeDistance = 50;
 
-  // Create a stable key for the media array to detect changes
-  const mediaKey = useMemo(() => media.map(m => m.id).join(','), [media]);
-
-  // Reset index when media changes
-  useEffect(() => {
-    // Skip the first render
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
+  // Reset index when media changes (controlled state update during render)
+  if (mediaKey !== lastMediaKey) {
+    setLastMediaKey(mediaKey);
     setCurrentIndex(0);
-  }, [mediaKey]);
+  }
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     setTouchEnd(null);

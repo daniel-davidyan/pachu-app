@@ -338,7 +338,7 @@ async function applyHardFilters(
 
   // Build query - support both 'Tel Aviv' and 'Tel Aviv-Yafo'
   // HARD FILTERS: Only distance and opening hours (budget moved to vector/rerank)
-  let query = supabase
+  const query = supabase
     .from('restaurant_cache')
     .select('*')
     .or('city.eq.Tel Aviv,city.eq.Tel Aviv-Yafo')
