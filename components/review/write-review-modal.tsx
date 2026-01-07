@@ -553,11 +553,16 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
           const bucket = item.type === 'video' ? 'review-videos' : 'review-photos';
           
-          console.log(`[WriteReviewModal] Uploading new ${item.type}:`, fileName);
+          console.log(`[WriteReviewModal] Uploading new ${item.type}:`, fileName, 'size:', file.size, 'type:', file.type);
           
+          // Upload with explicit content type for better quality preservation
           const { data, error } = await supabase.storage
             .from(bucket)
-            .upload(`reviews/${fileName}`, file);
+            .upload(`reviews/${fileName}`, file, {
+              contentType: file.type || (item.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+              cacheControl: '3600',
+              upsert: false,
+            });
           
           if (error) {
             console.error(`${item.type} upload error:`, error);

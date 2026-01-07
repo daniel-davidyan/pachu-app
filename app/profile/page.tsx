@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, Camera, X, Edit2, Heart, MapPin, Loader2, Trash2, MoreVertical } from 'lucide-react';
+import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2 } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { PostCard, PostCardData } from '@/components/post/post-card';
@@ -13,7 +13,6 @@ import { useRouter } from 'next/navigation';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
-import { GoogleImportModal } from '@/components/profile/google-import-modal';
 
 interface Profile {
   id: string;
@@ -66,7 +65,7 @@ interface WishlistItem {
   };
 }
 
-type ProfileTab = 'experiences' | 'wishlist';
+type ProfileTab = 'published' | 'unpublished' | 'saved';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -79,14 +78,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [loadingTab, setLoadingTab] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [activeTab, setActiveTab] = useState<ProfileTab>('experiences');
-  const [publishedFilter, setPublishedFilter] = useState<'all' | 'published' | 'unpublished'>('all');
+  const [activeTab, setActiveTab] = useState<ProfileTab>('published');
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [showGoogleImport, setShowGoogleImport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -100,13 +97,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      if (activeTab === 'experiences') {
+      if (activeTab === 'published' || activeTab === 'unpublished') {
         fetchReviews();
       } else {
         fetchWishlist();
       }
     }
-  }, [user, activeTab, publishedFilter]);
+  }, [user, activeTab]);
 
   const fetchProfile = async () => {
     try {
@@ -198,14 +195,13 @@ export default function ProfilePage() {
     
     setLoadingTab(true);
     try {
-      // Build URL with published filter
+      // Build URL with published filter based on active tab
       let url = `/api/reviews?userId=${user.id}`;
-      if (publishedFilter === 'published') {
+      if (activeTab === 'published') {
         url += '&published=true';
-      } else if (publishedFilter === 'unpublished') {
+      } else if (activeTab === 'unpublished') {
         url += '&published=false';
       }
-      // For 'all', don't add published parameter
       
       const response = await fetch(url);
       const data = await response.json();
@@ -379,8 +375,29 @@ export default function ProfilePage() {
     );
   }
 
+  const handleShareProfile = async () => {
+    const profileUrl = `${window.location.origin}/profile/${user?.id}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${profile?.full_name || profile?.username}'s Profile`,
+          text: `Check out ${profile?.full_name || profile?.username}'s food experiences on Pachu!`,
+          url: profileUrl,
+        });
+      } catch (err) {
+        // User cancelled or error
+        console.log('Share cancelled');
+      }
+    } else {
+      // Fallback: copy to clipboard
+      await navigator.clipboard.writeText(profileUrl);
+      showToast('Profile link copied to clipboard!', 'success');
+    }
+  };
+
   return (
-    <MainLayout showBottomNav={!showEditModal && !sheetOpen && !showGoogleImport}>
+    <MainLayout showBottomNav={!showEditModal && !sheetOpen}>
       <div className="pb-24 bg-gray-50 min-h-screen">
         {/* Compact Profile Header */}
         <div className="bg-white px-4 py-5">
@@ -452,293 +469,214 @@ export default function ProfilePage() {
                   </button>
                 </div>
               </div>
-
-              {/* Edit Button - Top Right */}
-              <button
-                onClick={() => router.push('/profile/edit')}
-                className="w-7 h-7 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors self-start"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-gray-600" />
-              </button>
             </div>
 
           {/* Bio - Full Width Below */}
-          {profile.bio ? (
+          {profile.bio && (
             <p className="text-xs text-gray-600 mt-3 leading-relaxed">{profile.bio}</p>
-          ) : (
-            <button 
+          )}
+
+          {/* Instagram-Style Action Buttons */}
+          <div className="flex gap-2 mt-4">
+            <button
               onClick={() => router.push('/profile/edit')}
-              className="text-xs text-primary font-medium mt-2 hover:underline"
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold text-sm py-2 px-4 rounded-lg transition-colors"
             >
-              + Add bio
+              Edit profile
             </button>
-          )}
-
-          {/* Google Import Button - Subtle & Modern */}
-          <button
-            onClick={() => setShowGoogleImport(true)}
-            className="group w-full mt-4 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl px-4 py-3.5 hover:border-gray-300 hover:shadow-sm transition-all duration-200 active:scale-[0.99]"
-          >
-            <div className="flex items-center gap-3">
-              {/* Google Logo - Subtle */}
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:shadow transition-shadow">
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-              </div>
-
-              {/* Text Content */}
-              <div className="flex-1 text-left">
-                <p className="text-sm font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
-                  Import from Google Reviews
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Bring your review history
-                </p>
-              </div>
-
-              {/* Arrow Icon */}
-              <svg 
-                className="w-4 h-4 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          </button>
-        </div>
-
-        {/* Tab Selector */}
-        <div className="sticky top-0 z-10 bg-white">
-          <div className="relative">
-            {/* Text Buttons */}
-            <div className="relative w-full h-12 flex items-center">
-              <button
-                onClick={() => setActiveTab('experiences')}
-                className="absolute transition-colors"
-                style={{ left: '25%', transform: 'translateX(-50%)' }}
-              >
-                <span 
-                  className={`text-base font-medium transition-all duration-300 ${
-                    activeTab === 'experiences' ? 'text-[#C5459C]' : 'text-black'
-                  }`}
-                >
-                  My Experiences
-                </span>
-              </button>
-              <button
-                onClick={() => setActiveTab('wishlist')}
-                className="absolute transition-colors"
-                style={{ left: '75%', transform: 'translateX(-50%)' }}
-              >
-                <span 
-                  className={`text-base font-medium transition-all duration-300 ${
-                    activeTab === 'wishlist' ? 'text-[#C5459C]' : 'text-black'
-                  }`}
-                >
-                  My Wishlist
-                </span>
-              </button>
-            </div>
-            
-            {/* Animated Underline */}
-            <div className="relative w-full">
-              <div 
-                className="h-0.5 rounded-full transition-all duration-300 ease-out"
-                style={{
-                  backgroundColor: '#C5459C',
-                  boxShadow: '0 0 8px rgba(197, 69, 156, 0.4)',
-                  marginLeft: activeTab === 'experiences' ? '0%' : '50%',
-                  width: '50%'
-                }}
-              />
-            </div>
+            <button
+              onClick={handleShareProfile}
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold text-sm py-2 px-4 rounded-lg transition-colors"
+            >
+              Share profile
+            </button>
           </div>
-
-          {/* Published Filter - Only show for Experiences tab */}
-          {activeTab === 'experiences' && (
-            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
-              <div className="flex gap-2 p-1 bg-white rounded-xl shadow-sm border border-gray-200">
-                <button
-                  onClick={() => setPublishedFilter('all')}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    publishedFilter === 'all'
-                      ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md transform scale-[1.02]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setPublishedFilter('published')}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    publishedFilter === 'published'
-                      ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md transform scale-[1.02]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  Published
-                </button>
-                <button
-                  onClick={() => setPublishedFilter('unpublished')}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    publishedFilter === 'unpublished'
-                      ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md transform scale-[1.02]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  Saved
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Tab Content */}
-        <div className="px-4 py-4">
+        {/* Instagram-Style Tab Selector */}
+        <div className="sticky top-0 z-10 bg-white border-t border-gray-200">
+          <div className="grid grid-cols-3">
+            {/* Published Tab */}
+            <button
+              onClick={() => setActiveTab('published')}
+              className={`flex flex-col items-center justify-center py-3 transition-all duration-200 relative ${
+                activeTab === 'published' ? 'text-gray-900' : 'text-gray-400'
+              }`}
+            >
+              <Grid3X3 className="w-6 h-6" strokeWidth={activeTab === 'published' ? 2 : 1.5} />
+              {activeTab === 'published' && (
+                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gray-900" />
+              )}
+            </button>
+
+            {/* Unpublished Tab */}
+            <button
+              onClick={() => setActiveTab('unpublished')}
+              className={`flex flex-col items-center justify-center py-3 transition-all duration-200 relative ${
+                activeTab === 'unpublished' ? 'text-gray-900' : 'text-gray-400'
+              }`}
+            >
+              <EyeOff className="w-6 h-6" strokeWidth={activeTab === 'unpublished' ? 2 : 1.5} />
+              {activeTab === 'unpublished' && (
+                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gray-900" />
+              )}
+            </button>
+
+            {/* Saved/Wishlist Tab */}
+            <button
+              onClick={() => setActiveTab('saved')}
+              className={`flex flex-col items-center justify-center py-3 transition-all duration-200 relative ${
+                activeTab === 'saved' ? 'text-gray-900' : 'text-gray-400'
+              }`}
+            >
+              <Bookmark className="w-6 h-6" strokeWidth={activeTab === 'saved' ? 2 : 1.5} />
+              {activeTab === 'saved' && (
+                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gray-900" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content - Instagram-Style Grid */}
+        <div>
           {loadingTab ? (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-2" />
               <p className="text-sm text-gray-500">Loading...</p>
             </div>
-          ) : activeTab === 'experiences' ? (
-            // My Experiences
+          ) : activeTab === 'published' || activeTab === 'unpublished' ? (
+            // Reviews Grid - Instagram Style
             reviews.length > 0 ? (
-              <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
                 {reviews.map((review) => {
-                  const postData: PostCardData = {
-                    id: review.id,
-                    rating: review.rating,
-                    content: review.content,
-                    createdAt: review.created_at,
-                    likesCount: review.likesCount || 0,
-                    commentsCount: review.commentsCount || 0,
-                    isLiked: review.isLiked || false,
-                    user: review.user || {
-                      id: user?.id || '',
-                      username: profile?.username || '',
-                      fullName: profile?.full_name || '',
-                      avatarUrl: profile?.avatar_url || undefined,
-                    },
-                    photos: review.review_photos?.map(p => p.photo_url) || [],
-                    restaurant: {
-                      id: review.restaurants?.id || '',
-                      name: review.restaurants?.name || 'Restaurant',
-                      address: review.restaurants?.address || '',
-                      imageUrl: review.restaurants?.image_url,
-                      googlePlaceId: review.restaurants?.google_place_id,
-                    },
-                  };
-
+                  const thumbnailUrl = review.review_photos?.[0]?.photo_url || review.restaurants?.image_url;
+                  const hasMultiplePhotos = (review.review_photos?.length || 0) > 1;
+                  
                   return (
-                    <PostCard
+                    <Link
                       key={review.id}
-                      post={postData}
-                      showRestaurantInfo={true}
-                      onEdit={handleEditReview}
-                      onDelete={handleDeleteReview}
-                      onSheetStateChange={setSheetOpen}
-                      onUpdate={() => {
-                        fetchReviews();
-                        fetchStats();
-                      }}
-                    />
+                      href={`/profile/feed?tab=${activeTab}&startId=${review.id}`}
+                      className="relative aspect-square bg-gray-200 overflow-hidden group"
+                    >
+                      {thumbnailUrl ? (
+                        <img
+                          src={thumbnailUrl}
+                          alt={review.restaurants?.name || 'Review'}
+                          className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                          <span className="text-2xl">🍽️</span>
+                        </div>
+                      )}
+                      
+                      {/* Multiple Photos Indicator */}
+                      {hasMultiplePhotos && (
+                        <div className="absolute top-2 right-2">
+                          <svg className="w-5 h-5 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 6h2v2H4V6zm0 5h2v2H4v-2zm0 5h2v2H4v-2zm16-10h-2V4h2v2zm-4 0H8V4h8v2zm4 5h-2v-2h2v2zm0 5h-2v-2h2v2zM8 20h8v-2H8v2z"/>
+                          </svg>
+                        </div>
+                      )}
+
+                      {/* Hover Overlay with Stats */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                        <div className="flex items-center gap-1 text-white font-semibold">
+                          <Heart className="w-5 h-5 fill-white" />
+                          <span>{review.likesCount || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-white font-semibold">
+                          <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                          </svg>
+                          <span>{review.commentsCount || 0}</span>
+                        </div>
+                      </div>
+                    </Link>
                   );
                 })}
               </div>
             ) : (
-              // Empty state - different message based on filter
-              <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <span className="text-3xl">
-                    {publishedFilter === 'unpublished' ? '📝' : '✨'}
-                  </span>
+              // Empty state
+              <div className="px-4 py-8">
+                <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border-2 border-dashed border-primary/30 p-10 text-center">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <span className="text-3xl">
+                      {activeTab === 'unpublished' ? '📝' : '✨'}
+                    </span>
+                  </div>
+                  <p className="text-gray-900 font-bold text-lg">
+                    {activeTab === 'unpublished' 
+                      ? 'No saved experiences yet'
+                      : 'No published experiences yet'}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-2 mb-4 max-w-sm mx-auto">
+                    {activeTab === 'unpublished'
+                      ? 'Save your dining experiences privately to help us learn your preferences and provide better recommendations'
+                      : 'Start sharing your restaurant experiences with the community!'}
+                  </p>
+                  {activeTab === 'published' && (
+                    <Link 
+                      href="/map" 
+                      className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+                    >
+                      ✍️ Write Your First Review
+                    </Link>
+                  )}
                 </div>
-                <p className="text-gray-900 font-bold text-lg">
-                  {publishedFilter === 'unpublished' 
-                    ? 'No saved experiences yet'
-                    : publishedFilter === 'published'
-                    ? 'No published experiences yet'
-                    : 'No experiences yet'}
-                </p>
-                <p className="text-sm text-gray-600 mt-2 mb-4 max-w-sm mx-auto">
-                  {publishedFilter === 'unpublished'
-                    ? 'Save your dining experiences privately to help us learn your preferences and provide better recommendations'
-                    : 'Start sharing your restaurant experiences with the community!'}
-                </p>
-                {publishedFilter !== 'unpublished' && (
+              </div>
+            )
+          ) : (
+            // Saved/Wishlist Grid - Instagram Style
+            wishlist.length > 0 ? (
+              <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
+                {wishlist.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/restaurant/${item.restaurants?.google_place_id || item.restaurants?.id}`}
+                    className="relative aspect-square bg-gray-200 overflow-hidden group"
+                  >
+                    {item.restaurants?.image_url ? (
+                      <img
+                        src={item.restaurants.image_url}
+                        alt={item.restaurants.name}
+                        className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                        <span className="text-2xl">🍽️</span>
+                      </div>
+                    )}
+                    
+                    {/* Restaurant Name Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-2">
+                      <p className="text-white text-xs font-medium line-clamp-2 leading-tight">
+                        {item.restaurants?.name || 'Restaurant'}
+                      </p>
+                    </div>
+
+                    {/* Bookmark Icon */}
+                    <div className="absolute top-2 right-2">
+                      <Bookmark className="w-5 h-5 text-white fill-white drop-shadow-lg" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-8">
+                <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl border-2 border-dashed border-red-200 p-10 text-center">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <Bookmark className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-900 font-bold text-lg">Your wishlist is empty</p>
+                  <p className="text-sm text-gray-600 mt-2 mb-4">Save restaurants you want to try!</p>
                   <Link 
                     href="/map" 
                     className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
                   >
-                    ✍️ Write Your First Review
+                    Explore Restaurants
                   </Link>
-                )}
-              </div>
-            )
-          ) : (
-            // My Wishlist
-            wishlist.length > 0 ? (
-              <div className="space-y-3">
-                {wishlist.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    <Link
-                      href={`/restaurant/${item.restaurants?.google_place_id || item.restaurants?.id}`}
-                      className="block p-4 flex items-center gap-3"
-                    >
-                      <div className="w-16 h-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-xl overflow-hidden flex-shrink-0">
-                        {item.restaurants?.image_url ? (
-                          <img src={item.restaurants.image_url} alt={item.restaurants.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-gray-900 truncate">
-                          {item.restaurants?.name || 'Restaurant'}
-                        </h3>
-                        <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {formatAddress(item.restaurants?.address) || 'Address not available'}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Added {formatDate(item.created_at)}
-                        </p>
-                      </div>
-                    </Link>
-                    <div className="px-4 pb-4">
-                      <button
-                        onClick={() => handleRemoveFromWishlist(item.restaurants.id)}
-                        className="w-full bg-red-50 text-red-600 py-2 rounded-lg font-medium text-sm hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Heart className="w-4 h-4 fill-current" />
-                        Remove from Wishlist
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl border-2 border-dashed border-red-200 p-10 text-center">
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <Heart className="w-8 h-8 text-red-500" />
                 </div>
-                <p className="text-gray-900 font-bold text-lg">Your wishlist is empty</p>
-                <p className="text-sm text-gray-600 mt-2 mb-4">Save restaurants you want to try!</p>
-                <Link 
-                  href="/map" 
-                  className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
-                >
-                  Explore Restaurants
-                </Link>
               </div>
             )
           )}
@@ -790,16 +728,6 @@ export default function ProfilePage() {
         confirmText="Delete"
         cancelText="Cancel"
         confirmButtonClass="bg-red-600 hover:bg-red-700"
-      />
-
-      {/* Google Import Modal */}
-      <GoogleImportModal
-        isOpen={showGoogleImport}
-        onClose={() => setShowGoogleImport(false)}
-        onSuccess={() => {
-          fetchReviews();
-          fetchStats();
-        }}
       />
     </MainLayout>
   );

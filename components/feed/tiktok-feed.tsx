@@ -145,12 +145,12 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
     touchStartY.current = null;
   }, [currentIndex, reviews.length]);
 
-  // Handle swipe right to restaurant
+  // Handle swipe right to restaurant - instant navigation
   const handleSwipeRight = useCallback((review: FeedReview) => {
     router.push(`/restaurant/${review.restaurant.googlePlaceId || review.restaurant.id}`);
   }, [router]);
 
-  // Handle swipe left to user profile
+  // Handle swipe left to user profile - instant navigation
   const handleSwipeLeft = useCallback((review: FeedReview) => {
     if (user && review.user.id === user.id) {
       router.push('/profile');
@@ -323,10 +323,10 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
           ))}
         </div>
 
-        {/* Loading indicator */}
+        {/* Loading more indicator */}
         {isLoading && (
           <div className="absolute bottom-24 left-0 right-0 flex justify-center z-20">
-            <Loader2 className="w-8 h-8 animate-spin text-white" />
+            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
           </div>
         )}
       </div>

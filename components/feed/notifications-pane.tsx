@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef } from 'react';
 import { X, Heart, MessageCircle, UserPlus } from 'lucide-react';
 
 interface Notification {
@@ -66,6 +67,34 @@ const mockNotifications: Notification[] = [
 ];
 
 export function NotificationsPane({ isOpen, onClose }: NotificationsPaneProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const startY = useRef(0);
+
+  // Drag handlers for closing
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const deltaY = e.touches[0].clientY - startY.current;
+    // Only allow upward drag (negative values)
+    if (deltaY < 0) {
+      setDragOffset(deltaY);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    // Close if dragged up more than 100px
+    if (dragOffset < -100) {
+      onClose();
+    }
+    setDragOffset(0);
+  };
+
   if (!isOpen) return null;
 
   const getNotificationIcon = (type: Notification['type']) => {
@@ -114,13 +143,19 @@ export function NotificationsPane({ isOpen, onClose }: NotificationsPaneProps) {
         onClick={onClose}
       />
 
-      {/* Notifications Pane - Opens from top */}
+      {/* Notifications Pane - Opens from top, doesn't hide bottom nav */}
       <div
-        className="fixed top-0 left-0 right-0 z-[95] h-[80vh] bg-black/95 backdrop-blur-xl border-b border-white/10 rounded-b-[28px] shadow-2xl flex flex-col animate-slide-down"
+        className="fixed top-0 left-0 right-0 z-[95] bg-black/95 backdrop-blur-xl border-b border-white/10 rounded-b-[28px] shadow-2xl flex flex-col animate-slide-down"
         style={{
+          height: 'calc(80vh - 70px)', // Leave room for bottom nav
           paddingTop: 'env(safe-area-inset-top)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          transform: `translateY(${dragOffset}px)`,
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out',
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 flex-shrink-0">
@@ -169,11 +204,9 @@ export function NotificationsPane({ isOpen, onClose }: NotificationsPaneProps) {
           ))}
         </div>
 
-        {/* Footer */}
-        <div className="p-3 border-t border-white/10">
-          <p className="text-center text-xs text-white/40">
-            Coming soon: real-time notifications
-          </p>
+        {/* Bottom drag indicator */}
+        <div className="py-3 flex justify-center">
+          <div className="w-10 h-1 bg-white/30 rounded-full" />
         </div>
       </div>
 

@@ -141,7 +141,7 @@ export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPla
 
       {/* Progress Bar - fixed at the bottom, above navigation */}
       <div 
-        className="fixed left-0 right-0 h-[2px] bg-white/30 z-40"
+        className="fixed left-0 right-0 h-[3px] bg-white/20 z-40"
         style={{ bottom: 'calc(56px + env(safe-area-inset-bottom))' }}
       >
         <div 

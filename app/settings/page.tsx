@@ -4,7 +4,9 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { User, Globe, Bell, Shield, HelpCircle, LogOut, ChevronRight, Moon, Mail, LucideIcon, Sparkles, UtensilsCrossed } from 'lucide-react';
+import { useState } from 'react';
+import { User, Globe, Bell, Shield, HelpCircle, LogOut, ChevronRight, Moon, Mail, LucideIcon, Sparkles, UtensilsCrossed, Download } from 'lucide-react';
+import { GoogleImportModal } from '@/components/profile/google-import-modal';
 
 interface SettingsItem {
   icon: LucideIcon;
@@ -25,6 +27,7 @@ export default function SettingsPage() {
   const { user } = useUser();
   const router = useRouter();
   const supabase = createClient();
+  const [showGoogleImport, setShowGoogleImport] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -70,6 +73,19 @@ export default function SettingsPage() {
           label: 'Dietary Restrictions',
           value: 'Kosher, Vegan, Allergies...',
           href: '/onboarding?edit=true&step=dietary',
+        },
+      ],
+    },
+    {
+      title: 'Data',
+      items: [
+        {
+          icon: Download,
+          iconBg: 'bg-emerald-100',
+          iconColor: 'text-emerald-600',
+          label: 'Import from Google Reviews',
+          value: 'Bring your review history',
+          href: '#google-import',
         },
       ],
     },
@@ -140,10 +156,17 @@ export default function SettingsPage() {
                 {group.items.map((item, index) => {
                   const Icon = item.icon;
                   const isClickable = !!item.href;
+                  const handleClick = () => {
+                    if (item.href === '#google-import') {
+                      setShowGoogleImport(true);
+                    } else if (isClickable) {
+                      router.push(item.href!);
+                    }
+                  };
                   return (
                     <div
                       key={index}
-                      onClick={() => isClickable && router.push(item.href!)}
+                      onClick={handleClick}
                       className={`w-full flex items-center gap-3 p-4 transition-colors text-left ${
                         isClickable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
                       }`}
@@ -191,6 +214,15 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Google Import Modal */}
+      <GoogleImportModal
+        isOpen={showGoogleImport}
+        onClose={() => setShowGoogleImport(false)}
+        onSuccess={() => {
+          setShowGoogleImport(false);
+        }}
+      />
     </MainLayout>
   );
 }

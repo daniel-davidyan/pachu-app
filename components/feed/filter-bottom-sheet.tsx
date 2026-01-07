@@ -195,16 +195,21 @@ export function FilterBottomSheet({
         onClick={onClose}
       />
 
-      {/* Top Sheet */}
+      {/* Top Sheet - doesn't hide bottom nav */}
       <div
         ref={sheetRef}
-        className="fixed top-0 left-0 right-0 bg-black/95 backdrop-blur-xl rounded-b-[28px] z-[101] flex flex-col transition-transform duration-300 ease-out border-b border-white/10 animate-slide-down"
+        className="fixed top-0 left-0 right-0 bg-black/95 backdrop-blur-xl rounded-b-[28px] z-[101] flex flex-col border-b border-white/10 animate-slide-down"
         style={{
-          height: '80vh',
-          maxHeight: '80vh',
+          height: 'calc(80vh - 70px)', // Leave room for bottom nav
+          maxHeight: 'calc(80vh - 70px)',
           paddingTop: 'env(safe-area-inset-top)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          transform: `translateY(${dragOffset}px)`,
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out',
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Header */}
         <div className="w-full py-4 px-4 flex items-center justify-between flex-shrink-0 border-b border-white/10">
@@ -412,6 +417,11 @@ export function FilterBottomSheet({
               )}
             </div>
           )}
+        </div>
+
+        {/* Bottom drag indicator */}
+        <div className="py-3 flex justify-center flex-shrink-0">
+          <div className="w-10 h-1 bg-white/30 rounded-full" />
         </div>
       </div>
 

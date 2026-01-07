@@ -68,15 +68,29 @@ export default function FeedPage() {
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [distanceKm, setDistanceKm] = useState(5);
   
-  // Feed state
-  const [reviews, setReviews] = useState<FeedReview[]>([]);
+  // Feed state - cached per tab for instant switching
+  const [forYouReviews, setForYouReviews] = useState<FeedReview[]>([]);
+  const [followingReviews, setFollowingReviews] = useState<FeedReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  const [forYouPage, setForYouPage] = useState(0);
+  const [followingPage, setFollowingPage] = useState(0);
+  const [forYouHasMore, setForYouHasMore] = useState(true);
+  const [followingHasMore, setFollowingHasMore] = useState(true);
+  
+  // Get current tab's data
+  const reviews = activeTab === 'foryou' ? forYouReviews : followingReviews;
+  const page = activeTab === 'foryou' ? forYouPage : followingPage;
+  const hasMore = activeTab === 'foryou' ? forYouHasMore : followingHasMore;
   
   // User location
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  
+  // Handle tab change - instant switch with cached data
+  const handleTabChange = useCallback((tab: 'following' | 'foryou') => {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+  }, [activeTab]);
   
   // Request tracking
   const latestRequestId = useRef(0);
@@ -99,16 +113,16 @@ export default function FeedPage() {
     );
   }, []);
 
-  // Fetch reviews
-  const fetchReviews = useCallback(async (pageNum: number, reset: boolean = false) => {
+  // Fetch reviews for a specific tab
+  const fetchReviewsForTab = useCallback(async (tab: 'following' | 'foryou', pageNum: number, reset: boolean = false) => {
     if (!userLocation) return;
     
     const requestId = ++latestRequestId.current;
     
     try {
-      if (reset) {
+      if (reset && ((tab === 'foryou' && forYouReviews.length === 0) || (tab === 'following' && followingReviews.length === 0))) {
         setLoading(true);
-      } else {
+      } else if (!reset) {
         setLoadingMore(true);
       }
 
@@ -116,24 +130,21 @@ export default function FeedPage() {
       const radius = distanceKm * 1000;
       
       const response = await fetch(
-        `/api/feed/reviews?page=${pageNum}&limit=10&latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}&tab=${activeTab}${selectedCity ? `&city=${encodeURIComponent(selectedCity.name)}` : ''}`
+        `/api/feed/reviews?page=${pageNum}&limit=10&latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}&tab=${tab}${selectedCity ? `&city=${encodeURIComponent(selectedCity.name)}` : ''}`
       );
       
       const data = await response.json();
-      
-      console.log('[Feed Page] API Response:', { 
-        reviewsCount: data.reviews?.length || 0, 
-        hasMore: data.hasMore,
-        error: data.error 
-      });
 
       if (requestId === latestRequestId.current) {
         if (data.reviews) {
+          const setReviews = tab === 'foryou' ? setForYouReviews : setFollowingReviews;
+          const setPageNum = tab === 'foryou' ? setForYouPage : setFollowingPage;
+          const setHasMoreTab = tab === 'foryou' ? setForYouHasMore : setFollowingHasMore;
+          
           if (reset) {
             setReviews(data.reviews);
           } else {
-            // Deduplicate when appending
-            setReviews(prev => {
+            setReviews((prev: FeedReview[]) => {
               const combined = [...prev, ...data.reviews];
               const unique = combined.reduce((acc: FeedReview[], review: FeedReview) => {
                 if (!acc.find(r => r.id === review.id)) {
@@ -144,8 +155,8 @@ export default function FeedPage() {
               return unique;
             });
           }
-          setHasMore(data.hasMore);
-          setPage(pageNum);
+          setHasMoreTab(data.hasMore);
+          setPageNum(pageNum);
         }
       }
     } catch (error) {
@@ -156,31 +167,35 @@ export default function FeedPage() {
         setLoadingMore(false);
       }
     }
-  }, [userLocation, selectedCity, distanceKm, activeTab]);
+  }, [userLocation, selectedCity, distanceKm, forYouReviews.length, followingReviews.length]);
 
-  // Initial load when location is available
+  // Initial load - fetch both tabs for instant switching!
   useEffect(() => {
     if (!userLocation) return;
     
     if (!hasFetchedOnMount.current) {
       hasFetchedOnMount.current = true;
-      fetchReviews(0, true);
+      // Load both tabs in parallel for instant switching
+      fetchReviewsForTab('foryou', 0, true);
+      fetchReviewsForTab('following', 0, true);
       return;
     }
-  }, [userLocation, fetchReviews]);
+  }, [userLocation, fetchReviewsForTab]);
 
-  // Refetch when tab or filters change
+  // Refetch when filters change (not tab - tab switch is now instant)
   useEffect(() => {
     if (!userLocation || !hasFetchedOnMount.current) return;
-    fetchReviews(0, true);
-  }, [activeTab, selectedCity, distanceKm, userLocation, fetchReviews]);
+    // Refetch both tabs when filters change
+    fetchReviewsForTab('foryou', 0, true);
+    fetchReviewsForTab('following', 0, true);
+  }, [selectedCity, distanceKm, userLocation, fetchReviewsForTab]);
 
   // Load more handler
   const handleLoadMore = useCallback(() => {
     if (!loadingMore && hasMore) {
-      fetchReviews(page + 1, false);
+      fetchReviewsForTab(activeTab, page + 1, false);
     }
-  }, [loadingMore, hasMore, page, fetchReviews]);
+  }, [loadingMore, hasMore, page, activeTab, fetchReviewsForTab]);
 
   // Check if filters are active
   const hasActiveFilters = selectedCity !== null || distanceKm !== 5;
@@ -190,7 +205,7 @@ export default function FeedPage() {
       {/* Feed Header */}
       <FeedHeader
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         onOpenFilters={() => setShowFilters(true)}
         onOpenNotifications={() => setShowNotifications(true)}
         hasActiveFilters={hasActiveFilters}
@@ -202,10 +217,11 @@ export default function FeedPage() {
         className="w-full h-full"
       >
         {loading && reviews.length === 0 ? (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="fixed inset-0 bg-black flex items-center justify-center z-10">
             <div className="text-center">
-              <Loader2 className="w-10 h-10 animate-spin text-white mx-auto mb-3" />
-              <p className="text-white/60 text-sm">Discovering great food...</p>
+              {/* Simple fast loader */}
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
+              <p className="text-white/50 text-sm">Loading...</p>
             </div>
           </div>
         ) : (
@@ -219,8 +235,8 @@ export default function FeedPage() {
         )}
       </div>
 
-      {/* Bottom Navigation */}
-      <BottomNav show={!showFilters && !showComments} variant="feed" />
+      {/* Bottom Navigation - always visible */}
+      <BottomNav show={!showComments} variant="feed" />
 
       {/* Filter Bottom Sheet */}
       <FilterBottomSheet

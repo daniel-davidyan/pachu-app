@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Heart, MessageCircle, Bookmark, Share2, MapPin } from 'lucide-react';
@@ -77,6 +77,19 @@ export function TikTokReviewCard({
   const [isSaved, setIsSaved] = useState(review.isSaved);
   const [isExpanded, setIsExpanded] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+
+  // Prefetch pages when card becomes visible for faster navigation
+  useEffect(() => {
+    if (isVisible) {
+      // Prefetch restaurant page
+      const restaurantUrl = `/restaurant/${review.restaurant.googlePlaceId || review.restaurant.id}`;
+      router.prefetch(restaurantUrl);
+      
+      // Prefetch user profile page
+      const userUrl = user && review.user.id === user.id ? '/profile' : `/profile/${review.user.id}`;
+      router.prefetch(userUrl);
+    }
+  }, [isVisible, review.restaurant.googlePlaceId, review.restaurant.id, review.user.id, user, router]);
 
   // Handle horizontal swipe for navigation
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
