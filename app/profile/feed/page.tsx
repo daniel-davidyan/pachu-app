@@ -32,6 +32,7 @@ interface Review {
     google_place_id?: string;
   };
   review_photos: Array<{ photo_url: string }>;
+  review_videos?: Array<{ video_url: string; thumbnail_url?: string }>;
 }
 
 interface Profile {

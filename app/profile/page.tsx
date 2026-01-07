@@ -51,6 +51,7 @@ interface Review {
     google_place_id?: string;
   };
   review_photos: Array<{ photo_url: string }>;
+  review_videos?: Array<{ video_url: string; thumbnail_url?: string }>;
 }
 
 interface WishlistItem {
@@ -549,8 +550,12 @@ export default function ProfilePage() {
             reviews.length > 0 ? (
               <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
                 {reviews.map((review) => {
-                  const thumbnailUrl = review.review_photos?.[0]?.photo_url || review.restaurants?.image_url;
-                  const hasMultiplePhotos = (review.review_photos?.length || 0) > 1;
+                  // Check for video first, then photo, then restaurant image
+                  const hasVideo = (review.review_videos?.length || 0) > 0;
+                  const videoThumbnail = review.review_videos?.[0]?.thumbnail_url;
+                  const photoUrl = review.review_photos?.[0]?.photo_url;
+                  const thumbnailUrl = videoThumbnail || photoUrl || review.restaurants?.image_url;
+                  const hasMultipleMedia = ((review.review_photos?.length || 0) + (review.review_videos?.length || 0)) > 1;
                   
                   return (
                     <Link
@@ -570,8 +575,15 @@ export default function ProfilePage() {
                         </div>
                       )}
                       
-                      {/* Multiple Photos Indicator */}
-                      {hasMultiplePhotos && (
+                      {/* Video Indicator */}
+                      {hasVideo && (
+                        <div className="absolute top-2 right-2">
+                          <Play className="w-5 h-5 text-white drop-shadow-lg fill-white" />
+                        </div>
+                      )}
+                      
+                      {/* Multiple Media Indicator (only if no video indicator shown) */}
+                      {!hasVideo && hasMultipleMedia && (
                         <div className="absolute top-2 right-2">
                           <svg className="w-5 h-5 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M4 6h2v2H4V6zm0 5h2v2H4v-2zm0 5h2v2H4v-2zm16-10h-2V4h2v2zm-4 0H8V4h8v2zm4 5h-2v-2h2v2zm0 5h-2v-2h2v2zM8 20h8v-2H8v2z"/>
