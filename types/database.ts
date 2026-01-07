@@ -79,6 +79,26 @@ export interface ReviewPhoto {
   createdAt: string;
 }
 
+export interface ReviewVideo {
+  id: string;
+  reviewId: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  durationSeconds?: number;
+  sortOrder: number;
+  createdAt: string;
+}
+
+// Combined media type for TikTok-style feed
+export interface ReviewMedia {
+  id: string;
+  type: 'photo' | 'video';
+  url: string;
+  thumbnailUrl?: string;
+  durationSeconds?: number;
+  sortOrder: number;
+}
+
 export interface ReviewLike {
   id: string;
   reviewId: string;

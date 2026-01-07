@@ -1,90 +1,166 @@
 'use client';
 
-import { Newspaper, Plus, User, Map, Sparkles } from 'lucide-react';
+import { Home, Search, MapPin, User, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 interface BottomNavProps {
   show?: boolean;
+  variant?: 'default' | 'feed';
 }
 
-export function BottomNav({ show = true }: BottomNavProps) {
+export function BottomNav({ show = true, variant = 'default' }: BottomNavProps) {
   const pathname = usePathname();
+  const isFeedPage = pathname === '/feed' || variant === 'feed';
 
-  const navItems = [
-    {
-      name: 'Feed',
-      href: '/feed',
-      icon: Newspaper,
-    },
-    {
-      name: 'Search',
-      href: '/search',
-      icon: Plus,
-    },
-    {
-      name: 'Agent',
-      href: '/agent',
-      icon: Sparkles,
-    },
-    {
-      name: 'Map',
-      href: '/map',
-      icon: Map,
-    },
-    {
-      name: 'Profile',
-      href: '/profile',
-      icon: User,
-    },
-  ];
-
-  const isActive = (href: string) => {
-    return pathname.startsWith(href);
-  };
+  const isActiveHome = pathname === '/feed';
+  const isActiveSearch = pathname === '/search';
+  const isActiveAgent = pathname === '/agent';
+  const isActiveMap = pathname === '/map';
+  const isActiveProfile = pathname === '/profile';
 
   return (
     <nav 
       className={cn(
-        "bottom-nav-container fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out",
-        show ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0"
+        "fixed bottom-0 left-0 right-0 z-50 transition-all duration-300 ease-out",
+        show ? "translate-y-0" : "translate-y-full",
+        isFeedPage 
+          ? "bg-black/80 backdrop-blur-xl border-t border-white/10" 
+          : "bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
       )}
       style={{
-        bottom: 'calc(0rem + env(safe-area-inset-bottom))',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <div className="bg-white rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.3)] border-2 border-gray-300 px-1.5">
-        <div className="flex items-center justify-center gap-1.5 h-12">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
+      <div className="flex items-center justify-around h-14 max-w-lg mx-auto px-2">
+        {/* Home */}
+        <Link
+          href="/feed"
+          className="flex flex-col items-center justify-center flex-1 py-2 group"
+        >
+          <Home
+            className={cn(
+              "w-6 h-6 transition-all duration-200",
+              isActiveHome 
+                ? isFeedPage ? "text-white" : "text-[#C5459C]"
+                : isFeedPage ? "text-white/50" : "text-gray-400",
+              "group-active:scale-90"
+            )}
+            strokeWidth={isActiveHome ? 2.5 : 1.5}
+            fill={isActiveHome ? 'currentColor' : 'none'}
+          />
+          <span className={cn(
+            "text-[10px] font-medium mt-0.5 transition-colors",
+            isActiveHome 
+              ? isFeedPage ? "text-white" : "text-[#C5459C]"
+              : isFeedPage ? "text-white/50" : "text-gray-400"
+          )}>
+            Home
+          </span>
+        </Link>
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex flex-col items-center justify-center py-2 px-2.5 rounded-full transition-all duration-200",
-                  active 
-                    ? "bg-primary/10" 
-                    : "hover:bg-gray-100 active:scale-95"
-                )}
-              >
-                <Icon
-                  className={cn(
-                    "transition-all duration-200",
-                    item.name === 'Search' ? "w-7 h-7" : item.name === 'Agent' ? "w-6 h-6" : "w-5 h-5",
-                    active ? "text-[#C5459C]" : "text-gray-400"
-                  )}
-                  strokeWidth={active ? 2.5 : 1.5}
-                />
-              </Link>
-            );
-          })}
-        </div>
+        {/* Search */}
+        <Link
+          href="/search"
+          className="flex flex-col items-center justify-center flex-1 py-2 group"
+        >
+          <Search
+            className={cn(
+              "w-6 h-6 transition-all duration-200",
+              isActiveSearch 
+                ? isFeedPage ? "text-white" : "text-[#C5459C]"
+                : isFeedPage ? "text-white/50" : "text-gray-400",
+              "group-active:scale-90"
+            )}
+            strokeWidth={isActiveSearch ? 2.5 : 1.5}
+          />
+          <span className={cn(
+            "text-[10px] font-medium mt-0.5 transition-colors",
+            isActiveSearch 
+              ? isFeedPage ? "text-white" : "text-[#C5459C]"
+              : isFeedPage ? "text-white/50" : "text-gray-400"
+          )}>
+            Search
+          </span>
+        </Link>
+
+        {/* Agent (Center) */}
+        <Link
+          href="/agent"
+          className="flex flex-col items-center justify-center flex-1 py-2 group"
+        >
+          <Sparkles
+            className={cn(
+              "w-6 h-6 transition-all duration-200",
+              isActiveAgent 
+                ? isFeedPage ? "text-white" : "text-[#C5459C]"
+                : isFeedPage ? "text-white/50" : "text-gray-400",
+              "group-active:scale-90"
+            )}
+            strokeWidth={isActiveAgent ? 2.5 : 1.5}
+            fill={isActiveAgent ? 'currentColor' : 'none'}
+          />
+          <span className={cn(
+            "text-[10px] font-medium mt-0.5 transition-colors",
+            isActiveAgent 
+              ? isFeedPage ? "text-white" : "text-[#C5459C]"
+              : isFeedPage ? "text-white/50" : "text-gray-400"
+          )}>
+            Agent
+          </span>
+        </Link>
+
+        {/* Map */}
+        <Link
+          href="/map"
+          className="flex flex-col items-center justify-center flex-1 py-2 group"
+        >
+          <MapPin
+            className={cn(
+              "w-6 h-6 transition-all duration-200",
+              isActiveMap 
+                ? isFeedPage ? "text-white" : "text-[#C5459C]"
+                : isFeedPage ? "text-white/50" : "text-gray-400",
+              "group-active:scale-90"
+            )}
+            strokeWidth={isActiveMap ? 2.5 : 1.5}
+          />
+          <span className={cn(
+            "text-[10px] font-medium mt-0.5 transition-colors",
+            isActiveMap 
+              ? isFeedPage ? "text-white" : "text-[#C5459C]"
+              : isFeedPage ? "text-white/50" : "text-gray-400"
+          )}>
+            Map
+          </span>
+        </Link>
+
+        {/* Profile */}
+        <Link
+          href="/profile"
+          className="flex flex-col items-center justify-center flex-1 py-2 group"
+        >
+          <User
+            className={cn(
+              "w-6 h-6 transition-all duration-200",
+              isActiveProfile 
+                ? isFeedPage ? "text-white" : "text-[#C5459C]"
+                : isFeedPage ? "text-white/50" : "text-gray-400",
+              "group-active:scale-90"
+            )}
+            strokeWidth={isActiveProfile ? 2.5 : 1.5}
+          />
+          <span className={cn(
+            "text-[10px] font-medium mt-0.5 transition-colors",
+            isActiveProfile 
+              ? isFeedPage ? "text-white" : "text-[#C5459C]"
+              : isFeedPage ? "text-white/50" : "text-gray-400"
+          )}>
+            Profile
+          </span>
+        </Link>
       </div>
     </nav>
   );
 }
-

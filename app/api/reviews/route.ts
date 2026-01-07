@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { restaurant, rating, content, photoUrls, reviewId, isPublished = true } = await request.json();
+    const { restaurant, rating, content, photoUrls, videoUrls, reviewId, isPublished = true } = await request.json();
 
     if (!restaurant || !rating) {
       return NextResponse.json(
@@ -182,6 +182,40 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Handle videos (if review_videos table exists)
+      if (videoUrls?.length > 0) {
+        try {
+          // Delete old videos
+          await supabase
+            .from('review_videos')
+            .delete()
+            .eq('review_id', reviewId);
+
+          // Add new videos
+          const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
+            review_id: reviewId,
+            video_url: video.url,
+            thumbnail_url: video.thumbnailUrl,
+            sort_order: index,
+          }));
+
+          await supabase.from('review_videos').insert(videoInserts);
+        } catch (videoError) {
+          // Video table may not exist yet, continue without error
+          console.log('[API reviews] Video update skipped:', videoError);
+        }
+      } else {
+        // Delete all existing videos if none provided
+        try {
+          await supabase
+            .from('review_videos')
+            .delete()
+            .eq('review_id', reviewId);
+        } catch (e) {
+          // Table may not exist
+        }
+      }
+
       return NextResponse.json({ 
         success: true, 
         reviewId: reviewId,
@@ -229,6 +263,23 @@ export async function POST(request: NextRequest) {
       }));
 
       await supabase.from('review_photos').insert(photoInserts);
+    }
+
+    // Add videos (if review_videos table exists)
+    if (videoUrls?.length > 0) {
+      try {
+        const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
+          review_id: newReview.id,
+          video_url: video.url,
+          thumbnail_url: video.thumbnailUrl,
+          sort_order: index,
+        }));
+
+        await supabase.from('review_videos').insert(videoInserts);
+      } catch (videoError) {
+        // Video table may not exist yet, continue without error
+        console.log('[API reviews] Video insert skipped:', videoError);
+      }
     }
 
     // Add taste signal for the review (strongest signal - user actually visited)
@@ -305,6 +356,12 @@ export async function GET(request: NextRequest) {
         ),
         review_photos (
           photo_url,
+          sort_order
+        ),
+        review_videos (
+          video_url,
+          thumbnail_url,
+          duration_seconds,
           sort_order
         )
       `)

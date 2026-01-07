@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Star, Camera, MapPin, Loader2, Search, MessageSquare, Send } from 'lucide-react';
+import { X, Star, Camera, MapPin, Loader2, Search, MessageSquare, Send, Video, Play } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/toast';
 
@@ -20,6 +20,15 @@ interface Review {
   rating: number;
   content: string;
   photos: string[];
+  videos?: string[];
+}
+
+interface MediaItem {
+  id: string;
+  type: 'photo' | 'video';
+  url: string;
+  thumbnailUrl?: string;
+  file?: File;
 }
 
 interface WriteReviewModalProps {
@@ -42,9 +51,15 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [experienceText, setExperienceText] = useState('');
+  
+  // Media items (photos and videos combined)
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  
+  // Legacy state for backwards compatibility during transition
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [photoUrlToFileMap, setPhotoUrlToFileMap] = useState<Map<string, File>>(new Map());
+  
   const [submitting, setSubmitting] = useState(false);
   const [submitType, setSubmitType] = useState<'publish' | 'save' | null>(null); // Track which button was clicked
   const [initialized, setInitialized] = useState(false);
@@ -53,8 +68,10 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
   const { showToast } = useToast();
 
@@ -80,6 +97,21 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       setPhotoUrls([...(existingReview.photos || [])]);
       setPhotos([]); // No new files yet
       setPhotoUrlToFileMap(new Map()); // Clear the map
+      
+      // Initialize media items from existing photos and videos
+      const existingMedia: MediaItem[] = [
+        ...(existingReview.photos || []).map((url, i) => ({
+          id: `photo-${i}`,
+          type: 'photo' as const,
+          url,
+        })),
+        ...(existingReview.videos || []).map((url, i) => ({
+          id: `video-${i}`,
+          type: 'video' as const,
+          url,
+        })),
+      ];
+      setMediaItems(existingMedia);
     } else {
       // Create mode - start fresh
       setRating(0);
@@ -87,6 +119,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       setPhotoUrls([]);
       setPhotos([]);
       setPhotoUrlToFileMap(new Map()); // Clear the map
+      setMediaItems([]);
     }
     
     setInitialized(true);
@@ -117,6 +150,35 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     }
   };
 
+  // Generate video thumbnail
+  const generateVideoThumbnail = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.src = URL.createObjectURL(file);
+      
+      video.onloadeddata = () => {
+        video.currentTime = 1; // Seek to 1 second
+      };
+      
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
+        URL.revokeObjectURL(video.src);
+        resolve(thumbnailUrl);
+      };
+      
+      video.onerror = () => {
+        URL.revokeObjectURL(video.src);
+        resolve(''); // Return empty string on error
+      };
+    });
+  };
+
   // Handle photo selection
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -128,28 +190,109 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     
     if (files.length === 0) return;
     
-    // Check total photos (existing + new)
-    if (files.length + photoUrls.length > 5) {
-      showToast('Maximum 5 photos allowed', 'error');
+    // Check total media (existing + new)
+    const totalMedia = mediaItems.length + files.length;
+    if (totalMedia > 10) {
+      showToast('Maximum 10 photos/videos allowed', 'error');
       return;
     }
     
     // Create preview URLs and add to state
     const newUrls: string[] = [];
     const newMap = new Map(photoUrlToFileMap);
+    const newMediaItems: MediaItem[] = [];
     
     files.forEach(file => {
       const url = URL.createObjectURL(file);
       newUrls.push(url);
-      newMap.set(url, file); // Map blob URL to File
+      newMap.set(url, file);
+      newMediaItems.push({
+        id: `photo-${Date.now()}-${Math.random()}`,
+        type: 'photo',
+        url,
+        file,
+      });
     });
     
     setPhotos(prev => [...prev, ...files]);
     setPhotoUrls(prev => [...prev, ...newUrls]);
     setPhotoUrlToFileMap(newMap);
+    setMediaItems(prev => [...prev, ...newMediaItems]);
   };
 
-  // Remove photo
+  // Handle video selection
+  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    // Reset the file input
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
+    
+    if (files.length === 0) return;
+    
+    // Check total media
+    const totalMedia = mediaItems.length + files.length;
+    if (totalMedia > 10) {
+      showToast('Maximum 10 photos/videos allowed', 'error');
+      return;
+    }
+    
+    // Validate video duration (max 30 seconds)
+    for (const file of files) {
+      // Check file size (max 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        showToast('Video must be under 50MB', 'error');
+        return;
+      }
+    }
+    
+    setGeneratingThumbnail(true);
+    
+    const newMediaItems: MediaItem[] = [];
+    
+    for (const file of files) {
+      const url = URL.createObjectURL(file);
+      const thumbnailUrl = await generateVideoThumbnail(file);
+      
+      newMediaItems.push({
+        id: `video-${Date.now()}-${Math.random()}`,
+        type: 'video',
+        url,
+        thumbnailUrl,
+        file,
+      });
+    }
+    
+    setMediaItems(prev => [...prev, ...newMediaItems]);
+    setGeneratingThumbnail(false);
+  };
+
+  // Remove media item
+  const removeMedia = (index: number) => {
+    const itemToRemove = mediaItems[index];
+    
+    // Clean up blob URL if it's a local file
+    if (itemToRemove.url.startsWith('blob:')) {
+      URL.revokeObjectURL(itemToRemove.url);
+      
+      // Also update legacy photo states
+      if (itemToRemove.type === 'photo') {
+        const newMap = new Map(photoUrlToFileMap);
+        newMap.delete(itemToRemove.url);
+        setPhotoUrlToFileMap(newMap);
+        
+        if (itemToRemove.file) {
+          setPhotos(prev => prev.filter(p => p !== itemToRemove.file));
+        }
+        setPhotoUrls(prev => prev.filter(url => url !== itemToRemove.url));
+      }
+    }
+    
+    setMediaItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Legacy remove function for backwards compatibility
   const removePhoto = (index: number) => {
     const urlToRemove = photoUrls[index];
     
@@ -168,6 +311,12 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     
     // Remove URL from photoUrls
     setPhotoUrls(prev => prev.filter((_, i) => i !== index));
+    
+    // Also remove from mediaItems
+    const mediaIndex = mediaItems.findIndex(m => m.url === urlToRemove);
+    if (mediaIndex !== -1) {
+      setMediaItems(prev => prev.filter((_, i) => i !== mediaIndex));
+    }
   };
 
   // Touch-friendly drag and drop handlers (works on mobile and desktop)
@@ -311,56 +460,73 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     setSubmitType(publish ? 'publish' : 'save'); // Track which button was clicked
     try {
       console.log('[WriteReviewModal] handleSubmit called with publish:', publish);
-      console.log('[WriteReviewModal] Current photoUrls state:', photoUrls);
-      console.log('[WriteReviewModal] PhotoUrlToFileMap size:', photoUrlToFileMap.size);
+      console.log('[WriteReviewModal] Current mediaItems:', mediaItems.length);
       console.log('[WriteReviewModal] existingReview:', existingReview?.id);
       
-      // Build the final photo URLs array preserving the exact order from photoUrls
+      // Process all media items and upload new ones
       const finalPhotoUrls: string[] = [];
+      const finalVideoUrls: { url: string; thumbnailUrl?: string }[] = [];
       
-      // Process each URL in photoUrls array in order
-      for (let i = 0; i < photoUrls.length; i++) {
-        const url = photoUrls[i];
+      for (let i = 0; i < mediaItems.length; i++) {
+        const item = mediaItems[i];
         
-        if (url.startsWith('blob:')) {
-          // This is a new photo that needs to be uploaded
-          const photo = photoUrlToFileMap.get(url);
-          
-          if (!photo) {
-            console.error('[WriteReviewModal] No file found for blob URL at position', i);
-            continue;
-          }
-          
-          const fileExt = photo.name.split('.').pop() || 'jpg';
+        if (item.url.startsWith('blob:') && item.file) {
+          // This is a new file that needs to be uploaded
+          const fileExt = item.file.name.split('.').pop() || (item.type === 'video' ? 'mp4' : 'jpg');
           const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const bucket = item.type === 'video' ? 'review-videos' : 'review-photos';
           
-          console.log('[WriteReviewModal] Uploading new photo:', fileName, 'at position', i);
+          console.log(`[WriteReviewModal] Uploading new ${item.type}:`, fileName);
           
           const { data, error } = await supabase.storage
-            .from('review-photos')
-            .upload(`reviews/${fileName}`, photo);
+            .from(bucket)
+            .upload(`reviews/${fileName}`, item.file);
           
           if (error) {
-            console.error('Photo upload error:', error);
-            showToast('Failed to upload photo', 'error');
+            console.error(`${item.type} upload error:`, error);
+            showToast(`Failed to upload ${item.type}`, 'error');
             setSubmitting(false);
             return;
           }
           
           const { data: { publicUrl } } = supabase.storage
-            .from('review-photos')
+            .from(bucket)
             .getPublicUrl(`reviews/${fileName}`);
           
-          console.log('[WriteReviewModal] Uploaded successfully at position', i);
-          finalPhotoUrls.push(publicUrl);
-        } else {
-          // This is an existing photo URL from the database, keep it in order
-          console.log('[WriteReviewModal] Keeping existing photo at position', i);
-          finalPhotoUrls.push(url);
+          if (item.type === 'video') {
+            // Upload thumbnail if we have one
+            let thumbnailPublicUrl: string | undefined;
+            if (item.thumbnailUrl && item.thumbnailUrl.startsWith('data:')) {
+              // Convert data URL to blob and upload
+              const thumbnailBlob = await fetch(item.thumbnailUrl).then(r => r.blob());
+              const thumbnailFileName = `${Date.now()}-thumb-${Math.random().toString(36).substring(7)}.jpg`;
+              
+              const { error: thumbError } = await supabase.storage
+                .from('review-photos')
+                .upload(`thumbnails/${thumbnailFileName}`, thumbnailBlob);
+              
+              if (!thumbError) {
+                const { data: { publicUrl: thumbUrl } } = supabase.storage
+                  .from('review-photos')
+                  .getPublicUrl(`thumbnails/${thumbnailFileName}`);
+                thumbnailPublicUrl = thumbUrl;
+              }
+            }
+            finalVideoUrls.push({ url: publicUrl, thumbnailUrl: thumbnailPublicUrl });
+          } else {
+            finalPhotoUrls.push(publicUrl);
+          }
+        } else if (!item.url.startsWith('blob:')) {
+          // This is an existing URL from the database
+          if (item.type === 'video') {
+            finalVideoUrls.push({ url: item.url, thumbnailUrl: item.thumbnailUrl });
+          } else {
+            finalPhotoUrls.push(item.url);
+          }
         }
       }
       
-      console.log('[WriteReviewModal] Final photoUrls to send (in order):', finalPhotoUrls.length, 'photos');
+      console.log('[WriteReviewModal] Final uploads:', finalPhotoUrls.length, 'photos,', finalVideoUrls.length, 'videos');
 
       // Submit experience
       const response = await fetch('/api/reviews', {
@@ -371,6 +537,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           rating,
           content: experienceText,
           photoUrls: finalPhotoUrls,
+          videoUrls: finalVideoUrls,
           reviewId: existingReview?.id, // Include reviewId when editing
           isPublished: publish,
         }),
@@ -405,6 +572,7 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       setExperienceText('');
       setPhotos([]);
       setPhotoUrls([]);
+      setMediaItems([]);
       setSelectedRestaurant(null);
       setStep('search');
     } catch (error) {
@@ -563,9 +731,12 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 )}
               </div>
 
-              {/* Photo Upload - Compact */}
+              {/* Media Upload - Photos & Videos */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">Add Photos (Optional)</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                  Add Photos & Videos (Optional)
+                  <span className="text-gray-400 font-normal ml-1">• Max 10 items, videos up to 30s</span>
+                </label>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -574,44 +745,69 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                   onChange={handlePhotoSelect}
                   className="hidden"
                 />
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm"
+                  multiple
+                  onChange={handleVideoSelect}
+                  className="hidden"
+                />
                 
-                {photoUrls.length === 0 ? (
-                  /* Clean modern upload placeholder matching design */
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="relative w-full h-36 rounded-2xl overflow-hidden transition-all hover:opacity-90 active:scale-[0.98]"
-                    style={{
-                      background: 'linear-gradient(135deg, #FFF5F7 0%, #FFF0F5 50%, #F8F4FF 100%)'
-                    }}
-                  >
-                    {/* Content */}
-                    <div className="relative flex flex-col items-center justify-center h-full">
-                      {/* Pink Camera Icon with Plus */}
-                      <div className="relative w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FFE6F0' }}>
-                        <svg width="40" height="36" viewBox="0 0 40 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M36 8H30L27 4H13L10 8H4C1.8 8 0 9.8 0 12V32C0 34.2 1.8 36 4 36H36C38.2 36 40 34.2 40 32V12C40 9.8 38.2 8 36 8ZM20 30C15.6 30 12 26.4 12 22C12 17.6 15.6 14 20 14C24.4 14 28 17.6 28 22C28 26.4 24.4 30 20 30Z" fill="#FF69B4"/>
-                          <circle cx="20" cy="22" r="5" fill="#FF69B4"/>
-                        </svg>
-                        {/* Plus icon */}
-                        <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FF69B4' }}>
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M5 1V9M1 5H9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
+                {mediaItems.length === 0 ? (
+                  /* Clean modern upload placeholder with both options */
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="relative flex-1 h-32 rounded-2xl overflow-hidden transition-all hover:opacity-90 active:scale-[0.98]"
+                      style={{
+                        background: 'linear-gradient(135deg, #FFF5F7 0%, #FFF0F5 50%, #F8F4FF 100%)'
+                      }}
+                    >
+                      <div className="relative flex flex-col items-center justify-center h-full">
+                        <div className="relative w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FFE6F0' }}>
+                          <Camera className="w-7 h-7" style={{ color: '#FF69B4' }} />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FF69B4' }}>
+                            <svg width="8" height="8" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M5 1V9M1 5H9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                          </div>
                         </div>
+                        <span className="text-xs font-medium text-gray-600 mt-2">Photos</span>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      onClick={() => videoInputRef.current?.click()}
+                      disabled={generatingThumbnail}
+                      className="relative flex-1 h-32 rounded-2xl overflow-hidden transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                      style={{
+                        background: 'linear-gradient(135deg, #F0F5FF 0%, #E8F0FF 50%, #F5F0FF 100%)'
+                      }}
+                    >
+                      <div className="relative flex flex-col items-center justify-center h-full">
+                        <div className="relative w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: '#E0E8FF' }}>
+                          <Video className="w-7 h-7" style={{ color: '#6366F1' }} />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#6366F1' }}>
+                            <svg width="8" height="8" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M5 1V9M1 5H9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-gray-600 mt-2">Video</span>
+                      </div>
+                    </button>
+                  </div>
                 ) : (
-                  /* Photo grid when photos exist - with touch-friendly drag and drop */
+                  /* Media grid when items exist - with touch-friendly drag and drop */
                   <div 
                     className="grid grid-cols-3 gap-1.5"
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                   >
-                    {photoUrls.map((url, index) => (
+                    {mediaItems.map((item, index) => (
                       <div
-                        key={index}
+                        key={item.id}
                         data-photo-index={index}
                         onTouchStart={(e) => handleTouchStart(e, index)}
                         onTouchMove={(e) => handleTouchMove(e, index)}
@@ -625,12 +821,40 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                           ${isDragging && draggedIndex === index ? 'cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}
                         `}
                       >
-                        <img 
-                          src={url} 
-                          alt="" 
-                          className="w-full h-full object-cover rounded-lg border border-gray-200 pointer-events-none" 
-                          draggable={false}
-                        />
+                        {item.type === 'video' ? (
+                          /* Video thumbnail with play indicator */
+                          <div className="relative w-full h-full">
+                            {item.thumbnailUrl ? (
+                              <img 
+                                src={item.thumbnailUrl} 
+                                alt="" 
+                                className="w-full h-full object-cover rounded-lg border border-gray-200 pointer-events-none" 
+                                draggable={false}
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gray-800 rounded-lg flex items-center justify-center">
+                                <Video className="w-8 h-8 text-gray-400" />
+                              </div>
+                            )}
+                            {/* Play icon overlay */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+                                <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
+                              </div>
+                            </div>
+                            {/* Video badge */}
+                            <div className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded font-medium">
+                              Video
+                            </div>
+                          </div>
+                        ) : (
+                          <img 
+                            src={item.url} 
+                            alt="" 
+                            className="w-full h-full object-cover rounded-lg border border-gray-200 pointer-events-none" 
+                            draggable={false}
+                          />
+                        )}
                         
                         {/* Visual feedback during drag */}
                         {isDragging && draggedIndex === index && (
@@ -648,8 +872,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                           <div className="absolute inset-0 bg-primary/10 rounded-lg border-2 border-dashed border-primary animate-pulse" />
                         )}
                         
-                        {/* Long press hint (shows briefly on first photo) */}
-                        {!isDragging && index === 0 && photoUrls.length > 1 && (
+                        {/* Long press hint */}
+                        {!isDragging && index === 0 && mediaItems.length > 1 && (
                           <div className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[8px] text-center py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                             Press & hold to reorder
                           </div>
@@ -657,10 +881,10 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                         
                         {/* Remove button */}
                         <button
-                          onClick={() => removePhoto(index)}
+                          onClick={() => removeMedia(index)}
                           onTouchEnd={(e) => {
                             e.stopPropagation();
-                            removePhoto(index);
+                            removeMedia(index);
                           }}
                           className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 hover:scale-110 transition-all z-50 active:scale-95"
                         >
@@ -669,14 +893,30 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                       </div>
                     ))}
                     
-                    {photoUrls.length < 6 && (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors active:scale-95"
-                      >
-                        <Camera className="w-5 h-5" />
-                        <span className="text-[9px] mt-0.5 font-medium">Add</span>
-                      </button>
+                    {mediaItems.length < 10 && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex-1 aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors active:scale-95"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span className="text-[8px] mt-0.5 font-medium">Photo</span>
+                        </button>
+                        <button
+                          onClick={() => videoInputRef.current?.click()}
+                          disabled={generatingThumbnail}
+                          className="flex-1 aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-indigo-500 hover:text-indigo-500 hover:bg-indigo-50 transition-colors active:scale-95 disabled:opacity-50"
+                        >
+                          {generatingThumbnail ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Video className="w-4 h-4" />
+                              <span className="text-[8px] mt-0.5 font-medium">Video</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
