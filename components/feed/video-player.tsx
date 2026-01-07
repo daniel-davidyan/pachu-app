@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
 
 interface VideoPlayerProps {
   src: string;
@@ -13,7 +13,6 @@ interface VideoPlayerProps {
 export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [progress, setProgress] = useState(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -24,9 +23,17 @@ export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPla
     if (!video) return;
 
     if (isVisible) {
-      // Auto-play when visible
+      // Auto-play when visible (with sound)
+      video.muted = false;
       video.play().catch(() => {
-        // Auto-play was prevented, user needs to interact
+        // Auto-play was prevented, try muted first then unmute
+        video.muted = true;
+        video.play().then(() => {
+          // Unmute after play starts
+          video.muted = false;
+        }).catch(() => {
+          // Autoplay completely blocked
+        });
       });
     } else {
       // Pause when not visible
@@ -88,16 +95,6 @@ export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPla
     showControlsTemporarily();
   }, [isPlaying, showControlsTemporarily]);
 
-  const toggleMute = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.muted = !isMuted;
-    setIsMuted(!isMuted);
-    showControlsTemporarily();
-  }, [isMuted, showControlsTemporarily]);
-
   const handleVideoClick = useCallback(() => {
     togglePlay();
   }, [togglePlay]);
@@ -120,7 +117,6 @@ export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPla
         ref={videoRef}
         src={src}
         poster={poster}
-        muted={isMuted}
         loop
         playsInline
         preload="auto"
@@ -143,21 +139,11 @@ export function VideoPlayer({ src, poster, isVisible, className = '' }: VideoPla
         </div>
       )}
 
-      {/* Mute Button (bottom right) */}
-      <button
-        onClick={toggleMute}
-        className="absolute bottom-20 right-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center transition-opacity z-10"
-        style={{ opacity: showControls ? 1 : 0.7 }}
+      {/* Progress Bar - positioned just above the bottom navigation */}
+      <div 
+        className="absolute left-0 right-0 h-[2px] bg-white/30"
+        style={{ bottom: 'calc(56px + env(safe-area-inset-bottom))' }}
       >
-        {isMuted ? (
-          <VolumeX className="w-5 h-5 text-white" />
-        ) : (
-          <Volume2 className="w-5 h-5 text-white" />
-        )}
-      </button>
-
-      {/* Progress Bar (bottom) */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
         <div 
           className="h-full bg-white transition-all duration-100"
           style={{ width: `${progress}%` }}

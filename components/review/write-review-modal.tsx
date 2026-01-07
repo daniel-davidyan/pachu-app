@@ -826,7 +826,6 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                   ref={videoInputRef}
                   type="file"
                   accept="video/*"
-                  capture="environment"
                   onChange={handleVideoSelect}
                   className="hidden"
                 />

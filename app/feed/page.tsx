@@ -197,14 +197,9 @@ export default function FeedPage() {
         notificationCount={6}
       />
 
-      {/* Main Feed Content */}
+      {/* Main Feed Content - Full screen, video behind everything */}
       <div 
-        className="w-full"
-        style={{
-          height: '100%',
-          paddingTop: 'max(60px, calc(52px + env(safe-area-inset-top)))',
-          paddingBottom: 'max(70px, calc(56px + env(safe-area-inset-bottom)))',
-        }}
+        className="w-full h-full"
       >
         {loading && reviews.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center">

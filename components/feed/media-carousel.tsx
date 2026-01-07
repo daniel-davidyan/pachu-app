@@ -148,7 +148,7 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
       {media.length > 1 && (
         <div 
           className="absolute left-0 right-0 flex justify-center gap-1.5 z-10"
-          style={{ bottom: 'calc(139px + env(safe-area-inset-bottom))' }}
+          style={{ bottom: 'calc(200px + env(safe-area-inset-bottom))' }}
         >
           {media.map((_, index) => (
             <button
