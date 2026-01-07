@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical, Camera } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical, Camera, Bookmark } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
+import { CollectionPicker } from '@/components/collections/collection-picker';
+import { CollectionModal } from '@/components/collections/collection-modal';
 
 interface Comment {
   id: string;
@@ -96,6 +98,11 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [editCommentContent, setEditCommentContent] = useState('');
   const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
   const commentMenuRef = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  
+  // Save/Collection state
+  const [isSaved, setIsSaved] = useState(false);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
 
   // Check if this is a Google review (ID starts with "google-")
   const isGoogleReview = post.id.startsWith('google-');
@@ -112,9 +119,29 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   // Notify parent when sheet state changes
   useEffect(() => {
     if (onSheetStateChange) {
-      onSheetStateChange(showComments || showLikes);
+      onSheetStateChange(showComments || showLikes || showCollectionPicker);
     }
-  }, [showComments, showLikes, onSheetStateChange]);
+  }, [showComments, showLikes, showCollectionPicker, onSheetStateChange]);
+
+  // Check if restaurant is saved
+  useEffect(() => {
+    if (!post.restaurant?.googlePlaceId && !post.restaurant?.id) return;
+    
+    const checkSavedStatus = async () => {
+      try {
+        const response = await fetch('/api/wishlist');
+        const data = await response.json();
+        const saved = data.wishlist?.some(
+          (item: any) => item.restaurants?.google_place_id === (post.restaurant?.googlePlaceId || post.restaurant?.id)
+        );
+        setIsSaved(saved || false);
+      } catch (error) {
+        console.error('Error checking saved status:', error);
+      }
+    };
+    
+    checkSavedStatus();
+  }, [post.restaurant]);
 
   // Close comment menu when clicking outside
   useEffect(() => {
@@ -506,6 +533,55 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
     }
   };
 
+  // Save to collection handlers
+  const handleSave = async () => {
+    if (!post.restaurant) {
+      showToast('Cannot save - no restaurant info', 'error');
+      return;
+    }
+
+    if (isSaved) {
+      // If already saved, remove from wishlist
+      try {
+        const wishlistResponse = await fetch('/api/wishlist');
+        const wishlistData = await wishlistResponse.json();
+        const wishlistItem = wishlistData.wishlist?.find(
+          (item: any) => item.restaurants?.google_place_id === (post.restaurant?.googlePlaceId || post.restaurant?.id)
+        );
+
+        if (wishlistItem) {
+          const response = await fetch(`/api/wishlist?restaurantId=${wishlistItem.restaurants.id}`, {
+            method: 'DELETE',
+          });
+
+          if (response.ok) {
+            setIsSaved(false);
+            showToast('Removed from saved', 'success');
+          }
+        }
+      } catch (error) {
+        console.error('Error removing from saved:', error);
+        showToast('Failed to remove', 'error');
+      }
+    } else {
+      // If not saved, open collection picker
+      setShowCollectionPicker(true);
+    }
+  };
+
+  const handleSavedToCollection = (collectionId: string | null) => {
+    setIsSaved(true);
+  };
+
+  const handleCreateNewCollection = () => {
+    setShowCollectionModal(true);
+  };
+
+  const handleCollectionCreated = () => {
+    // Re-open collection picker after creating a collection
+    setShowCollectionPicker(true);
+  };
+
   return (
     <div className={embedded ? "" : "bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"}>
       {/* Content at Top */}
@@ -838,6 +914,22 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                 </button>
               )}
             </div>
+
+            {/* Spacer to push save button to right */}
+            <div className="flex-1" />
+
+            {/* Save Button - Only show if restaurant info exists */}
+            {post.restaurant && (
+              <button
+                onClick={handleSave}
+                className="transition-transform active:scale-90"
+              >
+                <Bookmark 
+                  className={`w-[26px] h-[26px] ${isSaved ? 'fill-gray-900 text-gray-900' : 'text-gray-900'}`}
+                  strokeWidth={1.5}
+                />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1116,6 +1208,29 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
           </>
         )}
       </BottomSheet>
+
+      {/* Collection Picker */}
+      {post.restaurant && (
+        <CollectionPicker
+          isOpen={showCollectionPicker}
+          onClose={() => setShowCollectionPicker(false)}
+          restaurant={{
+            googlePlaceId: post.restaurant.googlePlaceId || post.restaurant.id,
+            name: post.restaurant.name,
+            address: post.restaurant.address,
+            imageUrl: post.restaurant.imageUrl,
+          }}
+          onSaved={handleSavedToCollection}
+          onCreateNew={handleCreateNewCollection}
+        />
+      )}
+
+      {/* Create Collection Modal */}
+      <CollectionModal
+        isOpen={showCollectionModal}
+        onClose={() => setShowCollectionModal(false)}
+        onSuccess={handleCollectionCreated}
+      />
     </div>
   );
 }

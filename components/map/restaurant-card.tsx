@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2, Calendar } from 'lucide-react';
+import { X, MapPin, Heart, Navigation, Phone, Globe, ChevronRight, Edit3, Loader2, Calendar, Bookmark } from 'lucide-react';
 import { Restaurant } from './mapbox';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { formatAddress, extractCityFromAddress } from '@/lib/address-utils';
+import { CollectionPicker } from '@/components/collections/collection-picker';
+import { CollectionModal } from '@/components/collections/collection-modal';
 
 interface RestaurantCardProps {
   restaurant: Restaurant | null;
@@ -34,6 +36,8 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   const [loadingOntopo, setLoadingOntopo] = useState(false);
   const [ontopoUrl, setOntopoUrl] = useState<string | null>(null);
   const [isIsrael, setIsIsrael] = useState(false);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
 
   // Notify parent when review modal opens/closes
   useEffect(() => {
@@ -106,28 +110,12 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
   const handleWishlist = async () => {
     if (loadingWishlist) return;
     
-    setLoadingWishlist(true);
-    const newWishlistState = !isLiked;
-    setIsLiked(newWishlistState);
-    
-    try {
-      if (newWishlistState) {
-        // Add to wishlist
-        const response = await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            googlePlaceId: restaurant?.googlePlaceId || restaurant?.id,
-            name: restaurant?.name,
-            address: restaurant?.address,
-            imageUrl: restaurant?.photoUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to add to wishlist');
-        }
-      } else {
+    if (isLiked) {
+      // If already saved, remove from wishlist
+      setLoadingWishlist(true);
+      setIsLiked(false);
+      
+      try {
         // Remove from wishlist - we need to get the restaurant ID first
         const wishlistResponse = await fetch('/api/wishlist');
         const wishlistData = await wishlistResponse.json();
@@ -144,14 +132,30 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
             throw new Error('Failed to remove from wishlist');
           }
         }
+      } catch (error) {
+        console.error('Error updating wishlist:', error);
+        // Revert on error
+        setIsLiked(true);
+      } finally {
+        setLoadingWishlist(false);
       }
-    } catch (error) {
-      console.error('Error updating wishlist:', error);
-      // Revert on error
-      setIsLiked(!newWishlistState);
-    } finally {
-      setLoadingWishlist(false);
+    } else {
+      // If not saved, open collection picker
+      setShowCollectionPicker(true);
     }
+  };
+
+  const handleSavedToCollection = (collectionId: string | null) => {
+    setIsLiked(true);
+  };
+
+  const handleCreateNewCollection = () => {
+    setShowCollectionModal(true);
+  };
+
+  const handleCollectionCreated = (collection: { id: string; name: string }) => {
+    // Re-open collection picker after creating a collection
+    setShowCollectionPicker(true);
   };
 
   // Check if restaurant is already in wishlist
@@ -535,13 +539,13 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
                 onClick={handleWishlist}
                 disabled={loadingWishlist}
                 className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all active:scale-95 disabled:opacity-50 ${
-                  isLiked ? 'bg-red-50' : 'bg-gray-100 hover:bg-gray-200'
+                  isLiked ? 'bg-primary/10' : 'bg-gray-100 hover:bg-gray-200'
                 }`}
               >
                 {loadingWishlist ? (
                   <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
                 ) : (
-                  <Heart className={`w-5 h-5 transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+                  <Bookmark className={`w-5 h-5 transition-colors ${isLiked ? 'fill-primary text-primary' : 'text-gray-600'}`} />
                 )}
               </button>
               {/* Website button - Only show if not confirmed to have no website */}
@@ -631,6 +635,29 @@ export function RestaurantCard({ restaurant, onClose, userLocation, onReviewModa
         onSuccess={() => {
           setShowWriteReview(false);
         }}
+      />
+
+      {/* Collection Picker */}
+      {restaurant && (
+        <CollectionPicker
+          isOpen={showCollectionPicker}
+          onClose={() => setShowCollectionPicker(false)}
+          restaurant={{
+            googlePlaceId: restaurant.googlePlaceId || restaurant.id,
+            name: restaurant.name,
+            address: restaurant.address,
+            imageUrl: restaurant.photoUrl,
+          }}
+          onSaved={handleSavedToCollection}
+          onCreateNew={handleCreateNewCollection}
+        />
+      )}
+
+      {/* Create Collection Modal */}
+      <CollectionModal
+        isOpen={showCollectionModal}
+        onClose={() => setShowCollectionModal(false)}
+        onSuccess={handleCollectionCreated}
       />
     </>
   );

@@ -114,6 +114,8 @@ export async function GET(request: NextRequest) {
     const tab = searchParams.get('tab') || 'foryou'; // 'following' or 'foryou'
     const city = searchParams.get('city') || null;
 
+    console.log('[Feed Reviews] Request params:', { page, limit, latitude, longitude, radius, tab, city });
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -227,19 +229,83 @@ export async function GET(request: NextRequest) {
       .in('review_id', reviewIds)
       .order('sort_order', { ascending: true });
 
-    // Get videos for all reviews
+    // For 'foryou' tab, ALWAYS fetch all recent videos first to ensure we don't miss any
     let videosData: any[] = [];
-    const { data: videosResult, error: videosError } = await supabase
-      .from('review_videos')
-      .select('review_id, id, video_url, thumbnail_url, duration_seconds, sort_order')
-      .in('review_id', reviewIds)
-      .order('sort_order', { ascending: true });
+    let additionalReviewsData: any[] = [];
     
-    if (videosError) {
-      console.error('[Feed Reviews] Error fetching videos:', videosError);
+    if (tab === 'foryou') {
+      console.log('[Feed Reviews] Fetching ALL recent videos for foryou tab...');
+      const { data: allVideos, error: allVideosError } = await supabase
+        .from('review_videos')
+        .select('review_id, id, video_url, thumbnail_url, duration_seconds, sort_order')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (allVideosError) {
+        console.error('[Feed Reviews] Error fetching all videos:', allVideosError);
+      } else if (allVideos && allVideos.length > 0) {
+        console.log('[Feed Reviews] Found', allVideos.length, 'videos total');
+        videosData = allVideos;
+        
+        // Get reviews for videos that aren't in our current reviewsData
+        const existingReviewIds = new Set(reviewIds);
+        const missingVideoReviewIds = [...new Set(allVideos.map((v: any) => v.review_id))]
+          .filter(id => !existingReviewIds.has(id));
+        
+        if (missingVideoReviewIds.length > 0) {
+          console.log('[Feed Reviews] Fetching', missingVideoReviewIds.length, 'missing reviews with videos');
+          const { data: videoReviews } = await supabase
+            .from('reviews')
+            .select(`
+              id,
+              rating,
+              content,
+              created_at,
+              user_id,
+              restaurant_id,
+              restaurants (
+                id,
+                name,
+                address,
+                city,
+                google_place_id,
+                image_url
+              )
+            `)
+            .in('id', missingVideoReviewIds)
+            .eq('is_published', true);
+          
+          if (videoReviews && videoReviews.length > 0) {
+            console.log('[Feed Reviews] Adding', videoReviews.length, 'reviews with videos to feed');
+            additionalReviewsData = videoReviews;
+            // Add to reviewIds for photo lookup
+            videoReviews.forEach((r: any) => reviewIds.push(r.id));
+          }
+        }
+      }
     } else {
-      videosData = videosResult || [];
-      console.log('[Feed Reviews] Videos fetched:', videosData.length);
+      // For 'following' tab, only get videos from reviews we already have
+      console.log('[Feed Reviews] Fetching videos for reviewIds:', reviewIds.slice(0, 5), '... total:', reviewIds.length);
+      
+      if (reviewIds.length > 0) {
+        const { data: videosResult, error: videosError } = await supabase
+          .from('review_videos')
+          .select('review_id, id, video_url, thumbnail_url, duration_seconds, sort_order')
+          .in('review_id', reviewIds)
+          .order('sort_order', { ascending: true });
+        
+        if (videosError) {
+          console.error('[Feed Reviews] Error fetching videos:', videosError);
+        } else {
+          videosData = videosResult || [];
+          console.log('[Feed Reviews] Videos fetched:', videosData.length);
+        }
+      }
+    }
+    
+    // Merge additional reviews into main reviewsData
+    if (additionalReviewsData.length > 0) {
+      (reviewsData as any[]).push(...additionalReviewsData);
     }
 
     // Group media by review
@@ -276,6 +342,14 @@ export async function GET(request: NextRequest) {
     console.log('[Feed Reviews] Total photos found:', photosData?.length || 0);
     console.log('[Feed Reviews] Total videos found:', videosData?.length || 0);
     console.log('[Feed Reviews] Reviews with media map size:', mediaByReview.size);
+    
+    // Log each review and its media for debugging
+    if (reviewsData && reviewsData.length > 0) {
+      reviewsData.forEach((r: any) => {
+        const media = mediaByReview.get(r.id);
+        console.log(`[Feed Reviews] Review ${r.id}: has ${media?.length || 0} media items, restaurant: ${r.restaurants?.name}`);
+      });
+    }
 
     // Filter reviews that have at least one media item
     const reviewsWithMedia = (reviewsData || []).filter((r: any) => {

@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2 } from 'lucide-react';
+import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { PostCard, PostCardData } from '@/components/post/post-card';
@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
+import { CollectionModal } from '@/components/collections/collection-modal';
 
 interface Profile {
   id: string;
@@ -66,6 +67,16 @@ interface WishlistItem {
   };
 }
 
+interface SavedCollection {
+  id: string;
+  name: string;
+  cover_image_url: string | null;
+  items_count: number;
+  preview_images: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 type ProfileTab = 'published' | 'unpublished' | 'saved';
 
 export default function ProfilePage() {
@@ -76,8 +87,11 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<Stats>({ experiences: 0, followers: 0, following: 0 });
   const [reviews, setReviews] = useState<Review[]>([]);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [collections, setCollections] = useState<SavedCollection[]>([]);
+  const [allSavedCount, setAllSavedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingTab, setLoadingTab] = useState(false);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('published');
   const [editingReview, setEditingReview] = useState<Review | null>(null);
@@ -101,7 +115,7 @@ export default function ProfilePage() {
       if (activeTab === 'published' || activeTab === 'unpublished') {
         fetchReviews();
       } else {
-        fetchWishlist();
+        fetchCollections();
       }
     }
   }, [user, activeTab]);
@@ -241,6 +255,40 @@ export default function ProfilePage() {
     } finally {
       setLoadingTab(false);
     }
+  };
+
+  const fetchCollections = async () => {
+    if (!user?.id) return;
+    
+    setLoadingTab(true);
+    try {
+      // Fetch collections and all saved count in parallel
+      const [collectionsRes, wishlistRes] = await Promise.all([
+        fetch('/api/collections'),
+        fetch('/api/wishlist'),
+      ]);
+      
+      const collectionsData = await collectionsRes.json();
+      const wishlistData = await wishlistRes.json();
+      
+      if (collectionsData.collections) {
+        setCollections(collectionsData.collections);
+      }
+      
+      if (wishlistData.wishlist) {
+        setAllSavedCount(wishlistData.count || wishlistData.wishlist.length);
+      }
+    } catch (error) {
+      console.error('Error fetching collections:', error);
+      setCollections([]);
+    } finally {
+      setLoadingTab(false);
+    }
+  };
+
+  const handleCollectionCreated = (collection: { id: string; name: string }) => {
+    // Refresh collections after creating a new one
+    fetchCollections();
   };
 
   const handleRemoveFromWishlist = async (restaurantId: string) => {
@@ -639,58 +687,100 @@ export default function ProfilePage() {
               </div>
             )
           ) : (
-            // Saved/Wishlist Grid - Instagram Style
-            wishlist.length > 0 ? (
-              <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
-                {wishlist.map((item) => (
+            // Saved Collections Grid
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-3">
+                {/* All Saved Collection - Always First */}
+                <Link
+                  href="/profile/collections/all"
+                  className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                    <Bookmark className="w-12 h-12 text-gray-400" />
+                  </div>
+                  
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex flex-col justify-end p-3">
+                    <p className="text-white font-semibold text-sm">All Saved</p>
+                    <p className="text-white/70 text-xs">{allSavedCount} {allSavedCount === 1 ? 'place' : 'places'}</p>
+                  </div>
+                </Link>
+
+                {/* User Collections */}
+                {collections.map((collection) => (
                   <Link
-                    key={item.id}
-                    href={`/restaurant/${item.restaurants?.google_place_id || item.restaurants?.id}`}
-                    className="relative aspect-square bg-gray-200 overflow-hidden group"
+                    key={collection.id}
+                    href={`/profile/collections/${collection.id}`}
+                    className="relative aspect-square bg-gray-100 rounded-2xl overflow-hidden group"
                   >
-                    {item.restaurants?.image_url ? (
-                      <img
-                        src={item.restaurants.image_url}
-                        alt={item.restaurants.name}
-                        className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-                      />
+                    {/* Collection Cover - Grid of up to 4 images or placeholder */}
+                    {collection.preview_images && collection.preview_images.length > 0 ? (
+                      collection.preview_images.length === 1 ? (
+                        <img
+                          src={collection.cover_image_url || collection.preview_images[0]}
+                          alt={collection.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                          {collection.preview_images.slice(0, 4).map((img, idx) => (
+                            <div key={idx} className="relative overflow-hidden">
+                              <img
+                                src={img}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                          {/* Fill empty slots if less than 4 images */}
+                          {Array.from({ length: Math.max(0, 4 - collection.preview_images.length) }).map((_, idx) => (
+                            <div key={`empty-${idx}`} className="bg-gray-200" />
+                          ))}
+                        </div>
+                      )
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                        <span className="text-2xl">🍽️</span>
+                      <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                        <Bookmark className="w-10 h-10 text-primary/40" />
                       </div>
                     )}
                     
-                    {/* Restaurant Name Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-2">
-                      <p className="text-white text-xs font-medium line-clamp-2 leading-tight">
-                        {item.restaurants?.name || 'Restaurant'}
-                      </p>
-                    </div>
-
-                    {/* Bookmark Icon */}
-                    <div className="absolute top-2 right-2">
-                      <Bookmark className="w-5 h-5 text-white fill-white drop-shadow-lg" />
+                    {/* Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex flex-col justify-end p-3">
+                      <p className="text-white font-semibold text-sm truncate">{collection.name}</p>
+                      <p className="text-white/70 text-xs">{collection.items_count} {collection.items_count === 1 ? 'place' : 'places'}</p>
                     </div>
                   </Link>
                 ))}
-              </div>
-            ) : (
-              <div className="px-4 py-8">
-                <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl border-2 border-dashed border-red-200 p-10 text-center">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                    <Bookmark className="w-8 h-8 text-gray-400" />
+
+                {/* Create New Collection Button */}
+                <button
+                  onClick={() => setShowCollectionModal(true)}
+                  className="aspect-square bg-white border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-colors group"
+                >
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <FolderPlus className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors" />
                   </div>
-                  <p className="text-gray-900 font-bold text-lg">Your wishlist is empty</p>
-                  <p className="text-sm text-gray-600 mt-2 mb-4">Save restaurants you want to try!</p>
+                  <span className="text-sm font-medium text-gray-500 group-hover:text-primary transition-colors">New Collection</span>
+                </button>
+              </div>
+
+              {/* Empty State - Only show if no collections and no saved items */}
+              {collections.length === 0 && allSavedCount === 0 && (
+                <div className="mt-6 bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl border-2 border-dashed border-red-200 p-8 text-center">
+                  <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                    <Bookmark className="w-7 h-7 text-gray-400" />
+                  </div>
+                  <p className="text-gray-900 font-bold">Start saving places!</p>
+                  <p className="text-sm text-gray-600 mt-1 mb-3">Save restaurants you want to try and organize them into collections</p>
                   <Link 
                     href="/map" 
-                    className="inline-block bg-primary text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+                    className="inline-block bg-primary text-white px-5 py-2 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
                   >
                     Explore Restaurants
                   </Link>
                 </div>
-              </div>
-            )
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -740,6 +830,13 @@ export default function ProfilePage() {
         confirmText="Delete"
         cancelText="Cancel"
         confirmButtonClass="bg-red-600 hover:bg-red-700"
+      />
+
+      {/* Create Collection Modal */}
+      <CollectionModal
+        isOpen={showCollectionModal}
+        onClose={() => setShowCollectionModal(false)}
+        onSuccess={handleCollectionCreated}
       />
     </MainLayout>
   );

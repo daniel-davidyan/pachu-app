@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Sparkles, Loader2, Plus, Clock, X, Trash2, BarChart3, Laptop, Armchair, Coffee, Users, MapPin, Utensils, Heart, Wallet, Leaf, Pizza, Fish, Beef, Salad, IceCream, Wine, Beer, Soup, Sandwich, Egg, Apple, Globe, Sun, Moon, PartyPopper, Baby, Dog, Music, Wifi, Car, TreePine, Building, Home, Flame, Snowflake, Zap, Star, type LucideIcon } from 'lucide-react';
+import { Send, Sparkles, Loader2, Plus, Clock, X, Trash2, BarChart3 } from 'lucide-react';
 import { BottomNav } from '@/components/layout/bottom-nav';
 
 interface Restaurant {
@@ -22,18 +22,11 @@ interface Restaurant {
   website?: string;
 }
 
-interface Chip {
-  label: string;
-  value: string;
-  emoji?: string;
-}
-
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   restaurants?: Restaurant[];
-  chips?: Chip[];
 }
 
 interface ConversationContext {
@@ -87,76 +80,6 @@ const getRestaurantIcon = (restaurant: Restaurant): string => {
 const getPriceLevel = (priceLevel?: number): string => {
   if (!priceLevel) return '$$';
   return '$'.repeat(priceLevel);
-};
-
-// Helper function to get modern icon for chip based on content
-const getChipIcon = (label: string, value: string): LucideIcon => {
-  const text = (label + ' ' + value).toLowerCase();
-  
-  // Work & Study
-  if (text.includes('עבודה') || text.includes('לפטופ') || text.includes('work') || text.includes('laptop')) return Laptop;
-  if (text.includes('ישיבה') || text.includes('seat') || text.includes('מקום') || text.includes('הזמנ')) return Armchair;
-  if (text.includes('wifi') || text.includes('אינטרנט')) return Wifi;
-  
-  // Social
-  if (text.includes('חברים') || text.includes('friend') || text.includes('קבוצה') || text.includes('group')) return Users;
-  if (text.includes('רומנטי') || text.includes('דייט') || text.includes('date') || text.includes('זוג')) return Heart;
-  if (text.includes('משפחה') || text.includes('family') || text.includes('ילדים')) return Home;
-  if (text.includes('תינוק') || text.includes('baby')) return Baby;
-  if (text.includes('כלב') || text.includes('dog') || text.includes('חיות')) return Dog;
-  if (text.includes('מסיבה') || text.includes('party') || text.includes('חגיגה') || text.includes('יומהולדת')) return PartyPopper;
-  
-  // Location & Cities
-  if (text.includes('תל אביב') || text.includes('tel aviv') || text.includes('tlv')) return Building;
-  if (text.includes('ירושלים') || text.includes('jerusalem')) return Building;
-  if (text.includes('חיפה') || text.includes('haifa')) return Building;
-  if (text.includes('הרצליה') || text.includes('herzliya')) return Building;
-  if (text.includes('רמת גן') || text.includes('ramat gan')) return Building;
-  if (text.includes('בכל') || text.includes('כל ה') || text.includes('באזור') || text.includes('סביבה')) return MapPin;
-  if (text.includes('מיקום') || text.includes('location') || text.includes('איפה') || text.includes('קרוב')) return MapPin;
-  if (text.includes('חוץ') || text.includes('outdoor') || text.includes('גינה') || text.includes('מרפסת')) return TreePine;
-  if (text.includes('פנים') || text.includes('indoor')) return Building;
-  if (text.includes('חניה') || text.includes('parking') || text.includes('רכב')) return Car;
-  if (text.includes('ים') || text.includes('חוף') || text.includes('beach')) return Sun;
-  
-  // Food Types
-  if (text.includes('אסייתי') || text.includes('asian') || text.includes('סיני') || text.includes('יפני') || text.includes('תאילנדי')) return Globe;
-  if (text.includes('איטלקי') || text.includes('italian') || text.includes('פיצה') || text.includes('פסטה')) return Pizza;
-  if (text.includes('בשר') || text.includes('meat') || text.includes('סטייק') || text.includes('המבורגר')) return Beef;
-  if (text.includes('דג') || text.includes('fish') || text.includes('סושי') || text.includes('ים')) return Fish;
-  if (text.includes('סלט') || text.includes('salad') || text.includes('טרי')) return Salad;
-  if (text.includes('בריא') || text.includes('healthy') || text.includes('טבעוני') || text.includes('צמחוני')) return Leaf;
-  if (text.includes('קינוח') || text.includes('dessert') || text.includes('מתוק') || text.includes('גלידה')) return IceCream;
-  if (text.includes('מרק') || text.includes('soup')) return Soup;
-  if (text.includes('סנדוויץ') || text.includes('sandwich') || text.includes('כריך')) return Sandwich;
-  if (text.includes('ארוחת בוקר') || text.includes('breakfast') || text.includes('בוקר')) return Egg;
-  if (text.includes('פרי') || text.includes('fruit')) return Apple;
-  
-  // Drinks
-  if (text.includes('קפה') || text.includes('coffee') || text.includes('בית קפה')) return Coffee;
-  if (text.includes('יין') || text.includes('wine')) return Wine;
-  if (text.includes('בירה') || text.includes('beer') || text.includes('בר')) return Beer;
-  
-  // Vibe & Atmosphere  
-  if (text.includes('שקט') || text.includes('quiet') || text.includes('רגוע')) return Moon;
-  if (text.includes('חי') || text.includes('lively') || text.includes('אנרגטי') || text.includes('תוסס')) return Zap;
-  if (text.includes('מוזיקה') || text.includes('music') || text.includes('dj')) return Music;
-  if (text.includes('חם') || text.includes('hot') || text.includes('חורף')) return Flame;
-  if (text.includes('קר') || text.includes('cold') || text.includes('קיץ') || text.includes('מזגן')) return Snowflake;
-  if (text.includes('שמש') || text.includes('sun') || text.includes('צהריים')) return Sun;
-  if (text.includes('ערב') || text.includes('לילה') || text.includes('night')) return Moon;
-  
-  // Budget
-  if (text.includes('תקציב') || text.includes('מחיר') || text.includes('budget') || text.includes('זול') || text.includes('יקר')) return Wallet;
-  
-  // Food general
-  if (text.includes('אוכל') || text.includes('food') || text.includes('מסעדה') || text.includes('לאכול')) return Utensils;
-  
-  // Surprise / Other
-  if (text.includes('הפתע') || text.includes('surprise') || text.includes('תפתיע')) return Star;
-  
-  // Default
-  return Utensils;
 };
 
 // Restaurant card component - Modern design with full image overlay
@@ -242,7 +165,6 @@ export default function AgentPage() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const [currentChips, setCurrentChips] = useState<Chip[]>([]);
   const [conversationContext, setConversationContext] = useState<ConversationContext | null>(null);
   const [latestDebugData, setLatestDebugData] = useState<any>(null);
   
@@ -328,7 +250,7 @@ export default function AgentPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }, 100);
     }
-  }, [messages, isInputFocused, currentChips]);
+  }, [messages, isInputFocused]);
 
   // Handle iOS keyboard behavior
   useEffect(() => {
@@ -358,7 +280,6 @@ export default function AgentPage() {
     setCurrentChatId(Date.now().toString());
     setShowHistory(false);
     setInputValue('');
-    setCurrentChips([]);
     setConversationContext(null);
     setTimeout(() => {
       inputRef.current?.focus();
@@ -369,7 +290,6 @@ export default function AgentPage() {
     setMessages(conversation.messages);
     setCurrentChatId(conversation.id);
     setShowHistory(false);
-    setCurrentChips([]);
   };
 
   const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
@@ -388,13 +308,6 @@ export default function AgentPage() {
     router.push(`/map?restaurantId=${restaurant.id}&lat=${restaurant.latitude}&lng=${restaurant.longitude}&fromAgent=true`);
   };
 
-  const handleChipClick = (chip: Chip) => {
-    // Send just the label without emoji for cleaner messages
-    setInputValue(chip.label);
-    // Immediately send the message
-    handleSendWithMessage(chip.label);
-  };
-
   const handleSendWithMessage = async (messageContent: string) => {
     if (!messageContent.trim() || isLoading) return;
 
@@ -408,7 +321,6 @@ export default function AgentPage() {
     setMessages(newMessages);
     setInputValue('');
     setIsLoading(true);
-    setCurrentChips([]); // Clear chips while loading
 
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -496,7 +408,6 @@ export default function AgentPage() {
         };
 
         setMessages(prev => [...prev, assistantMessage]);
-        setCurrentChips([]);
       } else if (agentData.error) {
         // API returned an error - show it
         console.error('Agent returned error:', agentData.error);
@@ -504,30 +415,24 @@ export default function AgentPage() {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: agentData.message || "משהו לא עבד, בוא ננסה שוב 🙏",
-          chips: agentData.chips || [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }],
         };
         setMessages(prev => [...prev, assistantMessage]);
-        setCurrentChips(agentData.chips || []);
       } else if (agentData.readyToRecommend) {
         // Ready but no recommendations found
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: agentData.message || "לא מצאתי מקומות מתאימים, אפשר לנסות לחפש משהו אחר?",
-          chips: agentData.chips,
         };
         setMessages(prev => [...prev, assistantMessage]);
-        setCurrentChips(agentData.chips || []);
       } else {
-        // Not ready yet, show agent response with chips
+        // Continue conversation naturally
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: agentData.message || "איך אפשר לעזור?",
-          chips: agentData.chips,
         };
         setMessages(prev => [...prev, assistantMessage]);
-        setCurrentChips(agentData.chips || []);
       }
 
     } catch (error: any) {
@@ -538,18 +443,12 @@ export default function AgentPage() {
       const errorMsg = error?.message || 'No message';
       
       let errorContent = "אופס, משהו השתבש. בוא ננסה שוב! 🙏";
-      let errorChips: Chip[] = [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }];
       
       // Handle specific error types
       if (error?.name === 'AbortError') {
         errorContent = "החיפוש לקח יותר מדי זמן 😅 נראה שהרשת איטית. בוא ננסה שוב?";
-        errorChips = [
-          { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
-          { label: 'חיפוש פשוט יותר', value: 'simpler', emoji: '✨' },
-        ];
       } else if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
         errorContent = "נראה שיש בעיה ברשת 📶 בדוק את החיבור ונסה שוב";
-        errorChips = [{ label: 'נסה שוב', value: 'retry', emoji: '🔄' }];
       }
       
       // Add debug info to error message (for troubleshooting)
@@ -559,10 +458,8 @@ export default function AgentPage() {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: errorContent + debugInfo,
-        chips: errorChips,
       };
       setMessages(prev => [...prev, errorMessage]);
-      setCurrentChips(errorChips);
     } finally {
       setIsLoading(false);
       setTimeout(() => {
@@ -847,28 +744,6 @@ export default function AgentPage() {
                   </div>
                 )}
 
-                {/* Chips - Modern 2x2 grid */}
-                {currentChips.length > 0 && !isLoading && (
-                  <div className="grid grid-cols-2 gap-2 py-2">
-                    {currentChips.slice(0, 4).map((chip, index) => {
-                      const IconComponent = getChipIcon(chip.label, chip.value);
-                      
-                      return (
-                        <button
-                          key={`${chip.value}-${index}`}
-                          onClick={() => handleChipClick(chip)}
-                          className="flex items-center gap-3 bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-lg transition-all active:scale-[0.98] shadow-md border border-gray-100"
-                          style={{
-                            animation: `chipSlide 0.3s ease-out ${index * 0.08}s both`
-                          }}
-                        >
-                          <IconComponent className="w-5 h-5 text-gray-400 flex-shrink-0" strokeWidth={1.5} />
-                          <span className="text-gray-600 text-right flex-1 text-xs leading-tight">{chip.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
 
                 <div ref={messagesEndRef} />
               </div>

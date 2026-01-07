@@ -726,20 +726,27 @@ ${restaurantList}
 === YOUR TASK ===
 Select the TOP 3 restaurants that are the BEST PERSONAL MATCH for this user.
 
-IMPORTANT RULES:
-1. If user has dietary requirements (kosher/vegan/etc) - PRIORITIZE restaurants that fit
-2. If user likes certain cuisines - explain how the restaurant matches their taste
-3. If user dislikes something - AVOID restaurants with those elements
-4. If friends visited a restaurant - MENTION IT in the reason (social proof!)
-5. Reference the user's past reviews if relevant (e.g., "Based on your love for Italian at X...")
-6. Be PERSONAL - use their name if available, reference their preferences
-7. Write reasons in Hebrew, make them feel understood
+## CRITICAL RULES (MUST FOLLOW):
+1. **CUISINE MATCH IS CRITICAL**: If user asked for specific food (burger, pizza, sushi, etc) - ONLY select restaurants that serve that type of food! Check the Categories field carefully.
+2. If user has dietary requirements (kosher/vegan/etc) - PRIORITIZE restaurants that fit
+3. If user likes certain cuisines - explain how the restaurant matches their taste
+4. If user dislikes something - AVOID restaurants with those elements
+5. If friends visited a restaurant - MENTION IT in the reason (social proof!)
+6. Reference the user's past reviews if relevant (e.g., "Based on your love for Italian at X...")
+7. Be PERSONAL - use their name if available, reference their preferences
+8. Write reasons in Hebrew, make them feel understood and special
+
+## REASON FORMAT:
+Write 2-3 sentences in Hebrew explaining:
+- Why this restaurant fits what they asked for
+- Something personal (their preferences, friends who visited, past reviews)
+- What makes this place special
 
 Return ONLY a JSON array:
 [
   {
     "index": 1,
-    "reason": "Hebrew PERSONAL explanation why this is perfect for THIS user (2-3 sentences, reference their preferences/reviews/friends)"
+    "reason": "Hebrew PERSONAL explanation (2-3 sentences)"
   },
   ...
 ]`;
@@ -793,7 +800,24 @@ function buildQueryText(context: RecommendationContext, conversationSummary?: st
   const parts: string[] = [];
 
   if (context.cuisinePreference) {
-    parts.push(`${context.cuisinePreference} food`);
+    // Map cuisine types to better search terms
+    const cuisineMap: Record<string, string> = {
+      'burger': 'hamburger burger american grill beef patty',
+      'pizza': 'pizza italian pizzeria',
+      'japanese': 'japanese sushi ramen asian',
+      'italian': 'italian pasta pizza mediterranean',
+      'asian': 'asian chinese thai vietnamese korean',
+      'steakhouse': 'steakhouse grill meat beef steak',
+      'israeli': 'israeli middle eastern mediterranean hummus falafel',
+      'mexican': 'mexican tacos burritos latin',
+      'healthy': 'healthy salad vegan vegetarian organic',
+      'seafood': 'seafood fish restaurant',
+      'cafe': 'cafe coffee breakfast brunch',
+      'bar': 'bar cocktails drinks pub',
+    };
+    
+    const searchTerms = cuisineMap[context.cuisinePreference.toLowerCase()] || `${context.cuisinePreference} food`;
+    parts.push(searchTerms);
   }
 
   if (context.withWho) {

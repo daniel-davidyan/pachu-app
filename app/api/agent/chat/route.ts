@@ -5,14 +5,13 @@ import OpenAI from 'openai';
 /**
  * POST /api/agent/chat
  * 
- * Pachu Agent v2.0 - Smart Conversational Restaurant Finder
+ * Pachu Agent v3.0 - Natural Conversational Restaurant Finder
  * 
  * Architecture:
- * 1. State Machine - tracks conversation state and what we know
- * 2. Intent Understanding - deeply understands what user wants
- * 3. Progressive Disclosure - asks one question at a time, naturally
- * 4. Smart Chips - context-aware quick replies
- * 5. Personalization - uses first name, references history
+ * 1. Single System Prompt - defines agent personality and behavior
+ * 2. Full Conversation History - sent to model for context
+ * 3. Agent Decides - when to ask questions vs recommend
+ * 4. Natural Flow - conversation feels human and connected
  */
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
@@ -21,45 +20,68 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 // TYPE DEFINITIONS
 // ============================================
 
-interface Chip {
-  label: string;
-  value: string;
-  emoji?: string;
-}
-
-// What we need to know to recommend
-interface SearchSlots {
-  occasion: string | null;     // Who/why: date, friends, family, solo, work, celebration
-  location: string | null;     // Distance: walking, nearby, willing_to_travel
-  cuisine: string | null;      // Food type: italian, asian, israeli, etc.
-  vibe: string | null;         // Atmosphere: romantic, casual, upscale, lively
-  budget: string | null;       // Price: cheap, moderate, expensive
-  timing: string | null;       // When: now, tonight, weekend, specific
-}
-
-// Conversation state machine
-type ConversationState = 
-  | 'greeting'           // First message - warm welcome
-  | 'gathering_info'     // Collecting slots progressively  
-  | 'ready_to_search'    // Have enough info to recommend
-  | 'showing_results'    // Displayed recommendations
-  | 'refining'           // User wants changes
-  | 'small_talk';        // User is just chatting
-
-interface ConversationContext {
-  state: ConversationState;
-  slots: SearchSlots;
-  turnCount: number;
-  lastQuestion: string | null;
-  userPreferences: string[];  // Accumulated preferences from chat
-}
-
 interface UserProfile {
   firstName: string;
   fullName: string;
   hasOnboarding: boolean;
   favoriteCategories?: string[];
+  likes?: string[];
+  dislikes?: string[];
+  dietary?: string[];
 }
+
+interface ExtractedInfo {
+  occasion: string | null;
+  location: string | null;
+  cuisine: string | null;
+  vibe: string | null;
+  budget: string | null;
+  readyToRecommend: boolean;
+}
+
+// ============================================
+// THE MAIN SYSTEM PROMPT - The Brain of Pachu
+// ============================================
+
+const SYSTEM_PROMPT = `אתה פאצ'ו (Pachu) - עוזר אישי וחברותי למציאת מסעדות בתל אביב. 
+אתה כמו חבר טוב שמכיר את כל המסעדות הכי שוות בעיר.
+
+## האישיות שלך:
+- חברותי, חם ונעים
+- מדבר עברית טבעית ויומיומית (לא פורמלי מדי)
+- משתמש באימוג'ים במידה - לא מוגזם
+- סקרן לגבי מה המשתמש מחפש
+- עוזר בלי להרגיש כמו רובוט
+
+## איך אתה עובד:
+1. כשמשתמש פונה אליך, התחל שיחה טבעית
+2. שאל שאלות בזרימה טבעית כדי להבין מה הוא מחפש
+3. אל תשאל יותר מדי שאלות ברצף - תן לשיחה לזרום
+4. כשאתה מרגיש שיש לך מספיק מידע - תציע לחפש מסעדות
+
+## מה חשוב לדעת (אבל לא חייב הכל):
+- עם מי יוצאים? (דייט, חברים, משפחה, לבד, עבודה)
+- איזור/מיקום? (קרוב, תל אביב, מוכן לנסוע)
+- סוג אוכל? (איטלקי, אסייתי, ישראלי, וכו')
+- תקציב? (חסכוני, בינוני, מפנק)
+- אווירה? (רומנטי, קז'ואל, חי)
+
+## חשוב מאוד:
+- אם המשתמש נותן לך מספיק פרטים (לפחות 2-3 דברים) - תציע לחפש
+- אם המשתמש אומר "תפתיע אותי" או "לא יודע" - תציע לחפש עם מה שיש
+- לא צריך לדעת הכל - עדיף להציע מאשר לשאול יותר מדי
+- השיחה צריכה להרגיש קלילה ולא כמו תחקיר
+
+## פורמט התגובה:
+תמיד תענה בעברית בצורה טבעית. 
+אם אתה מוכן להמליץ, סיים את התגובה שלך עם:
+[READY_TO_RECOMMEND]
+
+לדוגמה:
+"מעולה! דייט איטלקי באזור תל אביב, אני כבר מחפש לכם משהו מושלם! 😊
+[READY_TO_RECOMMEND]"
+
+אם אתה צריך עוד מידע, פשוט שאל בצורה טבעית בלי ה-tag.`;
 
 // ============================================
 // MAIN HANDLER
@@ -73,7 +95,6 @@ export async function POST(request: NextRequest) {
     console.log('🔐 CHAT API - User auth:', { 
       isLoggedIn: !!user, 
       userId: user?.id || 'NOT_LOGGED_IN',
-      email: user?.email || 'N/A'
     });
     
     const body = await request.json();
@@ -81,6 +102,7 @@ export async function POST(request: NextRequest) {
       message,
       conversationId,
       previousContext,
+      messages: conversationHistory,
       userLocation,
     } = body;
 
@@ -89,66 +111,106 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================
-    // STEP 1: Get User Profile
+    // STEP 1: Get User Profile for personalization
     // ========================================
     const userProfile = await getUserProfile(supabase, user?.id);
     
     // ========================================
-    // STEP 2: Initialize/Restore Context
+    // STEP 2: Build conversation for the model
     // ========================================
-    const context = initializeContext(previousContext);
-    const isFirstTurn = context.turnCount === 0;
-    context.turnCount++;
+    const systemPromptWithProfile = buildSystemPrompt(userProfile);
+    
+    const openaiMessages: any[] = [
+      { role: 'system', content: systemPromptWithProfile },
+    ];
+    
+    // Add conversation history
+    if (conversationHistory && conversationHistory.length > 0) {
+      conversationHistory.forEach((msg: any) => {
+        // Clean previous messages from the READY tag
+        const cleanContent = msg.content.replace(/\[READY_TO_RECOMMEND\]/g, '').trim();
+        openaiMessages.push({
+          role: msg.role,
+          content: cleanContent,
+        });
+      });
+    }
+    
+    // Add current message
+    openaiMessages.push({ role: 'user', content: message });
 
     // ========================================
-    // STEP 3: Understand User Intent (Deep Analysis)
+    // STEP 3: Get Agent Response
     // ========================================
-    const understanding = await understandUserIntent(message, context);
+    console.log('🤖 Calling OpenAI for natural conversation...');
     
-    // Update slots with new information
-    mergeSlots(context.slots, understanding.extractedSlots);
-    
-    // Update state based on understanding
-    context.state = determineState(context, understanding);
-    
-    console.log('🧠 Understanding:', understanding);
-    console.log('📋 Slots:', context.slots);
-    console.log('🔄 State:', context.state);
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: openaiMessages,
+      temperature: 0.8,
+      max_tokens: 500,
+    });
+
+    let agentResponse = completion.choices[0].message.content || '';
+    console.log('📝 Agent raw response:', agentResponse);
 
     // ========================================
-    // STEP 4: Generate Response Based on State
+    // STEP 4: Check if ready to recommend
     // ========================================
-    let response: AgentResponse;
+    const isReadyToRecommend = agentResponse.includes('[READY_TO_RECOMMEND]');
     
-    if (context.state === 'ready_to_search') {
-      // We have enough info - get recommendations!
+    // Clean the response from the tag
+    const cleanResponse = agentResponse.replace(/\[READY_TO_RECOMMEND\]/g, '').trim();
+
+    if (isReadyToRecommend) {
+      // Extract context from conversation for recommendation
+      const extractedContext = await extractContextFromConversation(
+        conversationHistory || [],
+        message
+      );
+      
+      console.log('🎯 Ready to recommend! Extracted context:', extractedContext);
+      
+      // Call recommendation API
       const requestUrl = new URL(request.url);
       const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
       const cookies = request.headers.get('cookie') || '';
-      response = await handleSearch(context, userLocation, userProfile, user, { baseUrl, cookies });
-    } else if (context.state === 'small_talk') {
-      // User is just chatting
-      response = await handleSmallTalk(message, userProfile, isFirstTurn);
-    } else {
-      // Need more info - ask smart questions
-      response = await handleGathering(context, userProfile, isFirstTurn, understanding);
+      
+      const recommendResponse = await callRecommendationAPI(
+        extractedContext,
+        userLocation,
+        user,
+        { baseUrl, cookies }
+      );
+
+      // Build response message with reasons for each restaurant
+      let fullMessage = cleanResponse;
+      
+      if (recommendResponse.recommendations && recommendResponse.recommendations.length > 0) {
+        fullMessage += '\n\n';
+        recommendResponse.recommendations.forEach((rec: any, index: number) => {
+          const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+          fullMessage += `${emoji} ${rec.restaurant.name}\n`;
+          fullMessage += `${rec.reason}\n\n`;
+        });
+        fullMessage = fullMessage.trim();
+      }
+
+      return NextResponse.json({
+        message: fullMessage,
+        readyToRecommend: true,
+        recommendations: recommendResponse.recommendations,
+        debugData: recommendResponse.debugData,
+        conversationId: conversationId || `conv_${Date.now()}`,
+      });
     }
 
     // ========================================
-    // STEP 5: Return Response
+    // STEP 5: Return conversational response
     // ========================================
     return NextResponse.json({
-      message: response.message,
-      chips: response.chips,
-      context: {
-        state: context.state,
-        slots: context.slots,
-        turnCount: context.turnCount,
-        lastQuestion: response.questionType,
-      },
-      readyToRecommend: context.state === 'ready_to_search',
-      recommendations: response.recommendations,
-      debugData: response.debugData, // Include debug data for analytics
+      message: cleanResponse,
+      readyToRecommend: false,
       conversationId: conversationId || `conv_${Date.now()}`,
     });
 
@@ -156,30 +218,40 @@ export async function POST(request: NextRequest) {
     console.error('Agent error:', error);
     return NextResponse.json({
       message: 'אופס, משהו קרה. בוא ננסה שוב! 🙏',
-      chips: [
-        { label: 'התחל מחדש', value: 'start_over', emoji: '🔄' }
-      ],
       readyToRecommend: false,
     });
   }
 }
 
 // ============================================
-// RESPONSE INTERFACE
+// HELPER FUNCTIONS
 // ============================================
 
-interface AgentResponse {
-  message: string;
-  chips: Chip[];
-  recommendations?: any[];
-  questionType?: string;
-  debugData?: any;
-  error?: string;
+function buildSystemPrompt(profile: UserProfile): string {
+  let prompt = SYSTEM_PROMPT;
+  
+  // Add personalization if we have user info
+  if (profile.firstName || profile.likes?.length || profile.dislikes?.length) {
+    prompt += '\n\n## מידע על המשתמש הנוכחי:\n';
+    
+    if (profile.firstName) {
+      prompt += `- שם: ${profile.firstName}\n`;
+    }
+    if (profile.likes && profile.likes.length > 0) {
+      prompt += `- אוהב: ${profile.likes.join(', ')}\n`;
+    }
+    if (profile.dislikes && profile.dislikes.length > 0) {
+      prompt += `- לא אוהב: ${profile.dislikes.join(', ')}\n`;
+    }
+    if (profile.dietary && profile.dietary.length > 0) {
+      prompt += `- העדפות תזונה: ${profile.dietary.join(', ')}\n`;
+    }
+    
+    prompt += '\nהשתמש במידע הזה כדי להתאים את ההמלצות ולדבר אליו בשם!';
+  }
+  
+  return prompt;
 }
-
-// ============================================
-// USER PROFILE
-// ============================================
 
 async function getUserProfile(supabase: any, userId?: string): Promise<UserProfile> {
   if (!userId) {
@@ -194,418 +266,144 @@ async function getUserProfile(supabase: any, userId?: string): Promise<UserProfi
 
   const { data: tasteProfile } = await supabase
     .from('user_taste_profiles')
-    .select('onboarding_completed, preferred_cuisines')
+    .select('onboarding_completed, preferred_cuisines, likes, dislikes, is_kosher, is_vegetarian, is_vegan, gluten_free')
     .eq('user_id', userId)
     .single();
 
   const fullName = profile?.full_name || profile?.username || '';
-  // Extract first name only (handle both "First Last" and "First")
   const firstName = fullName.split(' ')[0];
+
+  // Build dietary preferences
+  const dietary: string[] = [];
+  if (tasteProfile?.is_kosher) dietary.push('כשר');
+  if (tasteProfile?.is_vegetarian) dietary.push('צמחוני');
+  if (tasteProfile?.is_vegan) dietary.push('טבעוני');
+  if (tasteProfile?.gluten_free) dietary.push('ללא גלוטן');
 
   return {
     firstName,
     fullName,
     hasOnboarding: tasteProfile?.onboarding_completed || false,
     favoriteCategories: tasteProfile?.preferred_cuisines,
+    likes: tasteProfile?.likes,
+    dislikes: tasteProfile?.dislikes,
+    dietary,
   };
 }
 
-// ============================================
-// CONTEXT MANAGEMENT
-// ============================================
+async function extractContextFromConversation(
+  history: { role: string; content: string }[],
+  currentMessage: string
+): Promise<any> {
+  // Build full conversation text
+  const fullConversation = [
+    ...history.map(m => `${m.role === 'user' ? 'משתמש' : 'פאצ׳ו'}: ${m.content}`),
+    `משתמש: ${currentMessage}`
+  ].join('\n');
 
-function initializeContext(previous: any): ConversationContext {
-  if (previous?.slots) {
-    return {
-      state: previous.state || 'gathering_info',
-      slots: previous.slots,
-      turnCount: previous.turnCount || 0,
-      lastQuestion: previous.lastQuestion || null,
-      userPreferences: previous.userPreferences || [],
-    };
-  }
+  const extractionPrompt = `נתח את השיחה הבאה וחלץ את המידע הרלוונטי לחיפוש מסעדה.
 
-  return {
-    state: 'greeting',
-    slots: {
-      occasion: null,
-      location: null,
-      cuisine: null,
-      vibe: null,
-      budget: null,
-      timing: null,
-    },
-    turnCount: 0,
-    lastQuestion: null,
-    userPreferences: [],
-  };
-}
+שיחה:
+${fullConversation}
 
-function mergeSlots(existing: SearchSlots, extracted: Partial<SearchSlots>) {
-  Object.keys(extracted).forEach(key => {
-    const k = key as keyof SearchSlots;
-    if (extracted[k]) {
-      existing[k] = extracted[k];
-    }
-  });
-}
-
-// ============================================
-// INTENT UNDERSTANDING (The Brain)
-// ============================================
-
-interface IntentUnderstanding {
-  intent: 'search' | 'refine' | 'question' | 'small_talk' | 'greeting';
-  extractedSlots: Partial<SearchSlots>;
-  sentiment: 'positive' | 'neutral' | 'negative';
-  isComplete: boolean;  // Has user provided enough for search?
-  keywords: string[];
-}
-
-async function understandUserIntent(
-  message: string, 
-  context: ConversationContext
-): Promise<IntentUnderstanding> {
-  
-  const prompt = `Analyze this Hebrew/English message from a user looking for restaurant recommendations in Tel Aviv.
-
-MESSAGE: "${message}"
-
-CURRENT CONTEXT:
-- Occasion: ${context.slots.occasion || 'unknown'}
-- Location preference: ${context.slots.location || 'unknown'}
-- Cuisine: ${context.slots.cuisine || 'unknown'}
-- Vibe: ${context.slots.vibe || 'unknown'}
-- Budget: ${context.slots.budget || 'unknown'}
-
-Extract information and return JSON:
+החזר JSON בלבד בפורמט הבא:
 {
-  "intent": "search" | "refine" | "question" | "small_talk" | "greeting",
-  "extractedSlots": {
-    "occasion": "date" | "friends" | "family" | "solo" | "work" | "celebration" | null,
-    "location": "walking" | "nearby" | "willing_to_travel" | "tel_aviv" | null,
-    "cuisine": "<cuisine type or null>",
-    "vibe": "romantic" | "casual" | "upscale" | "lively" | "cozy" | "trendy" | null,
-    "budget": "cheap" | "moderate" | "expensive" | null,
-    "timing": "now" | "tonight" | "tomorrow" | "weekend" | null
-  },
-  "sentiment": "positive" | "neutral" | "negative",
-  "isComplete": <true if user gave enough info for meaningful search>,
-  "keywords": ["relevant", "keywords", "from", "message"]
+  "withWho": "date" | "friends" | "family" | "solo" | "work" | null,
+  "location": "walking_distance" | "tel_aviv" | "willing_to_travel" | null,
+  "cuisine": "<סוג מטבח באנגלית - ראה רשימה למטה>",
+  "budget": "cheap" | "moderate" | "expensive" | null,
+  "vibe": "romantic" | "casual" | "upscale" | "lively" | null,
+  "summary": "<תיאור קצר של מה המשתמש מחפש בעברית>"
 }
 
-Rules:
-- "דייט" / "בת זוג" / "זוגי" → occasion: "date"
-- "חברים" / "בנים" / "חבר'ה" → occasion: "friends"  
-- "משפחה" / "הורים" / "ילדים" → occasion: "family"
-- "לבד" → occasion: "solo"
-- "עבודה" / "פגישה" / "עסקי" → occasion: "work"
-- "יום הולדת" / "חגיגה" / "אירוע" → occasion: "celebration"
-- "הליכה" / "קרוב" → location: "walking"
-- "נסוע" / "לנסוע" / "רחוק" → location: "willing_to_travel"
-- "תל אביב" → location: "tel_aviv"
-- "איטלקי" / "פסטה" / "פיצה" → cuisine: "Italian"
-- "אסייתי" / "סושי" / "סיני" / "תאילנדי" → cuisine: "Asian"
-- "בשרים" / "סטייק" / "המבורגר" → cuisine: "Steakhouse"
-- "בריא" / "סלט" / "טבעוני" / "צמחוני" → cuisine: "Healthy"
-- "ים תיכוני" / "ישראלי" / "מזרחי" → cuisine: "Israeli"
-- "בירה" / "בר" / "משקאות" / "קוקטיילים" → cuisine: "Bar"
-- "רומנטי" / "אינטימי" → vibe: "romantic"
-- "זול" / "תקציב נמוך" → budget: "cheap"
-- "יקר" / "מפנק" → budget: "expensive"
-- Small talk: greetings, thanks, how are you, etc.
-- isComplete = true ONLY if user provided MULTIPLE pieces of info (e.g. "מסעדה איטלקית לדייט" has both cuisine AND occasion)
-- A single word like "חברים" or "דייט" alone is NOT complete
+## חשוב מאוד - זיהוי סוג אוכל (cuisine):
+- "המבורגר" / "בורגר" / "burger" → cuisine: "burger"
+- "פיצה" / "pizza" → cuisine: "pizza"
+- "סושי" / "יפני" / "sushi" / "japanese" → cuisine: "japanese"
+- "איטלקי" / "פסטה" / "italian" → cuisine: "italian"
+- "אסייתי" / "סיני" / "תאילנדי" / "asian" → cuisine: "asian"
+- "בשרים" / "סטייק" / "steak" / "גריל" → cuisine: "steakhouse"
+- "ישראלי" / "מזרחי" / "חומוס" / "שווארמה" → cuisine: "israeli"
+- "מקסיקני" / "mexican" / "טאקו" / "בוריטו" → cuisine: "mexican"
+- "בריא" / "סלט" / "טבעוני" / "צמחוני" → cuisine: "healthy"
+- "דגים" / "פירות ים" / "seafood" → cuisine: "seafood"
+- "קפה" / "בית קפה" / "ארוחת בוקר" → cuisine: "cafe"
+- "בר" / "משקאות" / "קוקטיילים" → cuisine: "bar"
 
-Return ONLY valid JSON.`;
+## כללים נוספים:
+- "דייט" / "בת זוג" / "זוגי" → withWho: "date"
+- "חברים" / "בנים" / "חבר'ה" → withWho: "friends"
+- "משפחה" / "הורים" / "ילדים" → withWho: "family"
+- "לבד" → withWho: "solo"
+- "עבודה" / "פגישה" → withWho: "work"
+- "קרוב" / "הליכה" → location: "walking_distance"
+- "תל אביב" / "בעיר" → location: "tel_aviv"
+- "זול" / "חסכוני" → budget: "cheap"
+- "בינוני" → budget: "moderate"
+- "מפנק" / "יקר" → budget: "expensive"
+
+החזר רק JSON, בלי הסברים.`;
 
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: extractionPrompt }],
       temperature: 0,
-      max_tokens: 400,
+      max_tokens: 300,
     });
 
     const text = response.choices[0].message.content || '{}';
     const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(cleaned);
   } catch (e) {
-    console.error('Intent parsing failed:', e);
+    console.error('Context extraction failed:', e);
     return {
-      intent: 'search',
-      extractedSlots: {},
-      sentiment: 'neutral',
-      isComplete: false,
-      keywords: [],
+      withWho: null,
+      location: 'tel_aviv',
+      cuisine: null,
+      budget: null,
+      vibe: null,
+      summary: currentMessage,
     };
   }
 }
 
-// ============================================
-// STATE DETERMINATION
-// ============================================
-
-function determineState(
-  context: ConversationContext, 
-  understanding: IntentUnderstanding
-): ConversationState {
-  
-  // If small talk detected
-  if (understanding.intent === 'small_talk' || understanding.intent === 'greeting') {
-    return 'small_talk';
-  }
-
-  // Check what slots we have
-  const slots = context.slots;
-  const hasOccasion = !!slots.occasion;
-  const hasLocation = !!slots.location;
-  const hasCuisine = !!slots.cuisine;
-  const hasBudget = !!slots.budget;
-  
-  // Count filled slots 
-  const coreSlots = [hasOccasion, hasLocation, hasCuisine, hasBudget].filter(Boolean).length;
-  
-  // Need at least 3 out of 4 core slots (occasion, location, cuisine, budget) to search
-  // This ensures we ask at least 3 questions before recommending for better results
-  // MUST have occasion + location at minimum
-  const canSearch = coreSlots >= 3 && hasOccasion && hasLocation;
-
-  if (canSearch) {
-    return 'ready_to_search';
-  }
-
-  return 'gathering_info';
-}
-
-// ============================================
-// RESPONSE HANDLERS
-// ============================================
-
-async function handleSmallTalk(
-  message: string, 
-  profile: UserProfile,
-  isFirst: boolean
-): Promise<AgentResponse> {
-  
-  // For greetings/small talk, always ask about occasion first
-  // This keeps chips consistent with the question
-  const greeting = profile.firstName ? `היי ${profile.firstName}!` : 'היי!';
-  
-  const messages = [
-    `${greeting} מה קורה? עם מי יוצאים לאכול? 😊`,
-    `${greeting} מה נשמע? מחפש מקום לדייט או יציאה עם חברים?`,
-    `${greeting} איזה כיף! מה האירוע - דייט, חברים, או משהו אחר?`,
-  ];
-  
-  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-
-  return {
-    message: randomMessage,
-    chips: [
-      { label: 'דייט', value: 'date', emoji: '💕' },
-      { label: 'חברים', value: 'friends', emoji: '👥' },
-      { label: 'משפחה', value: 'family', emoji: '👨‍👩‍👧' },
-      { label: 'לבד', value: 'solo', emoji: '🧘' },
-    ],
-    questionType: 'occasion',
-  };
-}
-
-async function handleGathering(
-  context: ConversationContext,
-  profile: UserProfile,
-  isFirst: boolean,
-  understanding: IntentUnderstanding
-): Promise<AgentResponse> {
-  
-  const slots = context.slots;
-  
-  // Determine what to ask next (priority order)
-  let questionType: string;
-  let question: string;
-  let chips: Chip[];
-
-  // Priority 1: Occasion (who/why)
-  if (!slots.occasion) {
-    questionType = 'occasion';
-    const greetingPrefix = isFirst && profile.firstName ? `היי ${profile.firstName}! ` : '';
-    question = greetingPrefix + 'עם מי יוצאים או מה האירוע? 😊';
-    chips = [
-      { label: 'דייט', value: 'date', emoji: '💕' },
-      { label: 'חברים', value: 'friends', emoji: '👥' },
-      { label: 'משפחה', value: 'family', emoji: '👨‍👩‍👧' },
-      { label: 'לבד', value: 'solo', emoji: '🧘' },
-      { label: 'עבודה', value: 'work', emoji: '💼' },
-    ];
-  }
-  // Priority 2: Location
-  else if (!slots.location) {
-    questionType = 'location';
-    const occasionText = slots.occasion === 'date' ? 'לדייט' :
-                        slots.occasion === 'friends' ? 'עם החברים' :
-                        slots.occasion === 'family' ? 'למשפחה' : '';
-    question = `איפה תרצו לחפש ${occasionText}? 📍`;
-    chips = [
-      { label: 'במרחק הליכה', value: 'walking', emoji: '🚶' },
-      { label: 'מוכן לנסוע', value: 'willing_to_travel', emoji: '🚗' },
-      { label: 'בכל תל אביב', value: 'tel_aviv', emoji: '🏙️' },
-    ];
-  }
-  // Priority 3: Cuisine
-  else if (!slots.cuisine) {
-    questionType = 'cuisine';
-    const occasionContext = slots.occasion === 'date' ? 'לדייט' : 
-                           slots.occasion === 'friends' ? 'עם החברים' : '';
-    question = `איזה סוג אוכל בא לכם ${occasionContext}? 🍽️`;
-    chips = [
-      { label: 'איטלקי', value: 'italian', emoji: '🍝' },
-      { label: 'אסייתי', value: 'asian', emoji: '🍜' },
-      { label: 'בריא', value: 'healthy', emoji: '🥗' },
-      { label: 'בשרים', value: 'steak', emoji: '🥩' },
-      { label: 'ים תיכוני', value: 'mediterranean', emoji: '🫒' },
-      { label: 'תפתיע אותי', value: 'surprise', emoji: '🎲' },
-    ];
-  }
-  // Priority 4: Budget
-  else if (!slots.budget) {
-    questionType = 'budget';
-    question = 'מה התקציב? 💰';
-    chips = [
-      { label: 'חסכוני', value: 'cheap', emoji: '💵' },
-      { label: 'בינוני', value: 'moderate', emoji: '💳' },
-      { label: 'מפנק', value: 'expensive', emoji: '💎' },
-      { label: 'לא משנה', value: 'any', emoji: '🤷' },
-    ];
-  }
-  // Have enough - but ask for vibe to improve results
-  else {
-    questionType = 'vibe';
-    question = 'איזה אווירה אתם מחפשים? ✨';
-    chips = [
-      { label: 'רומנטי', value: 'romantic', emoji: '💕' },
-      { label: 'קז\'ואל', value: 'casual', emoji: '😎' },
-      { label: 'מפנק', value: 'upscale', emoji: '🥂' },
-      { label: 'חי ותוסס', value: 'lively', emoji: '🎉' },
-    ];
-  }
-
-  // Add acknowledgment of what we understood
-  let acknowledgment = '';
-  if (understanding.extractedSlots.occasion) {
-    const occasionText: Record<string, string> = {
-      'date': 'דייט! 💕',
-      'friends': 'יציאה עם חברים! 🎉',
-      'family': 'ארוחה משפחתית! 👨‍👩‍👧',
-      'solo': 'לאכול לבד! 🧘',
-      'work': 'פגישת עבודה! 💼',
-      'celebration': 'חגיגה! 🎊',
-    };
-    acknowledgment = occasionText[understanding.extractedSlots.occasion] || '';
-  }
-  if (understanding.extractedSlots.cuisine) {
-    const cuisineAck = acknowledgment ? ' ' : '';
-    acknowledgment += `${cuisineAck}אוכל ${understanding.extractedSlots.cuisine} 👌`;
-  }
-  if (understanding.extractedSlots.location) {
-    const locationText: Record<string, string> = {
-      'walking': 'במרחק הליכה 🚶',
-      'willing_to_travel': 'מוכנים לנסוע 🚗',
-      'tel_aviv': 'בתל אביב 🏙️',
-    };
-    const locAck = acknowledgment ? ' ' : '';
-    acknowledgment += `${locAck}${locationText[understanding.extractedSlots.location] || ''}`;
-  }
-  if (understanding.extractedSlots.budget) {
-    const budgetText: Record<string, string> = {
-      'cheap': 'תקציב חסכוני 💵',
-      'moderate': 'תקציב בינוני 💳',
-      'expensive': 'מפנקים! 💎',
-      'any': '',
-    };
-    const budgetAck = budgetText[understanding.extractedSlots.budget];
-    if (budgetAck) {
-      const sep = acknowledgment ? ' ' : '';
-      acknowledgment += `${sep}${budgetAck}`;
-    }
-  }
-
-  const message = acknowledgment 
-    ? `${acknowledgment}\n\n${question}`
-    : question;
-
-  return {
-    message,
-    chips,
-    questionType,
-  };
-}
-
-async function handleSearch(
-  context: ConversationContext,
+async function callRecommendationAPI(
+  context: any,
   userLocation: { lat: number; lng: number } | null,
-  profile: UserProfile,
-  user?: { id: string; email?: string } | null,
-  requestInfo?: { baseUrl: string; cookies: string }
-): Promise<AgentResponse> {
+  user: { id: string; email?: string } | null | undefined,
+  requestInfo: { baseUrl: string; cookies: string }
+): Promise<{ recommendations: any[]; debugData?: any }> {
   
-  // Default to Tel Aviv center if no valid location
   const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
+  const effectiveLocation = userLocation || TEL_AVIV_CENTER;
   
-  // Validate location - must be in Israel region
-  let effectiveLocation = TEL_AVIV_CENTER;
-  if (userLocation && 
-      typeof userLocation.lat === 'number' && 
-      typeof userLocation.lng === 'number' &&
-      userLocation.lat >= 29.5 && userLocation.lat <= 33.5 &&
-      userLocation.lng >= 34 && userLocation.lng <= 36) {
-    effectiveLocation = userLocation;
-  }
-  
-  console.log(`📍 User location: ${JSON.stringify(userLocation)} → Effective: ${JSON.stringify(effectiveLocation)}`);
-
-  // Build context for recommendation API
   const recommendContext = {
-    where: mapLocationSlot(context.slots.location),
-    withWho: context.slots.occasion,
-    purpose: mapOccasionToPurpose(context.slots.occasion),
-    budget: context.slots.budget,
-    when: context.slots.timing,
-    cuisinePreference: context.slots.cuisine,
+    where: context.location || 'tel_aviv',
+    withWho: context.withWho,
+    purpose: mapOccasionToPurpose(context.withWho),
+    budget: context.budget,
+    when: null,
+    cuisinePreference: context.cuisine,
   };
-
-  // Show searching message
-  const searchingMessages = [
-    'מחפש את המקומות המושלמים בשבילך... 🔍',
-    'רגע, בודק כמה מקומות מעולים... ✨',
-    'מסנן את ההמלצות הטובות ביותר... 🎯',
-  ];
-  const searchMsg = searchingMessages[Math.floor(Math.random() * searchingMessages.length)];
 
   try {
-    // Call recommendation API with timeout
-    const baseUrl = requestInfo?.baseUrl || 'http://localhost:3000';
-    const recommendUrl = `${baseUrl}/api/agent/recommend`;
-    
-    console.log('🔍 Calling recommend API...');
-    console.log('📋 Recommend context:', recommendContext);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    const recommendResponse = await fetch(recommendUrl, {
+    const recommendResponse = await fetch(`${requestInfo.baseUrl}/api/agent/recommend`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Cookie': requestInfo?.cookies || '', // Forward authentication cookies
+        'Cookie': requestInfo.cookies,
       },
       body: JSON.stringify({
         context: recommendContext,
         userLocation: effectiveLocation,
-        conversationSummary: buildSearchSummary(context.slots),
-        includeDebugData: true, // Always include debug data for analytics
-        userEmail: user?.email, // Pass email for debug access check
-        userId: user?.id, // Pass userId directly for personalization
+        conversationSummary: context.summary || '',
+        includeDebugData: true,
+        userEmail: user?.email,
+        userId: user?.id,
       }),
       signal: controller.signal,
     });
@@ -613,100 +411,18 @@ async function handleSearch(
     clearTimeout(timeoutId);
 
     if (!recommendResponse.ok) {
-      const errorText = await recommendResponse.text();
-      console.error('❌ Recommend API error:', recommendResponse.status, errorText);
       throw new Error(`Recommend API error: ${recommendResponse.status}`);
     }
 
     const data = await recommendResponse.json();
-    const recommendations = data.recommendations || [];
-    const debugData = data.debugData || null;
-    
-    console.log(`✅ Got ${recommendations.length} recommendations`);
-
-    if (recommendations.length === 0) {
-      return {
-        message: 'לא מצאתי מקומות שמתאימים בדיוק, אולי ננסה לחפש קצת אחרת? 🤔',
-        chips: [
-          { label: 'הרחב חיפוש', value: 'expand_search', emoji: '🔄' },
-          { label: 'סוג אוכל אחר', value: 'change_cuisine', emoji: '🍽️' },
-          { label: 'התחל מחדש', value: 'start_over', emoji: '🆕' },
-        ],
-        debugData, // Include even for 0 results
-      };
-    }
-
-    // Build success message
-    const successMessages = [
-      `מצאתי ${recommendations.length} מקומות מושלמים! 🎉`,
-      `הנה ${recommendations.length} המלצות מעולות! ✨`,
-      `יש לי ${recommendations.length} מקומות שתאהבו! 💫`,
-    ];
-    
-    const occasion = context.slots.occasion;
-    let personalizedMsg = successMessages[Math.floor(Math.random() * successMessages.length)];
-    
-    if (occasion === 'date') {
-      personalizedMsg = `מצאתי ${recommendations.length} מקומות מושלמים לדייט! 💕`;
-    } else if (occasion === 'friends') {
-      personalizedMsg = `יש לי ${recommendations.length} מקומות שווים ליציאה עם החברים! 🎉`;
-    } else if (occasion === 'family') {
-      personalizedMsg = `הנה ${recommendations.length} מקומות מעולים למשפחה! 👨‍👩‍👧`;
-    }
-
     return {
-      message: personalizedMsg,
-      chips: [],
-      recommendations,
-      debugData, // Include debug data for analytics
+      recommendations: data.recommendations || [],
+      debugData: data.debugData,
     };
-
-  } catch (error: any) {
-    const errorName = error?.name || 'Unknown';
-    const errorMsg = error?.message || 'No details';
-    console.error('❌ Search error:', errorName, errorMsg);
-    
-    // Check if it was a timeout
-    if (error?.name === 'AbortError') {
-      return {
-        message: 'החיפוש לקח יותר מדי זמן 😅 בוא ננסה שוב?',
-        chips: [
-          { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
-          { label: 'חיפוש פשוט יותר', value: 'simpler', emoji: '✨' },
-        ],
-        error: 'timeout',
-      };
-    }
-    
-    // Include error details for debugging
-    const debugInfo = `\n\n🔧 [${errorName}] ${errorMsg.substring(0, 150)}`;
-    
-    return {
-      message: `אופס, משהו השתבש. בוא ננסה שוב? 🙏${debugInfo}`,
-      chips: [
-        { label: 'נסה שוב', value: 'retry', emoji: '🔄' },
-        { label: 'התחל מחדש', value: 'start_over', emoji: '🆕' },
-      ],
-      error: errorMsg,
-    };
+  } catch (error) {
+    console.error('Recommendation API error:', error);
+    return { recommendations: [] };
   }
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-function mapLocationSlot(location: string | null): string {
-  if (!location) return 'tel_aviv';
-  
-  const map: Record<string, string> = {
-    'walking': 'walking_distance',
-    'nearby': 'walking_distance',
-    'willing_to_travel': 'willing_to_travel',
-    'tel_aviv': 'tel_aviv',
-  };
-  
-  return map[location] || 'tel_aviv';
 }
 
 function mapOccasionToPurpose(occasion: string | null): string | null {
@@ -718,20 +434,7 @@ function mapOccasionToPurpose(occasion: string | null): string | null {
     'family': 'casual_meal',
     'solo': 'casual_meal',
     'work': 'business',
-    'celebration': 'celebration',
   };
   
   return map[occasion] || null;
-}
-
-function buildSearchSummary(slots: SearchSlots): string {
-  const parts: string[] = [];
-  
-  if (slots.occasion) parts.push(`Looking for ${slots.occasion} dining`);
-  if (slots.cuisine) parts.push(`${slots.cuisine} food`);
-  if (slots.vibe) parts.push(`${slots.vibe} atmosphere`);
-  if (slots.budget) parts.push(`${slots.budget} budget`);
-  if (slots.location) parts.push(`in ${slots.location} area`);
-  
-  return parts.join(', ') || 'restaurant in Tel Aviv';
 }
