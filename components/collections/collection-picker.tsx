@@ -151,34 +151,36 @@ export function CollectionPicker({
       isOpen={isOpen}
       onClose={onClose}
       title="Save to..."
+      zIndex={10000}
+      height="auto"
     >
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {/* All Saved Option */}
           <button
             onClick={() => handleSaveToCollection(null)}
             disabled={saving !== null}
-            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-colors ${
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
               currentCollectionId === null
-                ? 'bg-primary/10 border-2 border-primary'
-                : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                ? 'bg-primary/10 border border-primary'
+                : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
             }`}
           >
-            <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Bookmark className="w-6 h-6 text-gray-500" />
+            <div className="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Bookmark className="w-4 h-4 text-gray-500" />
             </div>
             <div className="flex-1 text-left">
-              <p className="font-semibold text-gray-900">All Saved</p>
-              <p className="text-sm text-gray-500">Default collection</p>
+              <p className="font-medium text-sm text-gray-900">All Saved</p>
+              <p className="text-xs text-gray-500">Default collection</p>
             </div>
             {saving === 'all' ? (
-              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              <Loader2 className="w-4 h-4 text-primary animate-spin" />
             ) : currentCollectionId === null ? (
-              <Check className="w-5 h-5 text-primary" />
+              <Check className="w-4 h-4 text-primary" />
             ) : null}
           </button>
 
@@ -188,14 +190,14 @@ export function CollectionPicker({
               key={collection.id}
               onClick={() => handleSaveToCollection(collection.id)}
               disabled={saving !== null}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-colors ${
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
                 currentCollectionId === collection.id
-                  ? 'bg-primary/10 border-2 border-primary'
-                  : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                  ? 'bg-primary/10 border border-primary'
+                  : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
               }`}
             >
               {/* Collection Preview */}
-              <div className="w-14 h-14 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0">
+              <div className="w-10 h-10 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                 {collection.cover_image_url || collection.preview_images?.[0] ? (
                   <img
                     src={collection.cover_image_url || collection.preview_images[0]}
@@ -204,22 +206,22 @@ export function CollectionPicker({
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                    <Bookmark className="w-6 h-6 text-primary/50" />
+                    <Bookmark className="w-4 h-4 text-primary/50" />
                   </div>
                 )}
               </div>
               
               <div className="flex-1 text-left">
-                <p className="font-semibold text-gray-900">{collection.name}</p>
-                <p className="text-sm text-gray-500">
+                <p className="font-medium text-sm text-gray-900">{collection.name}</p>
+                <p className="text-xs text-gray-500">
                   {collection.items_count} {collection.items_count === 1 ? 'place' : 'places'}
                 </p>
               </div>
               
               {saving === collection.id ? (
-                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
               ) : currentCollectionId === collection.id ? (
-                <Check className="w-5 h-5 text-primary" />
+                <Check className="w-4 h-4 text-primary" />
               ) : null}
             </button>
           ))}
@@ -227,16 +229,16 @@ export function CollectionPicker({
           {/* Create New Collection Button */}
           <button
             onClick={handleCreateNew}
-            className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white border-2 border-dashed border-gray-300 hover:border-primary hover:bg-primary/5 transition-colors"
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-dashed border-gray-300 hover:border-primary hover:bg-primary/5 transition-colors"
           >
-            <div className="w-14 h-14 bg-white border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center flex-shrink-0">
-              <FolderPlus className="w-6 h-6 text-gray-400" />
+            <div className="w-10 h-10 bg-white border border-dashed border-gray-300 rounded-lg flex items-center justify-center flex-shrink-0">
+              <FolderPlus className="w-4 h-4 text-gray-400" />
             </div>
             <div className="flex-1 text-left">
-              <p className="font-semibold text-gray-700">Create New Collection</p>
-              <p className="text-sm text-gray-500">Organize your saved places</p>
+              <p className="font-medium text-sm text-gray-700">Create New Collection</p>
+              <p className="text-xs text-gray-500">Organize your saved places</p>
             </div>
-            <Plus className="w-5 h-5 text-gray-400" />
+            <Plus className="w-4 h-4 text-gray-400" />
           </button>
         </div>
       )}

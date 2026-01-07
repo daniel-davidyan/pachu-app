@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 
@@ -24,9 +25,16 @@ export function CollectionModal({
   const { showToast } = useToast();
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!editingCollection;
+
+  // Mount check for portal
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,18 +88,19 @@ export function CollectionModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  const content = (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+        className="fixed inset-0 bg-black/50 transition-opacity"
+        style={{ zIndex: 10002 }}
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-sm mx-auto">
+      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 max-w-sm mx-auto" style={{ zIndex: 10003 }}>
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
@@ -157,4 +166,7 @@ export function CollectionModal({
       </div>
     </>
   );
+
+  // Use portal to render at document body level
+  return createPortal(content, document.body);
 }

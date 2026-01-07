@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface BottomSheetProps {
@@ -8,9 +9,12 @@ interface BottomSheetProps {
   onClose: () => void;
   children: React.ReactNode;
   title?: string;
+  zIndex?: number;
+  height?: string;
 }
 
-export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetProps) {
+export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, height = '70vh' }: BottomSheetProps) {
+  const [mounted, setMounted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
@@ -18,6 +22,12 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
+
+  // Mount check for portal
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -133,28 +143,29 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
     }
   }, [isDragging, currentY, startY, handleMouseMove, handleMouseUp]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
 
-  return (
+  const content = (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+        className="fixed inset-0 bg-black/50 transition-opacity duration-300"
         onClick={onClose}
-        style={{ opacity: isOpen ? 1 : 0 }}
+        style={{ opacity: isOpen ? 1 : 0, zIndex }}
       />
 
       {/* Bottom Sheet */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-50 flex flex-col transition-transform duration-300 ease-out"
+        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col transition-transform duration-300 ease-out"
         style={{
-          height: '70vh',
-          maxHeight: '70vh',
+          height: height === 'auto' ? 'auto' : height,
+          maxHeight: height === 'auto' ? '70vh' : height,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
+          zIndex: zIndex + 1,
         }}
       >
         {/* Drag Handle */}
@@ -194,5 +205,8 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
       </div>
     </>
   );
+
+  // Use portal to render at document body level - escapes any parent stacking contexts
+  return createPortal(content, document.body);
 }
 

@@ -23,9 +23,10 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lastMediaKey, setLastMediaKey] = useState(mediaKey);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isHorizontalSwipe, setIsHorizontalSwipe] = useState<boolean | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -38,45 +39,73 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
   }
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Stop propagation to prevent parent navigation handlers from triggering
-    e.stopPropagation();
+    // Don't stop propagation on start - we don't know if it's horizontal or vertical yet
     setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
     setIsDragging(true);
+    setIsHorizontalSwipe(null); // Reset - we'll determine direction on move
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isDragging || touchStart === null) return;
     
-    // Stop propagation to prevent parent handlers from interfering
-    e.stopPropagation();
+    const currentX = e.targetTouches[0].clientX;
+    const currentY = e.targetTouches[0].clientY;
+    const deltaX = Math.abs(currentX - touchStart.x);
+    const deltaY = Math.abs(currentY - touchStart.y);
     
-    const currentTouch = e.targetTouches[0].clientX;
-    setTouchEnd(currentTouch);
-    
-    // Calculate drag offset for visual feedback
-    const diff = currentTouch - touchStart;
-    
-    // Limit drag at edges
-    if ((currentIndex === 0 && diff > 0) || 
-        (currentIndex === media.length - 1 && diff < 0)) {
-      setDragOffset(diff * 0.3); // Reduced effect at edges
-    } else {
-      setDragOffset(diff);
+    // Determine swipe direction on first significant movement
+    if (isHorizontalSwipe === null && (deltaX > 10 || deltaY > 10)) {
+      const horizontal = deltaX > deltaY;
+      setIsHorizontalSwipe(horizontal);
+      
+      // If vertical swipe, stop tracking - let parent handle it
+      if (!horizontal) {
+        setIsDragging(false);
+        setDragOffset(0);
+        return;
+      }
     }
-  }, [isDragging, touchStart, currentIndex, media.length]);
+    
+    // Only handle horizontal swipes for carousel
+    if (isHorizontalSwipe === true) {
+      // Stop propagation only for horizontal swipes
+      e.stopPropagation();
+      
+      setTouchEnd({ x: currentX, y: currentY });
+      
+      // Calculate drag offset for visual feedback
+      const diff = currentX - touchStart.x;
+      
+      // Limit drag at edges
+      if ((currentIndex === 0 && diff > 0) || 
+          (currentIndex === media.length - 1 && diff < 0)) {
+        setDragOffset(diff * 0.3); // Reduced effect at edges
+      } else {
+        setDragOffset(diff);
+      }
+    }
+  }, [isDragging, touchStart, currentIndex, media.length, isHorizontalSwipe]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    // Stop propagation to prevent parent handlers from triggering
-    e.stopPropagation();
+    // Only stop propagation if we handled this as a horizontal swipe
+    if (isHorizontalSwipe === true) {
+      e.stopPropagation();
+    }
     
-    if (!touchStart || !touchEnd) {
+    if (!touchStart || !touchEnd || isHorizontalSwipe !== true) {
       setIsDragging(false);
       setDragOffset(0);
+      setIsHorizontalSwipe(null);
+      setTouchStart(null);
+      setTouchEnd(null);
       return;
     }
 
-    const distance = touchStart - touchEnd;
+    const distance = touchStart.x - touchEnd.x;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
@@ -88,9 +117,10 @@ export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouse
 
     setIsDragging(false);
     setDragOffset(0);
+    setIsHorizontalSwipe(null);
     setTouchStart(null);
     setTouchEnd(null);
-  }, [touchStart, touchEnd, currentIndex, media.length]);
+  }, [touchStart, touchEnd, currentIndex, media.length, isHorizontalSwipe]);
 
   // Go to specific index
   const goToIndex = useCallback((index: number) => {
