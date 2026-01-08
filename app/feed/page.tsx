@@ -99,15 +99,16 @@ export default function FeedPage() {
   const [followingReviews, setFollowingReviews] = useState<FeedReview[]>(
     () => cachedData.current?.following || []
   );
-  // Only show initial loading if we don't have cached data
-  const [loading, setLoading] = useState(!cachedData.current);
+  // Only show initial loading if we don't have cached data WITH actual content
+  const [loading, setLoading] = useState(!cachedData.current?.hasData);
   const [loadingMore, setLoadingMore] = useState(false);
   const [forYouPage, setForYouPage] = useState(0);
   const [followingPage, setFollowingPage] = useState(0);
   const [forYouHasMore, setForYouHasMore] = useState(true);
   const [followingHasMore, setFollowingHasMore] = useState(true);
   // Track if we've completed at least one successful load (prevents empty state flicker)
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(!!cachedData.current);
+  // ONLY true if cache has actual data - empty cache doesn't count as "loaded"
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(!!cachedData.current?.hasData);
   
   // Get current tab's data
   const reviews = activeTab === 'foryou' ? forYouReviews : followingReviews;
@@ -245,14 +246,14 @@ export default function FeedPage() {
     
     if (!hasFetchedOnMount.current) {
       hasFetchedOnMount.current = true;
-      // If we have cached data, do background refresh (no loader)
-      // Otherwise, do normal load with loader
-      const hasCache = forYouReviews.length > 0 || followingReviews.length > 0;
-      fetchReviewsForTab('foryou', 0, true, hasCache);
-      fetchReviewsForTab('following', 0, true, hasCache);
+      // Only do background refresh if we have actual cached data with content
+      // Empty arrays don't count - we need to show loader
+      const hasActualCache = cachedData.current?.hasData || false;
+      fetchReviewsForTab('foryou', 0, true, hasActualCache);
+      fetchReviewsForTab('following', 0, true, hasActualCache);
       return;
     }
-  }, [userLocation, fetchReviewsForTab, forYouReviews.length, followingReviews.length]);
+  }, [userLocation, fetchReviewsForTab]);
 
   // Refetch when filters change (not tab - tab switch is now instant)
   useEffect(() => {
