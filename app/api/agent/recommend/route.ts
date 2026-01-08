@@ -133,17 +133,16 @@ export async function POST(request: NextRequest) {
         throw new Error('No results from database function');
       }
     } catch (dbError) {
-      // Fallback: Fetch restaurants WITHOUT embeddings and use a simpler approach
-      console.log('   ⚠️ Database function failed, using fallback...');
+      // Fallback: Fetch ALL restaurants and filter by search intent keywords
+      console.log('   ⚠️ Database function failed, using keyword fallback...');
       console.log(`   ⚠️ Error: ${dbError}`);
       
-      // Fetch restaurants without the huge embedding field
+      // Fetch ALL restaurants (no embedding needed)
+      // Using ACTUAL column names from the enrich script (which populated the DB)
       const { data: allRestaurants, error: fetchError } = await supabase
         .from('restaurant_cache')
         .select('id, google_place_id, name, address, city, latitude, longitude, google_rating, google_reviews_count, price_level, categories, summary, opening_hours, photos')
-        .not('summary_embedding', 'is', null)
-        .order('google_rating', { ascending: false })
-        .limit(100);
+        .not('summary_embedding', 'is', null);
 
       if (fetchError) {
         console.error('Error fetching restaurants:', fetchError);
@@ -151,7 +150,7 @@ export async function POST(request: NextRequest) {
       }
 
       totalInDb = allRestaurants?.length || 0;
-      console.log(`   📦 Fallback: fetched ${totalInDb} restaurants (by rating)`);
+      console.log(`   📦 Fallback: fetched ${totalInDb} restaurants total`);
 
       if (!allRestaurants || allRestaurants.length === 0) {
         return NextResponse.json({
@@ -160,10 +159,63 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Use a simple scoring based on category matching since we don't have embeddings
-      top30 = allRestaurants.slice(0, 30).map(r => ({
-        ...r,
-        vectorScore: 0.5, // Default score without embeddings
+      // Extract keywords from search intent for filtering
+      const keywords = searchIntent.toLowerCase().split(/\s+/).filter(k => k.length > 2);
+      console.log(`   🔍 Filtering by keywords: ${keywords.join(', ')}`);
+
+      // Score restaurants by keyword matches in categories and summary
+      const scoredRestaurants = allRestaurants.map(r => {
+        const categoriesText = ((r.categories || []) as string[]).join(' ').toLowerCase();
+        const summaryText = (r.summary || '').toLowerCase();
+        const nameText = (r.name || '').toLowerCase();
+        const searchText = `${categoriesText} ${summaryText} ${nameText}`;
+        
+        // Count keyword matches
+        let score = 0;
+        for (const keyword of keywords) {
+          if (searchText.includes(keyword)) {
+            score += 1;
+          }
+          // Extra points for category match
+          if (categoriesText.includes(keyword)) {
+            score += 2;
+          }
+        }
+        
+        // Boost by rating
+        score += (r.google_rating || 0) / 5;
+        
+        return { ...r, keywordScore: score };
+      });
+
+      // Sort by keyword score, then by rating
+      scoredRestaurants.sort((a, b) => {
+        if (b.keywordScore !== a.keywordScore) {
+          return b.keywordScore - a.keywordScore;
+        }
+        return (b.google_rating || 0) - (a.google_rating || 0);
+      });
+
+      const topMatches = scoredRestaurants.slice(0, 30);
+      console.log(`   📊 Top matches: ${topMatches.slice(0, 5).map(r => `${r.name} (score: ${r.keywordScore.toFixed(1)})`).join(', ')}`);
+
+      // Map to Restaurant interface (column names match directly)
+      top30 = topMatches.map(r => ({
+        id: r.id,
+        google_place_id: r.google_place_id,
+        name: r.name,
+        address: r.address,
+        city: r.city,
+        latitude: r.latitude || 0,
+        longitude: r.longitude || 0,
+        google_rating: r.google_rating,
+        google_reviews_count: r.google_reviews_count,
+        price_level: r.price_level,
+        categories: r.categories || [],
+        summary: r.summary || '',
+        opening_hours: r.opening_hours,
+        photos: r.photos,
+        vectorScore: r.keywordScore / (keywords.length * 3 + 1), // Normalize score
       }));
     }
 

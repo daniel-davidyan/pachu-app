@@ -5,6 +5,9 @@
 -- This is used by the agent recommendation pipeline.
 -- ============================================================================
 
+-- Drop existing function if exists (to handle parameter changes)
+DROP FUNCTION IF EXISTS search_restaurants_simple(VECTOR(1536), INTEGER);
+
 -- ============================================================================
 -- FUNCTION: search_restaurants_simple
 -- ============================================================================
@@ -46,17 +49,17 @@ BEGIN
     rc.name,
     rc.address,
     rc.city,
-    rc.latitude,
-    rc.longitude,
+    -- Direct columns from enrich script (not PostGIS)
+    rc.latitude::DOUBLE PRECISION,
+    rc.longitude::DOUBLE PRECISION,
     rc.google_rating,
     rc.google_reviews_count,
     rc.price_level,
-    rc.categories,
-    rc.summary,
+    rc.categories,  -- Direct column name from enrich script
+    rc.summary,     -- Direct column name from enrich script
     rc.opening_hours,
     rc.photos,
     -- Cosine similarity: 1 - cosine distance
-    -- pgvector's <=> operator returns cosine distance (0 = identical, 2 = opposite)
     (1 - (rc.summary_embedding <=> query_embedding))::DOUBLE PRECISION AS similarity
   FROM restaurant_cache rc
   WHERE rc.summary_embedding IS NOT NULL
