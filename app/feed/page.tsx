@@ -6,7 +6,10 @@ import { FeedHeader } from '@/components/feed/feed-header';
 import { FilterBottomSheet } from '@/components/feed/filter-bottom-sheet';
 import { NotificationsPane } from '@/components/feed/notifications-pane';
 import { BottomNav } from '@/components/layout/bottom-nav';
-import { Loader2 } from 'lucide-react';
+
+// Session storage keys for feed data persistence
+const FEED_DATA_KEY = 'pachu_feed_data';
+const FEED_DATA_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
 interface City {
   id: string;
@@ -59,7 +62,26 @@ interface FeedReview {
   mutualFriends: MutualFriend[];
 }
 
+// Helper to load cached feed data from sessionStorage
+function loadCachedFeedData(): { forYou: FeedReview[]; following: FeedReview[]; timestamp: number } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const saved = sessionStorage.getItem(FEED_DATA_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      // Check if cache is still valid
+      if (Date.now() - data.timestamp < FEED_DATA_EXPIRY) {
+        return data;
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export default function FeedPage() {
+  // Load cached data on mount for instant display
+  const cachedData = useRef(loadCachedFeedData());
+  
   // Tab and filter state
   const [activeTab, setActiveTab] = useState<'following' | 'foryou'>('foryou');
   const [showFilters, setShowFilters] = useState(false);
@@ -68,10 +90,15 @@ export default function FeedPage() {
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [distanceKm, setDistanceKm] = useState(5);
   
-  // Feed state - cached per tab for instant switching
-  const [forYouReviews, setForYouReviews] = useState<FeedReview[]>([]);
-  const [followingReviews, setFollowingReviews] = useState<FeedReview[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Feed state - initialize from cache for instant return to feed
+  const [forYouReviews, setForYouReviews] = useState<FeedReview[]>(
+    () => cachedData.current?.forYou || []
+  );
+  const [followingReviews, setFollowingReviews] = useState<FeedReview[]>(
+    () => cachedData.current?.following || []
+  );
+  // Only show initial loading if we don't have cached data
+  const [loading, setLoading] = useState(!cachedData.current);
   const [loadingMore, setLoadingMore] = useState(false);
   const [forYouPage, setForYouPage] = useState(0);
   const [followingPage, setFollowingPage] = useState(0);
@@ -94,7 +121,20 @@ export default function FeedPage() {
   
   // Request tracking
   const latestRequestId = useRef(0);
-  const hasFetchedOnMount = useRef(false);
+  const hasFetchedOnMount = useRef(!!cachedData.current); // Skip fetch if we have cache
+
+  // Save feed data to sessionStorage for instant return
+  useEffect(() => {
+    if (forYouReviews.length > 0 || followingReviews.length > 0) {
+      try {
+        sessionStorage.setItem(FEED_DATA_KEY, JSON.stringify({
+          forYou: forYouReviews.slice(0, 20), // Only cache first 20 for each
+          following: followingReviews.slice(0, 20),
+          timestamp: Date.now(),
+        }));
+      } catch {}
+    }
+  }, [forYouReviews, followingReviews]);
 
   // Get user location on mount
   useEffect(() => {
@@ -114,17 +154,22 @@ export default function FeedPage() {
   }, []);
 
   // Fetch reviews for a specific tab
-  const fetchReviewsForTab = useCallback(async (tab: 'following' | 'foryou', pageNum: number, reset: boolean = false) => {
+  const fetchReviewsForTab = useCallback(async (tab: 'following' | 'foryou', pageNum: number, reset: boolean = false, isBackgroundRefresh: boolean = false) => {
     if (!userLocation) return;
     
     const requestId = ++latestRequestId.current;
+    const currentReviews = tab === 'foryou' ? forYouReviews : followingReviews;
     
     try {
-      if (reset && ((tab === 'foryou' && forYouReviews.length === 0) || (tab === 'following' && followingReviews.length === 0))) {
+      // Only show loading state if:
+      // 1. It's a reset AND we have no data yet AND it's not a background refresh
+      if (reset && currentReviews.length === 0 && !isBackgroundRefresh) {
         setLoading(true);
-      } else if (!reset) {
+      } else if (!reset && !isBackgroundRefresh) {
+        // Loading more (pagination) - only show if not background
         setLoadingMore(true);
       }
+      // Background refresh: don't show any loader
 
       const searchLocation = selectedCity || userLocation;
       const radius = distanceKm * 1000;
@@ -175,12 +220,14 @@ export default function FeedPage() {
     
     if (!hasFetchedOnMount.current) {
       hasFetchedOnMount.current = true;
-      // Load both tabs in parallel for instant switching
-      fetchReviewsForTab('foryou', 0, true);
-      fetchReviewsForTab('following', 0, true);
+      // If we have cached data, do background refresh (no loader)
+      // Otherwise, do normal load with loader
+      const hasCache = forYouReviews.length > 0 || followingReviews.length > 0;
+      fetchReviewsForTab('foryou', 0, true, hasCache);
+      fetchReviewsForTab('following', 0, true, hasCache);
       return;
     }
-  }, [userLocation, fetchReviewsForTab]);
+  }, [userLocation, fetchReviewsForTab, forYouReviews.length, followingReviews.length]);
 
   // Refetch when filters change (not tab - tab switch is now instant)
   useEffect(() => {

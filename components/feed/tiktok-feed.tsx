@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { TikTokReviewCard } from './tiktok-review-card';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -9,6 +9,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
 import Link from 'next/link';
+
+// Session storage key for feed position
+const FEED_POSITION_KEY = 'pachu_feed_position';
 
 interface MediaItem {
   id: string;
@@ -66,7 +69,23 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
   const { user } = useUser();
   const { showToast } = useToast();
   
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Restore position from sessionStorage on mount
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem(FEED_POSITION_KEY);
+      if (saved) {
+        try {
+          const { index, timestamp } = JSON.parse(saved);
+          // Only restore if saved within last 10 minutes
+          if (Date.now() - timestamp < 10 * 60 * 1000) {
+            return Math.min(index, Math.max(0, reviews.length - 1));
+          }
+        } catch {}
+      }
+    }
+    return 0;
+  });
+  
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -75,10 +94,39 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
   const [loadingComments, setLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
   const touchStartTime = useRef<number>(0);
+  const prevReviewsLengthRef = useRef(reviews.length);
+
+  // Save position to sessionStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && reviews.length > 0) {
+      sessionStorage.setItem(FEED_POSITION_KEY, JSON.stringify({
+        index: currentIndex,
+        timestamp: Date.now(),
+      }));
+    }
+  }, [currentIndex, reviews.length]);
+
+  // Get viewport height for fixed pixel positioning (prevents jump on content load)
+  useLayoutEffect(() => {
+    const updateHeight = () => setViewportHeight(window.innerHeight);
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
+
+  // Handle reviews array growing - keep position stable
+  useEffect(() => {
+    // If reviews were added (not replaced), don't change position
+    if (reviews.length > prevReviewsLengthRef.current && currentIndex <= prevReviewsLengthRef.current) {
+      // Position stays the same, just update the ref
+    }
+    prevReviewsLengthRef.current = reviews.length;
+  }, [reviews.length, currentIndex]);
 
   // Preload next reviews - increased threshold to 5
   useEffect(() => {
@@ -285,6 +333,14 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
     );
   }
 
+  // Only render reviews within a window around current index for performance
+  const renderWindow = 3; // Render current + 3 before/after
+  const startIndex = Math.max(0, currentIndex - renderWindow);
+  const endIndex = Math.min(reviews.length - 1, currentIndex + renderWindow);
+
+  // Show loader only when user is at the last loaded review and we're actively loading more
+  const showLoadingIndicator = isLoading && hasMore && currentIndex >= reviews.length - 2;
+
   return (
     <>
       <div
@@ -294,37 +350,54 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Reviews Stack - Smooth TikTok-style scrolling */}
+        {/* Reviews Stack - Fixed pixel positioning for stability */}
         <div 
           className="relative w-full"
           style={{
-            height: `${reviews.length * 100}%`,
-            transform: `translateY(calc(-${currentIndex * (100 / reviews.length)}% + ${dragOffset}px))`,
+            // Use fixed pixel height instead of percentage to prevent jump on load
+            height: `${reviews.length * viewportHeight}px`,
+            transform: `translateY(${-currentIndex * viewportHeight + dragOffset}px)`,
             transition: isDragging ? 'none' : 'transform 0.3s ease-out',
           }}
         >
-          {reviews.map((review, index) => (
-            <div
-              key={review.id}
-              className="absolute w-full"
-              style={{
-                height: `${100 / reviews.length}%`,
-                top: `${index * (100 / reviews.length)}%`,
-              }}
-            >
-              <TikTokReviewCard
-                review={review}
-                isVisible={index === currentIndex || Math.abs(index - currentIndex) === 1}
-                onSwipeRight={() => handleSwipeRight(review)}
-                onSwipeLeft={() => handleSwipeLeft(review)}
-                onOpenComments={() => handleOpenComments(review.id)}
-              />
-            </div>
-          ))}
+          {reviews.map((review, index) => {
+            // Only render reviews within the visible window
+            if (index < startIndex || index > endIndex) {
+              return (
+                <div
+                  key={review.id}
+                  className="absolute w-full"
+                  style={{
+                    height: `${viewportHeight}px`,
+                    top: `${index * viewportHeight}px`,
+                  }}
+                />
+              );
+            }
+            
+            return (
+              <div
+                key={review.id}
+                className="absolute w-full"
+                style={{
+                  height: `${viewportHeight}px`,
+                  top: `${index * viewportHeight}px`,
+                }}
+              >
+                <TikTokReviewCard
+                  review={review}
+                  isVisible={index === currentIndex || Math.abs(index - currentIndex) === 1}
+                  onSwipeRight={() => handleSwipeRight(review)}
+                  onSwipeLeft={() => handleSwipeLeft(review)}
+                  onOpenComments={() => handleOpenComments(review.id)}
+                />
+              </div>
+            );
+          })}
         </div>
 
-        {/* Loading more indicator */}
-        {isLoading && (
+        {/* Loading more indicator - only show when at end and loading */}
+        {showLoadingIndicator && (
           <div className="absolute bottom-24 left-0 right-0 flex justify-center z-20">
             <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
           </div>
