@@ -22,15 +22,19 @@ dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
 // Configuration
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY!;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
 
 // Validate required env vars
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('❌ Missing Supabase credentials');
+  console.error('SUPABASE_URL:', !!SUPABASE_URL);
+  console.error('SUPABASE_KEY:', !!SUPABASE_KEY);
   process.exit(1);
 }
+
+console.log('🔑 Using Supabase key type:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'service_role' : 'anon');
 if (!GOOGLE_API_KEY) {
   console.error('❌ Missing Google Places API key');
   process.exit(1);
@@ -41,7 +45,7 @@ if (!OPENAI_API_KEY) {
 }
 
 // Initialize clients
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // Rate limiting helpers
@@ -573,8 +577,6 @@ interface EnrichedRestaurant {
   google_reviews_count: number | null;
   price_level: number | null;
   categories: string[];
-  is_kosher: boolean;
-  is_vegetarian_friendly: boolean;
   opening_hours: any | null;
   photos: any[];
   google_reviews: any[];
@@ -891,10 +893,7 @@ async function enrichRestaurant(raw: RawRestaurant): Promise<EnrichedRestaurant 
   const reviewsText = generateReviewsText(details);
   const reviewsEmbedding = await generateEmbedding(reviewsText);
   
-  // Step 5: Detect dietary flags
-  const { isKosher, isVegetarian } = detectDietaryFlags(details);
-  
-  // Step 6: Build enriched restaurant object
+  // Step 5: Build enriched restaurant object
   const enriched: EnrichedRestaurant = {
     google_place_id: placeId,
     name: details.name,
@@ -908,8 +907,6 @@ async function enrichRestaurant(raw: RawRestaurant): Promise<EnrichedRestaurant 
     google_reviews_count: details.user_ratings_total || null,
     price_level: details.price_level || null,
     categories: mapCuisineTypes(details.types || []),
-    is_kosher: isKosher,
-    is_vegetarian_friendly: isVegetarian,
     opening_hours: details.opening_hours ? {
       periods: details.opening_hours.periods,
       weekday_text: details.opening_hours.weekday_text
@@ -949,16 +946,13 @@ async function insertRestaurant(restaurant: EnrichedRestaurant): Promise<boolean
       google_reviews_count: restaurant.google_reviews_count,
       price_level: restaurant.price_level,
       categories: restaurant.categories,
-      is_kosher: restaurant.is_kosher,
-      is_vegetarian_friendly: restaurant.is_vegetarian_friendly,
       opening_hours: restaurant.opening_hours,
       photos: restaurant.photos,
       google_reviews: restaurant.google_reviews,
       summary: restaurant.summary,
       summary_embedding: restaurant.summary_embedding,
       reviews_text: restaurant.reviews_text,
-      reviews_embedding: restaurant.reviews_embedding,
-      last_updated: new Date().toISOString()
+      reviews_embedding: restaurant.reviews_embedding
     }, {
       onConflict: 'google_place_id'
     });

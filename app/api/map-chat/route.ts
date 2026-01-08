@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { runRecommendationPipeline, type ChatMessage } from '@/lib/recommendation';
 
 // Helper function to detect language from message
 function detectLanguage(message: string): 'he' | 'en' | 'other' {
@@ -122,17 +123,17 @@ export async function POST(request: NextRequest) {
     const userMessages = conversationHistory.filter((m: any) => m.role === 'user');
     const isFirstMessage = userMessages.length === 0;
     
-    let detectedLanguage = 'en';
+    let detectedLanguage: 'he' | 'en' = 'en';
     if (isFirstMessage) {
-      // First message - detect from current message
-      detectedLanguage = detectLanguage(message);
+      const detected = detectLanguage(message);
+      detectedLanguage = detected === 'other' ? 'en' : detected;
     } else {
-      // Not first message - detect from first user message in history
       if (userMessages.length > 0) {
-        detectedLanguage = detectLanguage(userMessages[0].content);
+        const detected = detectLanguage(userMessages[0].content);
+        detectedLanguage = detected === 'other' ? 'en' : detected;
       } else {
-        // Fallback - detect from current message
-        detectedLanguage = detectLanguage(message);
+        const detected = detectLanguage(message);
+        detectedLanguage = detected === 'other' ? 'en' : detected;
       }
     }
     
@@ -157,229 +158,66 @@ export async function POST(request: NextRequest) {
 - Do NOT switch to other languages! Always English!
 - If ready to show restaurants, just leave message empty`;
     
-    // System prompt for conversational restaurant finding
-    const systemPrompt = `You are Pachu, a world-class restaurant expert and personal dining concierge. You have deep knowledge about restaurants, cuisines, and dining experiences. Your mission is to understand exactly what the user needs through natural, expert-level conversation, then deliver the 3 perfect restaurant recommendations.
+    // System prompt - Updated for Pipeline V2
+    const systemPrompt = `You are Pachu, a world-class restaurant expert and personal dining concierge. Your mission is to understand exactly what the user needs through natural conversation.
 
 ${languageInstructions}
 
-## ⚠️ CRITICAL - NEVER SWITCH LANGUAGES:
-**You detected the user speaks ${detectedLanguage === 'he' ? 'HEBREW (עברית)' : 'ENGLISH'}.**
-- Every single word you write must be in ${detectedLanguage === 'he' ? 'HEBREW' : 'ENGLISH'}
-- Do NOT write ANY words in ${detectedLanguage === 'he' ? 'English' : 'Hebrew'}
-- Do NOT mix languages
-- Stay ${detectedLanguage === 'he' ? 'עברית' : 'English'} from start to finish!
-- When ready to show restaurants, leave message EMPTY (no text at all)
-
 ## Your Expertise:
-You're like a trusted local friend who knows every restaurant. You ask thoughtful questions and really listen. You understand that dining is about the whole experience - the food, the vibe, the company, the occasion, and the budget.
+You're like a trusted local friend who knows every restaurant. You ask thoughtful questions and really listen.
 
 ## Conversation Style:
 - Talk like a knowledgeable friend, not a bot
 - Ask ONE clear question at a time
-- Keep questions short and natural (like texting a friend)
+- Keep questions short and natural
 - Use emojis naturally: 🍽️ 💰 ❤️ 🌮 🎉 👥 🚶 🚗
-- Be enthusiastic but not over-the-top
-- **SPEAK IN THE USER'S LANGUAGE** (${detectedLanguage === 'he' ? 'Hebrew' : 'English'})
 
-## Information to Gather (ask 1-4 questions based on what user provides):
+## CRITICAL - Information to Gather:
 
-**Essential Info:**
-1. **Mood & Cuisine** - What are they craving? What vibe?
-2. **Occasion** - Solo? Date? Friends? Family? Business?
-3. **Timing** - Now? Tonight? Weekend? Special time?
-4. **Location** - Which city? Nearby?
+**MUST ASK (in first 1-2 questions):**
+1. **WHERE** - איפה מחפשים?
+   - קרוב אליך / באזור שלך (nearby)
+   - לא משנה המרחק (anywhere)
+   - תל אביב / עיר ספציפית (specific city)
 
-**Budget - OPTIONAL:**
-- DO NOT ask about budget/price unless user mentions it first
-- If user says "cheap", "expensive", "budget", etc. → note it and use it
-- Otherwise, skip budget completely
+2. **WHEN** - מתי?
+   - עכשיו / מיד (now)
+   - הערב / הלילה (tonight)
+   - מחר (tomorrow)
+   - לא משנה (anytime)
 
-## Conversation Flow:
-
-**If user gives minimal info** (e.g., "I want pizza" or "אני רוצה פיצה"):
-→ Ask 3-4 targeted questions to understand their full context
-
-**If user gives moderate info** (e.g., "Looking for a romantic Italian place for dinner tonight"):
-→ Ask 1-2 clarifying questions (budget? distance?)
-
-**If user gives detailed info** (e.g., "Need a mid-range sushi place for 2, walking distance, for tonight around 7pm"):
-→ Just search! Set readyToShow: true immediately
+**Then ask about:**
+3. **WHAT** - מה בא להם? (cuisine, mood, occasion)
+4. **Budget** - רק אם הם מזכירים תקציב
 
 ## Current State:
 - Questions asked: ${questionCount}
 - User responses: ${userResponseCount}
-- Stage: ${userResponseCount === 0 ? 'Initial ask - understand their basic need' : userResponseCount === 1 ? 'Got first answer - ask follow-ups or search if enough info' : userResponseCount === 2 ? 'Got 2 answers - ask final question if needed or search' : userResponseCount === 3 ? 'Got 3 answers - search now!' : 'Time to search!'}
+- Stage: ${userResponseCount === 0 ? 'Initial - ask about WHERE and WHEN first!' : userResponseCount === 1 ? 'Got first answer - ask about WHAT they want' : userResponseCount === 2 ? 'Got 2 answers - confirm and search!' : 'Time to search!'}
 
 **IMPORTANT LIMITS:**
-- Maximum 4 questions total
-- After 4th user response → MUST set readyToShow: true
-- If user provides all info → search immediately (even on 1st message)
-
-## Special Case - Focused Search Detected:
-${focusedSearch.isFocused ? `
-🎯 USER IS SEARCHING FOR A SPECIFIC PLACE: "${focusedSearch.restaurantName}"
-${focusedSearch.isQuestion ? `
-→ This is a QUESTION about the place. Respond conversationally:
-  - Acknowledge you'll look into it
-  - Ask if they want you to show them the place or give alternatives
-  - Set searchMode: "specific" and searchQuery: "${focusedSearch.restaurantName}"
-  - Set readyToShow: false (wait for their answer)
-` : `
-→ This is a DIRECT SEARCH. Immediately:
-  - Set searchMode: "specific" and searchQuery: "${focusedSearch.restaurantName}"
-  - Set readyToShow: true
-  - No message needed
-`}
-` : 'No focused search detected - proceed with conversation'}
+- Maximum 3-4 questions total
+- After 3rd user response → set readyToShow: true
+- If user provides WHERE, WHEN, and WHAT → search immediately
 
 ## Data Extraction Format:
 After EVERY response, include this JSON (hidden from user):
 <data>
 {
-  "cuisineTypes": [],
-  "searchQuery": "",
-  "priceLevel": null,
-  "budget": "",
-  "occasion": "",
-  "timing": "",
-  "distance": "",
-  "specialPreferences": [],
-  "searchMode": "general",
   "readyToShow": false
 }
 </data>
 
-## Extraction Rules:
-
-**CRITICAL - Keep User's Language:**
-- Extract ALL fields in the user's original language (${detectedLanguage === 'he' ? 'Hebrew' : 'English'})
-- DO NOT translate cuisine types or any other terms
-- Use exact terms the user used for maximum search accuracy with Google Places API
-
-**cuisineTypes** (array) - IN USER'S LANGUAGE:
-${detectedLanguage === 'he' ? `
-- Hebrew examples: "המבורגר", "פיצה", "סושי", "עוף סיני", "מלוואח", "שווארמה", "פלאפל", "איטלקי", "סיני", "ים תיכוני"
-- Keep EXACTLY as user said it: "עוף סיני" stays "עוף סיני", "מלוואח" stays "מלוואח"
-` : `
-- English examples: "italian", "japanese", "chinese", "mexican", "pizza", "sushi", "burger", "seafood"
-- Keep EXACTLY as user said it
-`}
-
-**searchQuery** (string) - IN USER'S LANGUAGE:
-- The main search term to use with Google Places API
-- Use specific food/cuisine terms from conversation
-${detectedLanguage === 'he' ? `
-- Hebrew examples: "המבורגר", "מסעדת עוף סיני", "מלוואח", "פיצה"
-` : `
-- English examples: "burger", "chicken restaurant", "pizza place"
-`}
-
-**priceLevel** (number 1-4):
-${detectedLanguage === 'he' ? `
-- 1: "זול", "בזול", "עד 50 שקל", "תקציב נמוך"
-- 2: "בינוני", "סביר", "50-100 שקל"
-- 3: "יקר", "מפואר", "100-150 שקל"
-- 4: "יוקרתי", "מאוד יקר", "מעל 150 שקל"
-` : `
-- 1: "cheap", "budget", "affordable", "under 50 shekels"
-- 2: "moderate", "mid-range", "50-100 shekels"
-- 3: "upscale", "pricey", "100-150 shekels"
-- 4: "luxury", "expensive", "150+ shekels"
-`}
-
-**budget** (string): Extract exact budget mentions
-
-**occasion** (string):
-${detectedLanguage === 'he' ? `
-- "לבד", "בודד", "סולו"
-- "דייט", "רומנטי", "עם בן/בת זוג"
-- "חברים", "קבוצה"
-- "משפחה", "עם ילדים"
-- "עסקים", "פגישת עבודה"
-` : `
-- "solo", "alone"
-- "date", "romantic", "partner"
-- "friends", "group"
-- "family", "kids"
-- "business", "work meeting"
-`}
-
-**timing** (string):
-${detectedLanguage === 'he' ? `
-- "עכשיו", "מיד", "כרגע"
-- "הערב", "הלילה"
-- "מחר", "סוף שבוע"
-- "ארוחת צהריים", "ארוחת ערב"
-` : `
-- "now", "immediately", "asap"
-- "tonight", "this evening"
-- "tomorrow", "weekend"
-- "lunch", "dinner"
-`}
-
-**distance** (string):
-${detectedLanguage === 'he' ? `
-- "ברגל", "קרוב", "במרחק הליכה"
-- "נסיעה קצרה", "קורקינט", "5 דקות"
-- "נכון לנסוע", "לא אכפת לי מרחק"
-` : `
-- "walking distance", "nearby", "close"
-- "short ride", "scooter", "5 minutes"
-- "willing to drive", "don't care about distance"
-`}
-
-**city** (string) - VERY IMPORTANT:
-${detectedLanguage === 'he' ? `
-- חלץ את שם העיר אם המשתמש מזכיר אותה!
-- דוגמאות: "תל אביב", "ירושלים", "חיפה", "הרצליה", "באר שבע", "אילת", "נתניה", "רעננה", "כפר סבא", "פתח תקווה"
-- אם המשתמש לא מזכיר עיר, השאר ריק
-` : `
-- Extract the city name if user mentions it!
-- Examples: "Tel Aviv", "Jerusalem", "Haifa", "Herzliya", "Beer Sheva", "Eilat", "Netanya"
-- If user doesn't mention a city, leave empty
-`}
-
-**specialPreferences** (array) - IN USER'S LANGUAGE:
-${detectedLanguage === 'he' ? `
-- "רומנטי", "שקט", "אינטימי"
-- "חוץ", "מרפסת", "גינה"
-- "ידידותי לחיות", "מותר עם כלבים"
-- "מוזיקה חיה", "בידור"
-- "נוף", "גג", "על הים"
-- "קז'ואל", "נינוח"
-- "טרנדי", "אינסטגרמי"
-- "מסורתי", "אותנטי"
-` : `
-- "romantic", "quiet", "intimate"
-- "outdoor", "patio", "garden"
-- "pet-friendly", "dogs allowed"
-- "live music", "entertainment"
-- "view", "rooftop", "waterfront"
-- "casual", "relaxed"
-- "trendy", "instagram-worthy"
-- "traditional", "authentic"
-`}
-
-**searchMode**:
-- "general": Normal recommendation flow
-- "specific": User is searching for a specific restaurant by name
-
-**searchQuery** (string):
-- If searchMode is "specific", extract the restaurant name
-- If searchMode is "general", you can optionally put a more specific search term here (e.g., "burger joint", "italian restaurant", "sushi bar")
-- This helps find better results when user is specific about what they want
-- **KEEP IN USER'S LANGUAGE** - DO NOT TRANSLATE
-
-**readyToShow** (boolean):
-- true: You have enough info to search
-- false: Need to ask more questions
+Set readyToShow: true when you have:
+- Location preference (nearby/anywhere/city)
+- Timing preference (now/tonight/tomorrow/anytime)
+- What they're looking for (cuisine/mood/occasion)
 
 ## Response Guidelines:
-- If readyToShow is true and searchMode is "general": Empty message (just show restaurants)
-- If readyToShow is true and searchMode is "specific": Empty message (just show the specific restaurant)
-- If readyToShow is false: Ask your next question (conversational and natural)
+- If readyToShow is true: Leave message EMPTY (no text)
+- If readyToShow is false: Ask your next question
 
-Remember: You're an expert who cares about helping people have amazing dining experiences. Ask smart questions, listen carefully, and deliver perfect recommendations! 🌟`;
+Remember: Get WHERE and WHEN early in the conversation! This helps us filter restaurants properly.`;
 
     const messages: any[] = [
       { role: 'system', content: systemPrompt },
@@ -397,7 +235,7 @@ Remember: You're an expert who cares about helping people have amazing dining ex
     const fullResponse = completion.choices[0].message.content || '';
     console.log('🤖 AI Response:', fullResponse.substring(0, 200) + (fullResponse.length > 200 ? '...' : ''));
     
-    // Simple extraction - just check if AI says it's ready to show restaurants
+    // Extract readyToShow from response
     let readyToShow = false;
     const dataMatch = fullResponse.match(/<data>([\s\S]*?)<\/data>/);
     if (dataMatch) {
@@ -408,13 +246,11 @@ Remember: You're an expert who cares about helping people have amazing dining ex
       } catch (e) {
         console.error('Error parsing readyToShow:', e);
       }
-    } else {
-      console.warn('⚠️ No <data> block found in AI response');
     }
 
-    // Force readyToShow after 4 user responses
-    if (userResponseCount >= 4) {
-      console.log('⚡ Forcing readyToShow=true (4+ responses)');
+    // Force readyToShow after 3+ user responses
+    if (userResponseCount >= 3) {
+      console.log('⚡ Forcing readyToShow=true (3+ responses)');
       readyToShow = true;
     }
 
@@ -427,136 +263,90 @@ Remember: You're an expert who cares about helping people have amazing dining ex
       console.log('✅ readyToShow=true, clearing message');
     }
 
-    // If ready to show restaurants, send entire conversation to OpenAI for recommendations
-    const restaurants: any[] = [];
+    // =========================================================================
+    // RECOMMENDATION PIPELINE V2
+    // =========================================================================
+    
+    let restaurants: any[] = [];
+    let pipelineDebug: any = null;
+    
     if (readyToShow && location) {
       try {
-        console.log('🤖 Sending full conversation to OpenAI for restaurant recommendations...');
+        console.log('\n🚀 Starting Recommendation Pipeline V2...\n');
         
-        // Build the recommendation request - send ENTIRE conversation as-is
-        const locationContext = detectedLanguage === 'he'
-          ? `מיקום נוכחי של המשתמש (GPS): ${location.lat}, ${location.lng}`
-          : `User's current location (GPS): ${location.lat}, ${location.lng}`;
+        // Build messages array for pipeline
+        const pipelineMessages: ChatMessage[] = [
+          ...conversationHistory.map((m: any) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          })),
+          { role: 'user' as const, content: message },
+        ];
         
-        const recommendationPrompt = detectedLanguage === 'he'
-          ? `הנה השיחה המלאה שלי עם הלקוח:
-
-${conversationHistory.map((m: any) => `${m.role === 'user' ? 'לקוח' : 'אני'}: ${m.content}`).join('\n')}
-לקוח: ${message}
-
-${locationContext}
-
-בהתבסס על השיחה המלאה הזו ומיקום המשתמש, אנא המלץ על בדיוק 3 מסעדות ספציפיות שמתאימות בול למה שהלקוח רוצה.
-אם הלקוח הזכיר עיר ספציפית (כמו "ירושלים", "תל אביב", "הרצליה"), המלץ על מסעדות בעיר הזו.
-אם הלקוח אמר "קרוב" או "במרחק הליכה", המלץ על מסעדות קרובות למיקום ה-GPS שצוין.
-
-חשוב: תן רק את השמות המדויקים של המסעדות כפי שהן מופיעות בגוגל/במפות גוגל.
-
-פורמט:
-1. [שם מסעדה מדויק]
-2. [שם מסעדה מדויק]
-3. [שם מסעדה מדויק]`
-          : `Here is my full conversation with the client:
-
-${conversationHistory.map((m: any) => `${m.role === 'user' ? 'Client' : 'Me'}: ${m.content}`).join('\n')}
-Client: ${message}
-
-${locationContext}
-
-Based on this entire conversation and the user's location, please recommend exactly 3 specific restaurants that perfectly match what the client wants.
-If the client mentioned a specific city (like "Jerusalem", "Tel Aviv", "Herzliya"), recommend restaurants in that city.
-If the client said "nearby" or "walking distance", recommend restaurants close to the GPS location provided.
-
-Important: Provide only the exact restaurant names as they appear on Google/Google Maps.
-
-Format:
-1. [Exact restaurant name]
-2. [Exact restaurant name]
-3. [Exact restaurant name]`;
-
-        console.log('📝 Sending to OpenAI:\n', recommendationPrompt);
-
-        // Ask OpenAI for recommendations based on FULL conversation
-        const recommendationCompletion = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            { 
-              role: 'system', 
-              content: detectedLanguage === 'he'
-                ? `אתה מומחה מסעדות מקומי שמכיר מסעדות בישראל מצוין. קרא את כל השיחה בקפידה והבן מה הלקוח באמת רוצה - סוג האוכל, תקציב, עיר, מרחק, אווירה, וכו'. המלץ על 3 מסעדות אמיתיות שמתאימות בול.`
-                : `You are a local restaurant expert who knows restaurants extremely well. Read the entire conversation carefully and understand what the client really wants - food type, budget, city, distance, atmosphere, etc. Recommend 3 real restaurants that are a perfect match.`
-            },
-            { role: 'user', content: recommendationPrompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 400,
+        // Run the new pipeline
+        const pipelineResult = await runRecommendationPipeline(
+          pipelineMessages,
+          { lat: location.lat, lng: location.lng },
+          {
+            openaiApiKey: process.env.OPENAI_API_KEY!,
+            supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            vectorSearchTopK: 50,
+            rerankTopN: 15,
+            enableDiversity: true,
+            enableDebug: true,
+          }
+        );
+        
+        // Store debug data
+        pipelineDebug = pipelineResult.debug;
+        
+        // Transform recommendations to restaurant format for frontend
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
+        
+        restaurants = pipelineResult.recommendations.map(rec => {
+          const r = rec.restaurant;
+          
+          // Build photo URL if available
+          let photoUrl: string | undefined;
+          if (r.photos && r.photos.length > 0 && r.photos[0].photo_reference && apiKey) {
+            photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${r.photos[0].photo_reference}&key=${apiKey}`;
+          }
+          
+          return {
+            id: r.google_place_id,
+            googlePlaceId: r.google_place_id,
+            name: r.name,
+            address: r.address || '',
+            rating: r.google_rating || 0,
+            totalReviews: r.google_reviews_count || 0,
+            cuisineTypes: r.categories || [],
+            priceLevel: r.price_level,
+            photoUrl,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            matchPercentage: rec.matchPercentage,
+            reason: rec.reason, // Personal explanation from LLM
+            source: 'pipeline',
+            recommendedBy: 'ai',
+          };
         });
-
-        const recommendationText = recommendationCompletion.choices[0].message.content || '';
-        console.log('🎯 OpenAI recommendations:\n', recommendationText);
-
-        // Parse restaurant names from the response
-        const restaurantNames: string[] = [];
-        const lines = recommendationText.split('\n');
         
-        for (const line of lines) {
-          // Match patterns like "1. Restaurant Name" or "- Restaurant Name"
-          const match = line.match(/^[\d\-\*•]\s*[\.\):]?\s*(.+)$/);
-          if (match && match[1]) {
-            let name = match[1].trim();
-            // Remove quotes if present
-            name = name.replace(/^["']|["']$/g, '');
-            if (name && name.length > 2) {
-              restaurantNames.push(name);
-            }
-          }
-        }
-
-        console.log(`✅ Parsed ${restaurantNames.length} restaurant names:`, restaurantNames);
-
-        // Search for each recommended restaurant on Google Places
-        for (const restaurantName of restaurantNames.slice(0, 3)) {
-          try {
-            console.log(`🔍 Searching Google Places for: "${restaurantName}"`);
-            const searchResponse = await fetch(
-              `${request.nextUrl.origin}/api/restaurants/search?query=${encodeURIComponent(restaurantName)}&latitude=${location.lat}&longitude=${location.lng}`,
-              { headers: request.headers }
-            );
-            const searchData = await searchResponse.json();
-            
-            if (searchData.restaurants && searchData.restaurants.length > 0) {
-              // Take the first (best) match
-              const restaurant = searchData.restaurants[0];
-              console.log(`✓ Found: ${restaurant.name}`, {
-                hasPhoto: !!restaurant.photoUrl,
-                photoUrl: restaurant.photoUrl ? restaurant.photoUrl.substring(0, 100) + '...' : 'NO PHOTO',
-                rating: restaurant.rating,
-                address: restaurant.address?.substring(0, 50),
-                placeId: restaurant.googlePlaceId
-              });
-              
-              if (!restaurant.photoUrl) {
-                console.warn(`⚠️ "${restaurant.name}" has no photo! Place ID: ${restaurant.googlePlaceId}`);
-              }
-              
-              restaurants.push({
-                ...restaurant,
-                matchPercentage: 95,
-                source: restaurant.source || 'google',
-                recommendedBy: 'ai'
-              });
-            } else {
-              console.warn(`✗ Could not find restaurant: "${restaurantName}"`);
-            }
-          } catch (error) {
-            console.error(`Error searching for ${restaurantName}:`, error);
-          }
-        }
-
-        console.log(`📍 Final: ${restaurants.length} restaurants found`);
+        console.log(`📍 Pipeline returned ${restaurants.length} restaurants`);
         
       } catch (error) {
-        console.error('Error getting AI recommendations:', error);
+        console.error('Pipeline error:', error);
+        
+        // Fallback to old method if pipeline fails
+        console.log('⚠️ Falling back to old recommendation method...');
+        restaurants = await fallbackRecommendation(
+          openai,
+          conversationHistory,
+          message,
+          location,
+          detectedLanguage,
+          request
+        );
       }
     }
 
@@ -569,6 +359,7 @@ Format:
     return NextResponse.json({
       message: visibleMessage,
       restaurants: restaurants.length > 0 ? restaurants : undefined,
+      debug: pipelineDebug,
       success: true,
     });
   } catch (error: any) {
@@ -580,4 +371,103 @@ Format:
   }
 }
 
+// =========================================================================
+// FALLBACK METHOD (old recommendation logic)
+// =========================================================================
 
+async function fallbackRecommendation(
+  openai: OpenAI,
+  conversationHistory: any[],
+  message: string,
+  location: { lat: number; lng: number },
+  detectedLanguage: string,
+  request: NextRequest
+): Promise<any[]> {
+  const restaurants: any[] = [];
+  
+  try {
+    const locationContext = detectedLanguage === 'he'
+      ? `מיקום נוכחי של המשתמש (GPS): ${location.lat}, ${location.lng}`
+      : `User's current location (GPS): ${location.lat}, ${location.lng}`;
+    
+    const recommendationPrompt = detectedLanguage === 'he'
+      ? `הנה השיחה המלאה שלי עם הלקוח:
+
+${conversationHistory.map((m: any) => `${m.role === 'user' ? 'לקוח' : 'אני'}: ${m.content}`).join('\n')}
+לקוח: ${message}
+
+${locationContext}
+
+המלץ על 3 מסעדות ספציפיות. פורמט:
+1. [שם מסעדה]
+2. [שם מסעדה]
+3. [שם מסעדה]`
+      : `Here is my conversation with the client:
+
+${conversationHistory.map((m: any) => `${m.role === 'user' ? 'Client' : 'Me'}: ${m.content}`).join('\n')}
+Client: ${message}
+
+${locationContext}
+
+Recommend 3 specific restaurants. Format:
+1. [Restaurant name]
+2. [Restaurant name]
+3. [Restaurant name]`;
+
+    const recommendationCompletion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { 
+          role: 'system', 
+          content: detectedLanguage === 'he'
+            ? 'אתה מומחה מסעדות. המלץ על 3 מסעדות אמיתיות בישראל.'
+            : 'You are a restaurant expert. Recommend 3 real restaurants.'
+        },
+        { role: 'user', content: recommendationPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 400,
+    });
+
+    const recommendationText = recommendationCompletion.choices[0].message.content || '';
+    
+    const restaurantNames: string[] = [];
+    const lines = recommendationText.split('\n');
+    
+    for (const line of lines) {
+      const match = line.match(/^[\d\-\*•]\s*[\.\):]?\s*(.+)$/);
+      if (match && match[1]) {
+        let name = match[1].trim().replace(/^["']|["']$/g, '');
+        if (name && name.length > 2) {
+          restaurantNames.push(name);
+        }
+      }
+    }
+
+    for (const restaurantName of restaurantNames.slice(0, 3)) {
+      try {
+        const searchResponse = await fetch(
+          `${request.nextUrl.origin}/api/restaurants/search?query=${encodeURIComponent(restaurantName)}&latitude=${location.lat}&longitude=${location.lng}`,
+          { headers: request.headers }
+        );
+        const searchData = await searchResponse.json();
+        
+        if (searchData.restaurants && searchData.restaurants.length > 0) {
+          const restaurant = searchData.restaurants[0];
+          restaurants.push({
+            ...restaurant,
+            matchPercentage: 85,
+            source: restaurant.source || 'google',
+            recommendedBy: 'ai-fallback'
+          });
+        }
+      } catch (error) {
+        console.error(`Error searching for ${restaurantName}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Fallback recommendation error:', error);
+  }
+  
+  return restaurants;
+}
