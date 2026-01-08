@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
   ArrowLeft, Bookmark, MapPin, Phone, Globe, DollarSign, 
@@ -16,6 +17,8 @@ import Link from 'next/link';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
+import { useFeedData } from '@/components/providers';
+import { cacheKeys } from '@/lib/swr-config';
 
 interface Review {
   id: string;
@@ -84,11 +87,37 @@ export default function RestaurantPage() {
   const router = useRouter();
   const { user } = useUser();
   const { showToast } = useToast();
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [friendsWhoReviewed, setFriendsWhoReviewed] = useState<Friend[]>([]);
+  const { getCachedRestaurant } = useFeedData();
+  
+  const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
+  
+  // Get cached data from feed for instant display
+  const cachedData = restaurantId ? getCachedRestaurant(restaurantId) : null;
+  
+  // Use SWR for data fetching with fallback from feed cache
+  const { data: apiData, error, isLoading, mutate } = useSWR<RestaurantData>(
+    restaurantId ? cacheKeys.restaurant(restaurantId) : null,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    {
+      // Use cached data for instant render, then revalidate
+      fallbackData: cachedData as RestaurantData | undefined,
+      revalidateOnFocus: false,
+      revalidateIfStale: true,
+    }
+  );
+  
+  // Merge cached and API data (API takes precedence when available)
+  const data = apiData || cachedData;
+  const restaurant = data?.restaurant || null;
+  const reviews = data?.reviews || [];
+  const friendsWhoReviewed = data?.friendsWhoReviewed || [];
+  const loading = isLoading && !cachedData;
+  
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [loadingWishlist, setLoadingWishlist] = useState(false);
   const [restaurantDbId, setRestaurantDbId] = useState<string | null>(null);
@@ -102,14 +131,23 @@ export default function RestaurantPage() {
   const [showingGoogleReviews, setShowingGoogleReviews] = useState(false);
   const [showingNonFriendReviews, setShowingNonFriendReviews] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
-  
-  const restaurantId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const [openingHours, setOpeningHours] = useState<Restaurant['openingHours'] | null>(null);
 
+  // Update local state when API data arrives
+  useEffect(() => {
+    if (apiData) {
+      setIsWishlisted(apiData.isWishlisted || false);
+      setRestaurantDbId(apiData.restaurant?.id || null);
+      setShowingGoogleReviews(apiData.showingGoogleReviews || false);
+      setShowingNonFriendReviews(apiData.showingNonFriendReviews || false);
+    }
+  }, [apiData]);
+
+  // Reset ONTOPO state when restaurant changes
   useEffect(() => {
     if (restaurantId) {
       setOntopoUrl(null);
       setIsIsrael(false);
-      fetchRestaurant();
     }
   }, [restaurantId]);
 
@@ -117,7 +155,7 @@ export default function RestaurantPage() {
   useEffect(() => {
     if (!restaurant) return;
     // Skip if opening hours already loaded
-    if (restaurant.openingHours) return;
+    if (openingHours || restaurant.openingHours) return;
 
     const checkIsraelAndFetchOntopo = async () => {
       try {
@@ -127,14 +165,11 @@ export default function RestaurantPage() {
         
         console.log('Google Places API response:', data); // Debug log
         
-        // Update restaurant with opening hours if available
+        // Update opening hours in local state
         if (data.opening_hours || data.current_opening_hours) {
           const hoursData = data.opening_hours || data.current_opening_hours;
           console.log('Opening hours data:', hoursData); // Debug log
-          setRestaurant(prev => prev ? {
-            ...prev,
-            openingHours: hoursData
-          } : null);
+          setOpeningHours(hoursData);
         }
         
         // Check if country is Israel
@@ -166,7 +201,7 @@ export default function RestaurantPage() {
     };
 
     checkIsraelAndFetchOntopo();
-  }, [restaurant?.id, restaurantId]);
+  }, [restaurant?.id, restaurantId, openingHours, restaurant?.openingHours]);
 
   const extractCityFromAddress = (address?: string) => {
     if (!address) return '';
@@ -175,26 +210,9 @@ export default function RestaurantPage() {
     return parts.length > 1 ? parts[parts.length - 1].trim() : '';
   };
 
-  const fetchRestaurant = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/restaurants/${restaurantId}`);
-      const data: RestaurantData = await response.json();
-
-      if (data.restaurant) {
-        setRestaurant(data.restaurant);
-        setReviews(data.reviews || []);
-        setFriendsWhoReviewed(data.friendsWhoReviewed || []);
-        setIsWishlisted(data.isWishlisted || false);
-        setRestaurantDbId(data.restaurant.id);
-        setShowingGoogleReviews(data.showingGoogleReviews || false);
-        setShowingNonFriendReviews(data.showingNonFriendReviews || false);
-      }
-    } catch (error) {
-      console.error('Error fetching restaurant:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Refetch restaurant data (SWR mutate)
+  const fetchRestaurant = () => {
+    mutate();
   };
 
   const handleWishlist = async () => {
@@ -243,7 +261,7 @@ export default function RestaurantPage() {
   };
 
   const handleEditReview = (post: PostCardData) => {
-    const review = reviews.find(r => r.id === post.id);
+    const review = reviews.find((r: Review) => r.id === post.id);
     if (review) {
       setEditingReview(review);
       setShowWriteReview(true);
@@ -264,9 +282,8 @@ export default function RestaurantPage() {
       });
 
       if (response.ok) {
-        setReviews(prev => prev.filter(review => review.id !== reviewToDelete));
         showToast('Experience deleted successfully', 'success');
-        fetchRestaurant(); // Refresh the restaurant data
+        fetchRestaurant(); // Refresh the restaurant data via SWR mutate
       } else {
         showToast('Failed to delete experience', 'error');
       }
@@ -503,7 +520,7 @@ export default function RestaurantPage() {
                         {/* All hours - expandable */}
                         {showAllHours && (
                           <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5">
-                            {restaurant.openingHours.weekday_text.map((day, index) => {
+                            {restaurant.openingHours.weekday_text.map((day: string, index: number) => {
                               const isToday = index === (new Date().getDay() + 6) % 7;
                               return (
                                 <div 
@@ -640,7 +657,7 @@ export default function RestaurantPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => (
+              {reviews.map((review: Review) => (
                 <PostCard
                   key={review.id}
                   post={review}

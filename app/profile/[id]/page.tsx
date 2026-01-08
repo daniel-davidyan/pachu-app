@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ArrowLeft, UserPlus, UserCheck, Loader2, Heart, Grid3X3, Play } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import { useFeedData } from '@/components/providers';
+import { cacheKeys } from '@/lib/swr-config';
 
 interface Review {
   id: string;
@@ -48,46 +51,62 @@ interface MutualFriend {
   avatarUrl?: string;
 }
 
+interface ProfileData {
+  profile: Profile;
+  stats: Stats;
+  reviews: Review[];
+  mutualFriends: MutualFriend[];
+  isFollowing: boolean;
+  isOwnProfile: boolean;
+}
+
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
   const { showToast } = useToast();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [stats, setStats] = useState<Stats>({ followersCount: 0, followingCount: 0, reviewsCount: 0, averageRating: 0 });
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [mutualFriends, setMutualFriends] = useState<MutualFriend[]>([]);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isOwnProfile, setIsOwnProfile] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { getCachedProfile } = useFeedData();
   
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
+  
+  // Get cached data from feed for instant display
+  const cachedData = profileId ? getCachedProfile(profileId) : null;
+  
+  // Use SWR for data fetching with fallback from feed cache
+  const { data: apiData, error, isLoading, mutate } = useSWR<ProfileData>(
+    profileId ? cacheKeys.profile(profileId) : null,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    {
+      // Use cached data for instant render, then revalidate
+      fallbackData: cachedData as ProfileData | undefined,
+      revalidateOnFocus: false,
+      revalidateIfStale: true,
+    }
+  );
+  
+  // Merge cached and API data (API takes precedence when available)
+  const data = apiData || cachedData;
+  const profile = data?.profile || null;
+  const stats = data?.stats || { followersCount: 0, followingCount: 0, reviewsCount: 0, averageRating: 0 };
+  const reviews = data?.reviews || [];
+  const mutualFriends = data?.mutualFriends || [];
+  const loading = isLoading && !cachedData;
+  
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [localStats, setLocalStats] = useState(stats);
 
+  // Update local state when API data arrives
   useEffect(() => {
-    if (profileId) {
-      fetchProfile();
+    if (apiData) {
+      setIsFollowing(apiData.isFollowing || false);
+      setIsOwnProfile(apiData.isOwnProfile || false);
+      setLocalStats(apiData.stats);
     }
-  }, [profileId]);
-
-  const fetchProfile = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/profile/${profileId}`);
-      const data = await response.json();
-
-      if (data.profile) {
-        setProfile(data.profile);
-        setStats(data.stats);
-        setReviews(data.reviews || []);
-        setMutualFriends(data.mutualFriends || []);
-        setIsFollowing(data.isFollowing || false);
-        setIsOwnProfile(data.isOwnProfile || false);
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [apiData]);
 
   const handleFollow = async () => {
     try {
@@ -102,11 +121,13 @@ export default function UserProfilePage() {
 
       if (response.ok) {
         setIsFollowing(!isFollowing);
-        setStats({
-          ...stats,
-          followersCount: isFollowing ? stats.followersCount - 1 : stats.followersCount + 1,
+        setLocalStats({
+          ...localStats,
+          followersCount: isFollowing ? localStats.followersCount - 1 : localStats.followersCount + 1,
         });
         showToast(isFollowing ? 'Unfollowed' : 'Following', 'success');
+        // Revalidate the SWR cache
+        mutate();
       } else {
         showToast(`Failed to ${action}`, 'error');
       }
@@ -207,21 +228,21 @@ export default function UserProfilePage() {
             {/* Stats */}
             <div className="flex-1 flex justify-around">
               <div className="text-center">
-                <p className="text-lg font-semibold text-gray-900">{stats.reviewsCount}</p>
+                <p className="text-lg font-semibold text-gray-900">{localStats.reviewsCount}</p>
                 <p className="text-xs text-gray-500">posts</p>
               </div>
               <button
                 onClick={() => router.push(`/profile/${profileId}/connections?tab=followers`)}
                 className="text-center"
               >
-                <p className="text-lg font-semibold text-gray-900">{stats.followersCount}</p>
+                <p className="text-lg font-semibold text-gray-900">{localStats.followersCount}</p>
                 <p className="text-xs text-gray-500">followers</p>
               </button>
               <button
                 onClick={() => router.push(`/profile/${profileId}/connections?tab=following`)}
                 className="text-center"
               >
-                <p className="text-lg font-semibold text-gray-900">{stats.followingCount}</p>
+                <p className="text-lg font-semibold text-gray-900">{localStats.followingCount}</p>
                 <p className="text-xs text-gray-500">following</p>
               </button>
             </div>
@@ -239,7 +260,7 @@ export default function UserProfilePage() {
           {mutualFriends.length > 0 && (
             <div className="flex items-center gap-2 mt-3">
               <div className="flex -space-x-2">
-                {mutualFriends.slice(0, 3).map((friend) => (
+                {mutualFriends.slice(0, 3).map((friend: MutualFriend) => (
                   friend.avatarUrl ? (
                     <img
                       key={friend.id}
@@ -300,7 +321,7 @@ export default function UserProfilePage() {
         {/* Posts Grid - Instagram Style */}
         {reviews.length > 0 ? (
           <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
-            {reviews.map((review) => {
+            {reviews.map((review: Review) => {
               const thumbnailUrl = review.photos?.[0] || review.restaurant?.imageUrl;
               const hasMultiplePhotos = (review.photos?.length || 0) > 1;
               

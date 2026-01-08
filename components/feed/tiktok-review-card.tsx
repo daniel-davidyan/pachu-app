@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Heart, MessageCircle, Bookmark, Share2, MapPin } from 'lucide-react';
@@ -9,6 +9,8 @@ import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
 import { CollectionPicker } from '@/components/collections/collection-picker';
 import { CollectionModal } from '@/components/collections/collection-modal';
+import { useFeedData } from '@/components/providers';
+import { prefetchData, cacheKeys } from '@/lib/swr-config';
 
 interface MediaItem {
   id: string;
@@ -73,6 +75,7 @@ export function TikTokReviewCard({
   const router = useRouter();
   const { user } = useUser();
   const { showToast } = useToast();
+  const { cacheRestaurantFromFeed, cacheProfileFromFeed } = useFeedData();
   
   const [isLiked, setIsLiked] = useState(review.isLiked);
   const [likesCount, setLikesCount] = useState(review.likesCount);
@@ -81,19 +84,38 @@ export function TikTokReviewCard({
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
+  
+  // Track if we've already cached/prefetched for this review
+  const hasCachedRef = useRef(false);
 
-  // Prefetch pages when card becomes visible for faster navigation
+  // PERFORMANCE: Cache feed data + prefetch when card becomes visible
+  // This enables INSTANT navigation to restaurant/profile pages
   useEffect(() => {
-    if (isVisible) {
-      // Prefetch restaurant page
-      const restaurantUrl = `/restaurant/${review.restaurant.googlePlaceId || review.restaurant.id}`;
-      router.prefetch(restaurantUrl);
+    if (isVisible && !hasCachedRef.current) {
+      hasCachedRef.current = true;
       
-      // Prefetch user profile page
+      // 1. Cache review data for instant rendering on navigation
+      // This populates SWR cache so detail pages render immediately
+      cacheRestaurantFromFeed(review);
+      cacheProfileFromFeed(review);
+      
+      // 2. Prefetch Next.js routes (client-side bundle)
+      const restaurantUrl = `/restaurant/${review.restaurant.googlePlaceId || review.restaurant.id}`;
       const userUrl = user && review.user.id === user.id ? '/profile' : `/profile/${review.user.id}`;
+      router.prefetch(restaurantUrl);
       router.prefetch(userUrl);
+      
+      // 3. Background prefetch full API data (for complete details)
+      // This runs after initial cache population for enhanced data
+      const restaurantId = review.restaurant.googlePlaceId || review.restaurant.id;
+      setTimeout(() => {
+        prefetchData(cacheKeys.restaurant(restaurantId));
+        if (review.user.id !== user?.id) {
+          prefetchData(cacheKeys.profile(review.user.id));
+        }
+      }, 100); // Small delay to not block UI
     }
-  }, [isVisible, review.restaurant.googlePlaceId, review.restaurant.id, review.user.id, user, router]);
+  }, [isVisible, review, user, router, cacheRestaurantFromFeed, cacheProfileFromFeed]);
 
   // Handle horizontal swipe for navigation - only from screen edges
   // Edge zone width in pixels - swipes starting from this zone trigger navigation
