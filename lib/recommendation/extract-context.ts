@@ -46,8 +46,8 @@ const LOCATION_PATTERNS = {
 
 const TIMING_PATTERNS = {
   now: {
-    he: ['עכשיו', 'מיד', 'כרגע', 'עוד רגע', 'עוד מעט'],
-    en: ['now', 'right now', 'immediately', 'asap', 'right away'],
+    he: ['עכשיו', 'מיד', 'כרגע', 'עוד רגע', 'עוד מעט', 'פתוח עכשיו', 'פתוח', 'שפתוח', 'שיהיה פתוח', 'מקום פתוח'],
+    en: ['now', 'right now', 'immediately', 'asap', 'right away', 'open now', 'currently open', "that's open"],
   },
   tonight: {
     he: ['הערב', 'הלילה', 'ערב', 'לארוחת ערב', 'דינר'],

@@ -732,23 +732,26 @@ Select the TOP 3 restaurants that are the BEST PERSONAL MATCH for this user.
 3. If user likes certain cuisines - explain how the restaurant matches their taste
 4. If user dislikes something - AVOID restaurants with those elements
 5. If friends visited a restaurant - MENTION IT in the reason (social proof!)
-6. Reference the user's past reviews if relevant (e.g., "Based on your love for Italian at X...")
-7. Be PERSONAL - use their name if available, reference their preferences
-8. Write reasons in Hebrew, make them feel understood and special
+6. Reference the user's past reviews if relevant
 
-## REASON FORMAT:
-Write 2-3 sentences in Hebrew explaining:
-- Why this restaurant fits what they asked for
-- Something personal (their preferences, friends who visited, past reviews)
-- What makes this place special
+## REASON FORMAT - CRITICAL:
+Write EXACTLY 1 SHORT sentence in Hebrew for each restaurant (like a friend telling you why).
+
+Good examples:
+- "בול מה שחיפשת - איטלקי אותנטי עם פסטה מטורפת"
+- "מושלם לדייט, רומנטי ושקט"
+- "הכי קרוב אליך והאוכל שם מדהים"
+- "ידעתי שתאהב - המבורגרים פה אגדיים"
+
+BAD examples (TOO LONG - DO NOT WRITE LIKE THIS):
+- "המסעדה הזו מציעה מגוון רחב של מנות איכותיות בסביבה נעימה, האוכל טעים..."
+- "אני ממליץ על המקום הזה בגלל האווירה הייחודית והאוכל המשובח שמוגש שם..."
 
 Return ONLY a JSON array:
 [
-  {
-    "index": 1,
-    "reason": "Hebrew PERSONAL explanation (2-3 sentences)"
-  },
-  ...
+  {"index": 1, "reason": "משפט אחד קצר בעברית"},
+  {"index": 2, "reason": "משפט אחד קצר בעברית"},
+  {"index": 3, "reason": "משפט אחד קצר בעברית"}
 ]`;
 
   // DEBUG: Log if we have user profile section
@@ -758,10 +761,10 @@ Return ONLY a JSON array:
   }
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',  // Using stronger model for better reasoning
     messages: [{ role: 'user', content: prompt }],
-    temperature: 0.7,
-    max_tokens: 800,
+    temperature: 0.6,  // Slightly lower for more consistent output
+    max_tokens: 400,   // Less tokens = forces shorter responses
   });
 
   try {
@@ -964,20 +967,107 @@ function isOpenNow(openingHours: any): boolean {
   if (!openingHours) return true; // Assume open if no data
   
   const now = new Date();
-  const day = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()];
-  const currentTime = now.getHours() * 100 + now.getMinutes();
+  const currentDay = now.getDay(); // 0 = Sunday
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
   
-  const todayHours = openingHours[day];
-  if (!todayHours) return true;
-  
-  // Simple check - could be improved
-  if (todayHours.open && todayHours.close) {
-    const open = parseInt(todayHours.open.replace(':', ''));
-    const close = parseInt(todayHours.close.replace(':', ''));
-    return currentTime >= open && currentTime <= close;
+  // Method 1: Check periods array (Google Places API format)
+  if (openingHours.periods && Array.isArray(openingHours.periods)) {
+    for (const period of openingHours.periods) {
+      // Check if this period starts today
+      if (period.open?.day === currentDay) {
+        const openTime = parseTimeToMinutes(period.open.time);
+        
+        // If no close time, assume open 24 hours
+        if (!period.close) {
+          if (currentMinutes >= openTime) return true;
+          continue;
+        }
+        
+        const closeTime = parseTimeToMinutes(period.close.time);
+        
+        // Handle overnight closing (close day != open day)
+        if (period.close.day !== period.open.day) {
+          // Opens today and closes tomorrow
+          if (currentMinutes >= openTime) return true;
+        } else {
+          // Same day closing
+          if (currentMinutes >= openTime && currentMinutes <= closeTime) return true;
+        }
+      }
+      
+      // Check if yesterday's period extends into today (overnight)
+      const yesterday = (currentDay + 6) % 7;
+      if (period.open?.day === yesterday && period.close?.day === currentDay) {
+        const closeTime = parseTimeToMinutes(period.close.time);
+        if (currentMinutes <= closeTime) return true;
+      }
+    }
+    return false;
   }
   
-  return true;
+  // Method 2: Fallback to weekday_text parsing
+  if (openingHours.weekday_text && Array.isArray(openingHours.weekday_text)) {
+    // weekday_text index: Monday=0, Sunday=6 in Google's format
+    const googleDayIndex = currentDay === 0 ? 6 : currentDay - 1;
+    const dayText = openingHours.weekday_text[googleDayIndex];
+    
+    if (!dayText) return true;
+    if (dayText.toLowerCase().includes('closed') || dayText.includes('סגור')) return false;
+    if (dayText.toLowerCase().includes('24 hours') || dayText.includes('24 שעות')) return true;
+    
+    // Try to parse time range like "9:00 AM – 10:00 PM"
+    const timeMatch = dayText.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM|am|pm)?\s*[–-]\s*(\d{1,2}):?(\d{2})?\s*(AM|PM|am|pm)?/);
+    if (timeMatch) {
+      let openHour = parseInt(timeMatch[1], 10);
+      const openMinute = parseInt(timeMatch[2] || '0', 10);
+      const openAmPm = timeMatch[3]?.toUpperCase();
+      
+      let closeHour = parseInt(timeMatch[4], 10);
+      const closeMinute = parseInt(timeMatch[5] || '0', 10);
+      const closeAmPm = timeMatch[6]?.toUpperCase();
+      
+      // Convert to 24-hour format
+      if (openAmPm === 'PM' && openHour !== 12) openHour += 12;
+      if (openAmPm === 'AM' && openHour === 12) openHour = 0;
+      if (closeAmPm === 'PM' && closeHour !== 12) closeHour += 12;
+      if (closeAmPm === 'AM' && closeHour === 12) closeHour = 0;
+      
+      const openMinutes = openHour * 60 + openMinute;
+      let closeMinutes = closeHour * 60 + closeMinute;
+      
+      // Handle overnight
+      if (closeMinutes < openMinutes) {
+        closeMinutes += 24 * 60;
+        if (currentMinutes < openMinutes) {
+          return currentMinutes + 24 * 60 <= closeMinutes;
+        }
+      }
+      
+      return currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+    }
+  }
+  
+  return true; // If can't parse, assume open
+}
+
+// Helper to parse time string like "1930" or "19:30" to minutes
+function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  
+  // Handle "HHMM" format (Google Places API)
+  if (timeStr.length === 4 && !timeStr.includes(':')) {
+    const hours = parseInt(timeStr.slice(0, 2), 10);
+    const minutes = parseInt(timeStr.slice(2, 4), 10);
+    return hours * 60 + minutes;
+  }
+  
+  // Handle "HH:MM" format
+  const parts = timeStr.split(':');
+  if (parts.length === 2) {
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+  
+  return 0;
 }
 
 async function getFriendsReviews(supabase: any, userId: string): Promise<Map<string, string[]>> {

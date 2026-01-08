@@ -183,17 +183,27 @@ export async function POST(request: NextRequest) {
         { baseUrl, cookies }
       );
 
-      // Build response message with reasons for each restaurant
-      let fullMessage = cleanResponse;
+      // Build response message - just the intro, reasons are shown on restaurant cards
+      let fullMessage = '';
       
       if (recommendResponse.recommendations && recommendResponse.recommendations.length > 0) {
+        // Build short intro with one-line reason per restaurant
+        const intros = [
+          'הנה 3 המלצות מושלמות! 🍽️',
+          'מצאתי לך 3 מקומות שווים! 🎯',
+          'יש לי בדיוק מה שחיפשת! ✨',
+        ];
+        fullMessage = intros[Math.floor(Math.random() * intros.length)];
+        
+        // Add short reasons (one line each)
         fullMessage += '\n\n';
         recommendResponse.recommendations.forEach((rec: any, index: number) => {
           const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-          fullMessage += `${emoji} ${rec.restaurant.name}\n`;
-          fullMessage += `${rec.reason}\n\n`;
+          fullMessage += `${emoji} **${rec.restaurant.name}** - ${rec.reason}\n`;
         });
         fullMessage = fullMessage.trim();
+      } else if (cleanResponse) {
+        fullMessage = cleanResponse;
       }
 
       return NextResponse.json({
@@ -313,6 +323,7 @@ ${fullConversation}
   "cuisine": "<סוג מטבח באנגלית - ראה רשימה למטה>",
   "budget": "cheap" | "moderate" | "expensive" | null,
   "vibe": "romantic" | "casual" | "upscale" | "lively" | null,
+  "when": "now" | "tonight" | "tomorrow" | "weekend" | null,
   "summary": "<תיאור קצר של מה המשתמש מחפש בעברית>"
 }
 
@@ -341,6 +352,12 @@ ${fullConversation}
 - "זול" / "חסכוני" → budget: "cheap"
 - "בינוני" → budget: "moderate"
 - "מפנק" / "יקר" → budget: "expensive"
+
+## זיהוי זמן (when) - חשוב מאוד!:
+- "עכשיו" / "מיד" / "כרגע" / "פתוח" / "שפתוח" / "פתוח עכשיו" / "מקום פתוח" → when: "now"
+- "הערב" / "הלילה" / "ערב" / "דינר" → when: "tonight"
+- "מחר" / "מחר בערב" → when: "tomorrow"
+- "סופש" / "סוף שבוע" / "שישי" / "שבת" → when: "weekend"
 
 החזר רק JSON, בלי הסברים.`;
 
@@ -383,7 +400,7 @@ async function callRecommendationAPI(
     withWho: context.withWho,
     purpose: mapOccasionToPurpose(context.withWho),
     budget: context.budget,
-    when: null,
+    when: context.when || null,  // Pass timing preference for opening hours filter
     cuisinePreference: context.cuisine,
   };
 
