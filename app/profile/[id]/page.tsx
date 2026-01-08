@@ -157,7 +157,7 @@ export default function UserProfilePage() {
 
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout showTopBar={false}>
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
         </div>
@@ -167,7 +167,7 @@ export default function UserProfilePage() {
 
   if (!profile) {
     return (
-      <MainLayout>
+      <MainLayout showTopBar={false}>
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <p className="text-gray-500 mb-4">User not found</p>
           <button 
@@ -188,7 +188,7 @@ export default function UserProfilePage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout showTopBar={false}>
       <div className="pb-24 bg-white min-h-screen">
         {/* Header - Instagram Style */}
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200">

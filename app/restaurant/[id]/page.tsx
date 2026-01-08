@@ -350,7 +350,7 @@ export default function RestaurantPage() {
 
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout showTopBar={false}>
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -360,7 +360,7 @@ export default function RestaurantPage() {
 
   if (!restaurant) {
     return (
-      <MainLayout>
+      <MainLayout showTopBar={false}>
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <p className="text-gray-500 mb-4">Restaurant not found</p>
           <button 
@@ -375,7 +375,7 @@ export default function RestaurantPage() {
   }
 
   return (
-    <MainLayout showBottomNav={!showWriteReview && !sheetOpen}>
+    <MainLayout showTopBar={false} showBottomNav={!showWriteReview && !sheetOpen}>
       <div className="min-h-screen bg-gray-50 pb-20">
         {/* Header Image */}
         <div className="relative h-72 bg-gray-200">

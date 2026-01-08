@@ -6,16 +6,17 @@ import { BottomNav } from './bottom-nav';
 interface MainLayoutProps {
   children: React.ReactNode;
   showBottomNav?: boolean;
+  showTopBar?: boolean;
 }
 
-export function MainLayout({ children, showBottomNav = true }: MainLayoutProps) {
+export function MainLayout({ children, showBottomNav = true, showTopBar = true }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-100">
-      <TopBar />
+      {showTopBar && <TopBar />}
       <main 
         className="pb-20"
         style={{
-          paddingTop: 'calc(3.5rem + env(safe-area-inset-top))',
+          paddingTop: showTopBar ? 'calc(3.5rem + env(safe-area-inset-top))' : 'env(safe-area-inset-top)',
         }}
       >
         {children}

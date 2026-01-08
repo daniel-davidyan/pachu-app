@@ -239,7 +239,7 @@ export default function SearchPage() {
   };
 
   return (
-    <MainLayout>
+    <MainLayout showTopBar={false}>
       <div className="container mx-auto px-4 py-3">
         {/* Search Header */}
         <div className="mb-4">
