@@ -50,14 +50,23 @@ export async function POST(request: NextRequest) {
 
     // Build conversation text from messages or use summary
     let conversationText = '';
+    let userMessagesOnly = '';
+    
     if (messages && Array.isArray(messages)) {
       conversationText = messages
         .map((m: { role: string; content: string }) => 
           `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
         )
         .join('\n');
+      
+      // Extract only user messages for better embedding
+      userMessagesOnly = messages
+        .filter((m: { role: string }) => m.role === 'user')
+        .map((m: { content: string }) => m.content)
+        .join(' ');
     } else if (conversationSummary) {
       conversationText = conversationSummary;
+      userMessagesOnly = conversationSummary;
     }
 
     if (!conversationText) {
@@ -68,9 +77,16 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('\n========================================');
-    console.log('🚀 SIMPLIFIED PIPELINE V3');
+    console.log('🚀 SIMPLIFIED PIPELINE V3.1');
     console.log('========================================\n');
-    console.log('📝 Conversation:', conversationText.substring(0, 200) + '...');
+    console.log('📝 User messages:', userMessagesOnly.substring(0, 200));
+
+    // ================================================
+    // STEP 0: EXTRACT SEARCH INTENT
+    // ================================================
+    console.log('\n🎯 STEP 0: Extract Search Intent');
+    const searchIntent = await extractSearchIntent(userMessagesOnly);
+    console.log('   Search intent:', searchIntent);
 
     // ================================================
     // STEP 1: VECTOR SEARCH (All → Top 30)
@@ -97,15 +113,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Generate embedding for the conversation
-    console.log('   🧠 Generating conversation embedding...');
-    const conversationEmbedding = await generateEmbedding(conversationText);
+    // Generate embedding for the SEARCH INTENT (not full conversation)
+    console.log('   🧠 Generating search embedding...');
+    const searchEmbedding = await generateEmbedding(searchIntent);
 
     // Calculate similarity scores
     console.log('   📐 Calculating similarity scores...');
     const scoredRestaurants = allRestaurants.map(r => {
       const score = r.summary_embedding 
-        ? cosineSimilarity(conversationEmbedding, r.summary_embedding)
+        ? cosineSimilarity(searchEmbedding, r.summary_embedding)
         : 0;
       return { ...r, vectorScore: score, summary_embedding: undefined }; // Remove embedding from result
     });
@@ -149,6 +165,46 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to generate recommendations' },
       { status: 500 }
     );
+  }
+}
+
+// ============================================
+// STEP 0: Extract Search Intent
+// ============================================
+
+async function extractSearchIntent(userMessages: string): Promise<string> {
+  const prompt = `Extract the restaurant search intent from this user message. 
+Return a short search query in English that captures what type of food/restaurant they want.
+
+User said: "${userMessages}"
+
+Focus on:
+- Type of food (burger, pizza, sushi, italian, etc.)
+- Atmosphere/vibe if mentioned
+- Any specific requirements
+
+Examples:
+- "מת על המבורגר" → "hamburger burger restaurant"
+- "משהו איטלקי רומנטי" → "romantic italian restaurant pasta"
+- "סושי עם חברים" → "sushi japanese restaurant casual"
+- "בשר טוב" → "steakhouse meat grill restaurant"
+- "קפה ועוגה" → "cafe coffee cake dessert"
+
+Return ONLY the search query, nothing else:`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+      max_tokens: 50,
+    });
+    
+    const intent = response.choices[0].message.content?.trim() || userMessages;
+    return intent;
+  } catch (e) {
+    console.error('Failed to extract search intent:', e);
+    return userMessages;
   }
 }
 
@@ -206,16 +262,23 @@ async function selectWithLLM(
 ## השיחה עם המשתמש:
 ${conversationText}
 
-## 30 המסעדות הרלוונטיות ביותר:
+## 30 מסעדות מועמדות:
 ${restaurantList}
 
 ## המשימה שלך:
 בחר בדיוק 3 מסעדות שהכי מתאימות למה שהמשתמש מחפש.
 
-## כללים:
-1. בחר מסעדות שמתאימות לבקשה של המשתמש (סוג אוכל, אווירה, וכו')
-2. לכל מסעדה כתוב משפט אחד קצר וקולע למה בחרת אותה
-3. התייחס למה שהמשתמש אמר בשיחה
+## כללים קריטיים:
+1. **סוג אוכל הכי חשוב!** - אם המשתמש רוצה המבורגר, בחר רק מקומות המבורגרים. אם רוצה איטלקי, בחר איטלקיות. תסתכל בקטגוריות ובתיאור!
+2. התעלם ממסעדות שלא מתאימות לסוג האוכל שהמשתמש ביקש
+3. לכל מסעדה כתוב משפט אחד קצר וקולע
+
+## זיהוי סוג אוכל:
+- "המבורגר" / "בורגר" → חפש מקומות עם burger, המבורגר, בשר
+- "פיצה" → חפש מקומות עם pizza, פיצה, איטלקי
+- "סושי" / "יפני" → חפש מקומות עם sushi, japanese, יפני
+- "בשר" / "סטייק" → חפש steakhouse, גריל, בשרים
+- "איטלקי" → חפש italian, איטלקי, פסטה
 
 ## פורמט התשובה (JSON בלבד):
 [
@@ -225,9 +288,9 @@ ${restaurantList}
 ]
 
 דוגמאות לנימוקים טובים:
-- "בול מה שחיפשת - איטלקי אותנטי עם פסטה מטורפת"
-- "מושלם לדייט, רומנטי ושקט"
-- "המבורגרים פה אגדיים, בדיוק בשבילך"`;
+- "המבורגרים פה אגדיים, בדיוק מה שחיפשת"
+- "פיצה נפוליטנית מטורפת"
+- "הסושי הכי טרי בעיר"`;
 
   try {
     const response = await openai.chat.completions.create({

@@ -176,23 +176,23 @@ export async function POST(request: NextRequest) {
         { baseUrl, cookies }
       );
 
-      // Build response message - just the intro, reasons are shown on restaurant cards
+      // Build response message - clean format without markdown
       let fullMessage = '';
       
       if (recommendResponse.recommendations && recommendResponse.recommendations.length > 0) {
         // Build short intro with one-line reason per restaurant
         const intros = [
-          'הנה 3 המלצות מושלמות! 🍽️',
+          'הנה 3 המלצות בשבילך! 🍽️',
           'מצאתי לך 3 מקומות שווים! 🎯',
           'יש לי בדיוק מה שחיפשת! ✨',
         ];
         fullMessage = intros[Math.floor(Math.random() * intros.length)];
         
-        // Add short reasons (one line each)
+        // Add restaurant names and reasons (clean format)
         fullMessage += '\n\n';
         recommendResponse.recommendations.forEach((rec: any, index: number) => {
           const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-          fullMessage += `${emoji} **${rec.restaurant.name}** - ${rec.reason}\n`;
+          fullMessage += `${emoji} ${rec.restaurant.name}\n${rec.reason}\n\n`;
         });
         fullMessage = fullMessage.trim();
       } else if (cleanResponse) {
