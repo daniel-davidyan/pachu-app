@@ -104,6 +104,8 @@ export default function FeedPage() {
   const [followingPage, setFollowingPage] = useState(0);
   const [forYouHasMore, setForYouHasMore] = useState(true);
   const [followingHasMore, setFollowingHasMore] = useState(true);
+  // Track if we've completed at least one successful load (prevents empty state flicker)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(!!cachedData.current);
   
   // Get current tab's data
   const reviews = activeTab === 'foryou' ? forYouReviews : followingReviews;
@@ -188,9 +190,11 @@ export default function FeedPage() {
 
       const searchLocation = selectedCity || userLocation;
       const radius = distanceKm * 1000;
+      // Use smaller batch (5) for initial load for faster first paint, then 10 for pagination
+      const limit = reset && currentReviews.length === 0 ? 5 : 10;
       
       const response = await fetch(
-        `/api/feed/reviews?page=${pageNum}&limit=10&latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}&tab=${tab}${selectedCity ? `&city=${encodeURIComponent(selectedCity.name)}` : ''}`
+        `/api/feed/reviews?page=${pageNum}&limit=${limit}&latitude=${searchLocation.latitude}&longitude=${searchLocation.longitude}&radius=${radius}&tab=${tab}${selectedCity ? `&city=${encodeURIComponent(selectedCity.name)}` : ''}`
       );
       
       const data = await response.json();
@@ -217,10 +221,14 @@ export default function FeedPage() {
           }
           setHasMoreTab(data.hasMore);
           setPageNum(pageNum);
+          // Mark that we've completed at least one successful load
+          setHasLoadedOnce(true);
         }
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);
+      // Even on error, mark as loaded to prevent infinite loader
+      setHasLoadedOnce(true);
     } finally {
       if (requestId === latestRequestId.current) {
         setLoading(false);
@@ -282,6 +290,7 @@ export default function FeedPage() {
           hasMore={hasMore}
           isLoading={loadingMore}
           isInitialLoading={loading}
+          hasLoadedOnce={hasLoadedOnce}
           onCommentsVisibilityChange={setShowComments}
         />
       </div>
