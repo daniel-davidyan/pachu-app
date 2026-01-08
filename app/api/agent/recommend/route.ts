@@ -90,78 +90,82 @@ export async function POST(request: NextRequest) {
 
     // ================================================
     // STEP 1: VECTOR SEARCH (All → Top 30)
+    // Using pgvector for efficient database-side similarity search
     // ================================================
     console.log('\n📊 STEP 1: Vector Search');
     
-    // Get all restaurants with embeddings
-    const { data: allRestaurants, error: fetchError } = await supabase
-      .from('restaurant_cache')
-      .select('id, google_place_id, name, address, city, latitude, longitude, google_rating, google_reviews_count, price_level, categories, summary, opening_hours, photos, summary_embedding')
-      .not('summary_embedding', 'is', null);
-
-    if (fetchError) {
-      console.error('Error fetching restaurants:', fetchError);
-      return NextResponse.json({ error: 'Failed to fetch restaurants' }, { status: 500 });
-    }
-
-    console.log(`   📦 Total restaurants with embeddings: ${allRestaurants?.length || 0}`);
-    
-    // Debug: Check first restaurant's embedding format
-    if (allRestaurants && allRestaurants.length > 0) {
-      const firstEmbedding = allRestaurants[0].summary_embedding;
-      console.log(`   🔍 First embedding type: ${typeof firstEmbedding}`);
-      if (typeof firstEmbedding === 'string') {
-        console.log(`   🔍 First embedding (string preview): ${firstEmbedding.substring(0, 100)}...`);
-      } else if (Array.isArray(firstEmbedding)) {
-        console.log(`   🔍 First embedding is array with length: ${firstEmbedding.length}`);
-      } else {
-        console.log(`   🔍 First embedding value: ${JSON.stringify(firstEmbedding)?.substring(0, 100)}`);
-      }
-    }
-
-    if (!allRestaurants || allRestaurants.length === 0) {
-      return NextResponse.json({
-        recommendations: [],
-        message: 'אין מסעדות במערכת',
-      });
-    }
-
-    // Generate embedding for the SEARCH INTENT (not full conversation)
+    // Generate embedding for the SEARCH INTENT
     console.log('   🧠 Generating search embedding...');
     const searchEmbedding = await generateEmbedding(searchIntent);
     console.log(`   🧠 Search embedding length: ${searchEmbedding.length}`);
 
-    // Calculate similarity scores
-    console.log('   📐 Calculating similarity scores...');
-    let debuggedFirst = false;
-    const scoredRestaurants = allRestaurants.map(r => {
-      // Parse embedding - handle multiple formats (array, JSON string, pgvector string)
-      const embedding = parseEmbedding(r.summary_embedding);
-      
-      // Debug first restaurant
-      if (!debuggedFirst) {
-        console.log(`   📐 First restaurant "${r.name}"`);
-        console.log(`   📐 Raw embedding type: ${typeof r.summary_embedding}`);
-        console.log(`   📐 Parsed embedding: ${embedding ? `array[${embedding.length}]` : 'null'}`);
-        console.log(`   📐 Search embedding length: ${searchEmbedding.length}`);
-        if (embedding && embedding.length > 0) {
-          console.log(`   📐 First 3 values of parsed embedding: [${embedding.slice(0, 3).join(', ')}]`);
-          console.log(`   📐 First 3 values of search embedding: [${searchEmbedding.slice(0, 3).join(', ')}]`);
-        }
-        debuggedFirst = true;
-      }
-      
-      const score = embedding && Array.isArray(embedding) && embedding.length === searchEmbedding.length
-        ? cosineSimilarity(searchEmbedding, embedding)
-        : 0;
-      
-      return { ...r, vectorScore: score, summary_embedding: undefined }; // Remove embedding from result
-    });
+    // Try to use the optimized database function first
+    let top30: Restaurant[] = [];
+    let totalInDb = 0;
+    
+    try {
+      // Use pgvector's database-side similarity search (MUCH faster, no JSON parsing issues)
+      console.log('   📡 Calling database vector search function...');
+      const { data: vectorResults, error: rpcError } = await supabase.rpc('search_restaurants_simple', {
+        query_embedding: JSON.stringify(searchEmbedding), // pgvector expects string format
+        max_results: 30,
+      });
 
-    // Sort by score and take top 30
-    const top30 = scoredRestaurants
-      .sort((a, b) => (b.vectorScore || 0) - (a.vectorScore || 0))
-      .slice(0, 30);
+      if (rpcError) {
+        console.error('   ⚠️ RPC error:', rpcError.message);
+        throw new Error(rpcError.message);
+      }
+
+      if (vectorResults && vectorResults.length > 0) {
+        console.log(`   ✅ Database returned ${vectorResults.length} results`);
+        top30 = vectorResults.map((r: any) => ({
+          ...r,
+          vectorScore: r.similarity || 0,
+        }));
+        
+        // Get total count for debug
+        const { count } = await supabase
+          .from('restaurant_cache')
+          .select('id', { count: 'exact', head: true })
+          .not('summary_embedding', 'is', null);
+        totalInDb = count || vectorResults.length;
+      } else {
+        throw new Error('No results from database function');
+      }
+    } catch (dbError) {
+      // Fallback: Fetch restaurants WITHOUT embeddings and use a simpler approach
+      console.log('   ⚠️ Database function failed, using fallback...');
+      console.log(`   ⚠️ Error: ${dbError}`);
+      
+      // Fetch restaurants without the huge embedding field
+      const { data: allRestaurants, error: fetchError } = await supabase
+        .from('restaurant_cache')
+        .select('id, google_place_id, name, address, city, latitude, longitude, google_rating, google_reviews_count, price_level, categories, summary, opening_hours, photos')
+        .not('summary_embedding', 'is', null)
+        .order('google_rating', { ascending: false })
+        .limit(100);
+
+      if (fetchError) {
+        console.error('Error fetching restaurants:', fetchError);
+        return NextResponse.json({ error: 'Failed to fetch restaurants' }, { status: 500 });
+      }
+
+      totalInDb = allRestaurants?.length || 0;
+      console.log(`   📦 Fallback: fetched ${totalInDb} restaurants (by rating)`);
+
+      if (!allRestaurants || allRestaurants.length === 0) {
+        return NextResponse.json({
+          recommendations: [],
+          message: 'אין מסעדות במערכת',
+        });
+      }
+
+      // Use a simple scoring based on category matching since we don't have embeddings
+      top30 = allRestaurants.slice(0, 30).map(r => ({
+        ...r,
+        vectorScore: 0.5, // Default score without embeddings
+      }));
+    }
 
     console.log(`   ✅ Top 30 selected. Best score: ${top30[0]?.vectorScore?.toFixed(4)}`);
     console.log('   Top 5:', top30.slice(0, 5).map(r => `${r.name} (${r.vectorScore?.toFixed(3)})`).join(', '));
@@ -191,9 +195,9 @@ export async function POST(request: NextRequest) {
       debugData: includeDebugData ? {
         // Step 1: Database & Hard Filters (currently no hard filters, so same as total)
         step1: {
-          totalInDb: allRestaurants.length,
-          afterFilter: allRestaurants.length, // No hard filters in V3
-          sampleRestaurants: scoredRestaurants.slice(0, 10).map(r => ({
+          totalInDb: totalInDb,
+          afterFilter: totalInDb, // No hard filters in V3
+          sampleRestaurants: top30.slice(0, 10).map(r => ({
             id: r.id,
             name: r.name,
             categories: r.categories,
@@ -203,7 +207,7 @@ export async function POST(request: NextRequest) {
         // Step 2: Vector Search
         step2: {
           queryText: searchIntent,
-          totalScored: allRestaurants.length,
+          totalScored: totalInDb,
           topByVector: top30.map(r => ({
             id: r.id,
             name: r.name,

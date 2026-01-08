@@ -294,7 +294,8 @@ async function callRecommendationAPI(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    // Increased timeout to 60 seconds - vector search + LLM calls can take time
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     
     const recommendResponse = await fetch(`${requestInfo.baseUrl}/api/agent/recommend`, {
       method: 'POST',
