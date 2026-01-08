@@ -105,6 +105,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`   📦 Total restaurants with embeddings: ${allRestaurants?.length || 0}`);
+    
+    // Debug: Check first restaurant's embedding format
+    if (allRestaurants && allRestaurants.length > 0) {
+      const firstEmbedding = allRestaurants[0].summary_embedding;
+      console.log(`   🔍 First embedding type: ${typeof firstEmbedding}`);
+      if (typeof firstEmbedding === 'string') {
+        console.log(`   🔍 First embedding (string preview): ${firstEmbedding.substring(0, 100)}...`);
+      } else if (Array.isArray(firstEmbedding)) {
+        console.log(`   🔍 First embedding is array with length: ${firstEmbedding.length}`);
+      } else {
+        console.log(`   🔍 First embedding value: ${JSON.stringify(firstEmbedding)?.substring(0, 100)}`);
+      }
+    }
 
     if (!allRestaurants || allRestaurants.length === 0) {
       return NextResponse.json({
@@ -116,13 +129,32 @@ export async function POST(request: NextRequest) {
     // Generate embedding for the SEARCH INTENT (not full conversation)
     console.log('   🧠 Generating search embedding...');
     const searchEmbedding = await generateEmbedding(searchIntent);
+    console.log(`   🧠 Search embedding length: ${searchEmbedding.length}`);
 
     // Calculate similarity scores
     console.log('   📐 Calculating similarity scores...');
+    let debuggedFirst = false;
     const scoredRestaurants = allRestaurants.map(r => {
-      const score = r.summary_embedding 
-        ? cosineSimilarity(searchEmbedding, r.summary_embedding)
+      // Parse embedding - handle multiple formats (array, JSON string, pgvector string)
+      let embedding = parseEmbedding(r.summary_embedding);
+      
+      // Debug first restaurant
+      if (!debuggedFirst) {
+        console.log(`   📐 First restaurant "${r.name}"`);
+        console.log(`   📐 Raw embedding type: ${typeof r.summary_embedding}`);
+        console.log(`   📐 Parsed embedding: ${embedding ? `array[${embedding.length}]` : 'null'}`);
+        console.log(`   📐 Search embedding length: ${searchEmbedding.length}`);
+        if (embedding && embedding.length > 0) {
+          console.log(`   📐 First 3 values of parsed embedding: [${embedding.slice(0, 3).join(', ')}]`);
+          console.log(`   📐 First 3 values of search embedding: [${searchEmbedding.slice(0, 3).join(', ')}]`);
+        }
+        debuggedFirst = true;
+      }
+      
+      const score = embedding && Array.isArray(embedding) && embedding.length === searchEmbedding.length
+        ? cosineSimilarity(searchEmbedding, embedding)
         : 0;
+      
       return { ...r, vectorScore: score, summary_embedding: undefined }; // Remove embedding from result
     });
 
@@ -220,6 +252,44 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return response.data[0].embedding;
 }
 
+/**
+ * Parse embedding from various formats:
+ * - Array of numbers (direct)
+ * - JSON string: "[0.1, 0.2, ...]"
+ * - pgvector string: "[0.1,0.2,...]" or "(0.1,0.2,...)"
+ */
+function parseEmbedding(embedding: any): number[] | null {
+  if (!embedding) return null;
+  
+  // Already an array
+  if (Array.isArray(embedding)) {
+    return embedding;
+  }
+  
+  // String format (JSON or pgvector)
+  if (typeof embedding === 'string') {
+    try {
+      // Try JSON parse first
+      const parsed = JSON.parse(embedding);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Try pgvector format: remove brackets and split by comma
+      const cleaned = embedding.replace(/[\[\]()]/g, '');
+      const values = cleaned.split(',').map(v => parseFloat(v.trim()));
+      if (values.length > 0 && !isNaN(values[0])) {
+        return values;
+      }
+    }
+  }
+  
+  // Object with data property (some drivers return this)
+  if (typeof embedding === 'object' && embedding.data) {
+    return parseEmbedding(embedding.data);
+  }
+  
+  return null;
+}
+
 function cosineSimilarity(a: number[], b: number[]): number {
   if (!a || !b || a.length !== b.length) return 0;
   
@@ -246,7 +316,12 @@ async function selectWithLLM(
   userId?: string
 ): Promise<Recommendation[]> {
   
-  if (candidates.length === 0) return [];
+  console.log('🎯 selectWithLLM called with', candidates.length, 'candidates');
+  
+  if (candidates.length === 0) {
+    console.error('❌ No candidates provided to LLM selection!');
+    return [];
+  }
 
   // Build restaurant list for prompt
   const restaurantList = candidates.map((r, i) => {
@@ -293,6 +368,7 @@ ${restaurantList}
 - "הסושי הכי טרי בעיר"`;
 
   try {
+    console.log('📤 Calling GPT-4o for selection...');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
@@ -301,24 +377,35 @@ ${restaurantList}
     });
 
     const responseText = response.choices[0].message.content || '[]';
+    console.log('📥 LLM raw response:', responseText.substring(0, 200));
+    
     const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
+    console.log('🧹 Cleaned response:', cleaned.substring(0, 200));
+    
     const selections = JSON.parse(cleaned);
+    console.log('✅ Parsed selections:', selections);
 
-    return selections.slice(0, 3).map((sel: { index: number; reason: string }) => {
+    const results = selections.slice(0, 3).map((sel: { index: number; reason: string }) => {
       const restaurant = candidates[sel.index - 1];
       if (!restaurant) {
-        console.error(`Invalid index ${sel.index} in LLM response`);
+        console.error(`❌ Invalid index ${sel.index} in LLM response (candidates length: ${candidates.length})`);
         return null;
       }
+      console.log(`   ✓ Selected: ${restaurant.name}`);
       return {
         restaurant,
         reason: sel.reason,
         matchScore: Math.round((restaurant.vectorScore || 0.5) * 100),
       };
     }).filter(Boolean) as Recommendation[];
+    
+    console.log(`📊 Final results: ${results.length} recommendations`);
+    return results;
 
   } catch (e) {
-    console.error('LLM selection error:', e);
+    console.error('❌ LLM selection error:', e);
+    console.log('⚠️ Using fallback: returning top 3 candidates');
+    
     // Fallback: return top 3 with generic reasons
     return candidates.slice(0, 3).map(r => ({
       restaurant: r,

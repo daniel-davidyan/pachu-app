@@ -15,6 +15,7 @@ interface Restaurant {
   latitude: number;
   longitude: number;
   matchPercentage?: number;
+  reason?: string; // Personal reason from LLM
   source: 'google' | 'friends' | 'own';
   googlePlaceId?: string;
   website?: string;
@@ -467,28 +468,51 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
         setConversationContext(agentData.context);
       }
 
+      // Debug: Log the response
+      console.log('🔍 Agent response:', {
+        readyToRecommend: agentData.readyToRecommend,
+        recommendationsCount: agentData.recommendations?.length || 0,
+        message: agentData.message?.substring(0, 100),
+      });
+
       // If ready to recommend, use the recommendations from the chat response
       if (agentData.readyToRecommend && agentData.recommendations?.length > 0) {
+        console.log('📦 Processing recommendations:', agentData.recommendations);
+        
         // Map recommendations to restaurant format
-        const restaurants = agentData.recommendations.map((rec: any) => ({
-          id: rec.restaurant.id || rec.restaurant.google_place_id,
-          name: rec.restaurant.name,
-          address: rec.restaurant.address,
-          rating: rec.restaurant.google_rating || rec.restaurant.rating || 0,
-          totalReviews: rec.restaurant.google_reviews_count || 0,
-          cuisineTypes: rec.restaurant.categories || rec.restaurant.cuisineTypes || [],
-          priceLevel: rec.restaurant.price_level || rec.restaurant.priceLevel,
-          photoUrl: rec.restaurant.photos?.[0]?.photo_reference 
-            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
-            : undefined,
-          latitude: rec.restaurant.latitude,
-          longitude: rec.restaurant.longitude,
-          matchPercentage: rec.matchScore,
-          reason: rec.reason, // Personal reason from LLM
-          source: 'google' as const,
-          googlePlaceId: rec.restaurant.google_place_id,
-        }));
+        const restaurants = agentData.recommendations.map((rec: any) => {
+          console.log('🍽️ Mapping restaurant:', rec.restaurant?.name, rec);
+          
+          // Build photo URL with API key from window
+          let photoUrl: string | undefined;
+          if (rec.restaurant.photos?.[0]?.photo_reference) {
+            const apiKey = (window as any).__GOOGLE_MAPS_API_KEY__ || 
+              document.querySelector('script[src*="maps.googleapis.com"]')?.getAttribute('src')?.match(/key=([^&]+)/)?.[1];
+            if (apiKey) {
+              photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photo_reference}&key=${apiKey}`;
+            }
+          }
+          
+          return {
+            id: rec.restaurant.id || rec.restaurant.google_place_id,
+            name: rec.restaurant.name,
+            address: rec.restaurant.address || '',
+            rating: rec.restaurant.google_rating || rec.restaurant.rating || 0,
+            totalReviews: rec.restaurant.google_reviews_count || 0,
+            cuisineTypes: rec.restaurant.categories || rec.restaurant.cuisineTypes || [],
+            priceLevel: rec.restaurant.price_level || rec.restaurant.priceLevel,
+            photoUrl,
+            latitude: rec.restaurant.latitude,
+            longitude: rec.restaurant.longitude,
+            matchPercentage: rec.matchScore || 80,
+            reason: rec.reason,
+            source: 'google' as const,
+            googlePlaceId: rec.restaurant.google_place_id,
+          };
+        });
 
+        console.log('✅ Mapped restaurants:', restaurants);
+        
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
@@ -496,6 +520,8 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
           restaurants,
         };
 
+        console.log('💬 Assistant message with restaurants:', assistantMessage);
+        
         setMessages(prev => [...prev, assistantMessage]);
         onRestaurantsFound?.(restaurants);
         setCurrentChips([]);
