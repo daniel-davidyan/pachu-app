@@ -6,6 +6,7 @@ import { FeedHeader } from '@/components/feed/feed-header';
 import { FilterBottomSheet } from '@/components/feed/filter-bottom-sheet';
 import { NotificationsPane } from '@/components/feed/notifications-pane';
 import { BottomNav } from '@/components/layout/bottom-nav';
+import { usePrefetch } from '@/hooks/use-prefetch';
 
 // Session storage keys for feed data persistence
 const FEED_DATA_KEY = 'pachu_feed_data';
@@ -81,6 +82,9 @@ function loadCachedFeedData(): { forYou: FeedReview[]; following: FeedReview[]; 
 }
 
 export default function FeedPage() {
+  // Get prefetched data from app-level provider (starts loading when app opens!)
+  const { userLocation: prefetchedLocation, feedData: prefetchedFeed, feedLoading: prefetchLoading } = usePrefetch();
+  
   // Load cached data on mount for instant display
   const cachedData = useRef(loadCachedFeedData());
   
@@ -92,35 +96,52 @@ export default function FeedPage() {
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [distanceKm, setDistanceKm] = useState(5);
   
-  // Feed state - initialize from cache for instant return to feed
+  // Determine initial data: prefer prefetched > cached > empty
+  const getInitialData = () => {
+    // First check prefetched data (most fresh)
+    if (prefetchedFeed && (prefetchedFeed.forYou.length > 0 || prefetchedFeed.following.length > 0)) {
+      return { forYou: prefetchedFeed.forYou, following: prefetchedFeed.following, hasData: true };
+    }
+    // Then check cached data
+    if (cachedData.current?.hasData) {
+      return cachedData.current;
+    }
+    return { forYou: [], following: [], hasData: false };
+  };
+  
+  const initialData = useRef(getInitialData());
+  
+  // Feed state - initialize from prefetched or cached data for instant display
   const [forYouReviews, setForYouReviews] = useState<FeedReview[]>(
-    () => cachedData.current?.forYou || []
+    () => initialData.current.forYou || []
   );
   const [followingReviews, setFollowingReviews] = useState<FeedReview[]>(
-    () => cachedData.current?.following || []
+    () => initialData.current.following || []
   );
-  // Only show initial loading if we don't have cached data WITH actual content
-  const [loading, setLoading] = useState(!cachedData.current?.hasData);
+  // Only show initial loading if we don't have prefetched or cached data WITH actual content
+  const [loading, setLoading] = useState(!initialData.current.hasData && !prefetchLoading);
   const [loadingMore, setLoadingMore] = useState(false);
   const [forYouPage, setForYouPage] = useState(0);
   const [followingPage, setFollowingPage] = useState(0);
   const [forYouHasMore, setForYouHasMore] = useState(true);
   const [followingHasMore, setFollowingHasMore] = useState(true);
   // Track if we've completed at least one successful load (prevents empty state flicker)
-  // ONLY true if cache has actual data - empty cache doesn't count as "loaded"
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(!!cachedData.current?.hasData);
+  // ONLY true if we have actual data
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(!!initialData.current.hasData);
   
   // Get current tab's data
   const reviews = activeTab === 'foryou' ? forYouReviews : followingReviews;
   const page = activeTab === 'foryou' ? forYouPage : followingPage;
   const hasMore = activeTab === 'foryou' ? forYouHasMore : followingHasMore;
   
-  // User location - start with default (Tel Aviv) for faster initial load
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number }>({ 
-    latitude: 32.0853, 
-    longitude: 34.7818 
+  // User location - use prefetched location if available, otherwise default (Tel Aviv)
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number }>(() => {
+    if (prefetchedLocation) {
+      return { latitude: prefetchedLocation.latitude, longitude: prefetchedLocation.longitude };
+    }
+    return { latitude: 32.0853, longitude: 34.7818 };
   });
-  const [hasAccurateLocation, setHasAccurateLocation] = useState(false);
+  const [hasAccurateLocation, setHasAccurateLocation] = useState(!!prefetchedLocation);
   
   // Handle tab change - instant switch with cached data
   const handleTabChange = useCallback((tab: 'following' | 'foryou') => {
@@ -130,7 +151,33 @@ export default function FeedPage() {
   
   // Request tracking
   const latestRequestId = useRef(0);
-  const hasFetchedOnMount = useRef(!!cachedData.current); // Skip fetch if we have cache
+  const hasFetchedOnMount = useRef(!!initialData.current.hasData); // Skip fetch if we have data
+  
+  // Update from prefetched data when it arrives
+  useEffect(() => {
+    if (prefetchedFeed && !hasFetchedOnMount.current) {
+      if (prefetchedFeed.forYou.length > 0) {
+        setForYouReviews(prefetchedFeed.forYou);
+        setHasLoadedOnce(true);
+        setLoading(false);
+      }
+      if (prefetchedFeed.following.length > 0) {
+        setFollowingReviews(prefetchedFeed.following);
+      }
+      hasFetchedOnMount.current = true;
+    }
+  }, [prefetchedFeed]);
+  
+  // Update location from prefetch when it arrives
+  useEffect(() => {
+    if (prefetchedLocation && !hasAccurateLocation) {
+      setUserLocation({
+        latitude: prefetchedLocation.latitude,
+        longitude: prefetchedLocation.longitude,
+      });
+      setHasAccurateLocation(true);
+    }
+  }, [prefetchedLocation, hasAccurateLocation]);
 
   // Save feed data to sessionStorage for instant return
   useEffect(() => {
@@ -145,25 +192,25 @@ export default function FeedPage() {
     }
   }, [forYouReviews, followingReviews]);
 
-  // Get accurate user location (we already start with default for fast initial load)
+  // Get accurate user location - skip if prefetch already provided it
   useEffect(() => {
+    // Skip if we already have accurate location from prefetch
+    if (hasAccurateLocation) return;
+    
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const newLat = position.coords.latitude;
         const newLng = position.coords.longitude;
         
-        // Only update and refetch if location is significantly different (>1km)
+        // Only update if location is significantly different (>1km)
         const latDiff = Math.abs(newLat - userLocation.latitude);
         const lngDiff = Math.abs(newLng - userLocation.longitude);
         const significantChange = latDiff > 0.01 || lngDiff > 0.01; // ~1km
         
-        if (significantChange && !hasAccurateLocation) {
+        if (significantChange) {
           setUserLocation({ latitude: newLat, longitude: newLng });
-          setHasAccurateLocation(true);
-          // Will trigger refetch via the filter change effect
-        } else {
-          setHasAccurateLocation(true);
         }
+        setHasAccurateLocation(true);
       },
       (error) => {
         console.warn('Could not get location, using default:', error);
@@ -171,7 +218,7 @@ export default function FeedPage() {
       },
       { timeout: 5000, maximumAge: 60000 } // Faster timeout, allow cached location
     );
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasAccurateLocation, userLocation.latitude, userLocation.longitude]);
 
   // Fetch reviews for a specific tab
   const fetchReviewsForTab = useCallback(async (tab: 'following' | 'foryou', pageNum: number, reset: boolean = false, isBackgroundRefresh: boolean = false) => {

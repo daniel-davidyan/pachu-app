@@ -43,6 +43,12 @@ interface ProfileData {
   timestamp: number;
 }
 
+interface FeedData {
+  forYou: any[];
+  following: any[];
+  timestamp: number;
+}
+
 interface PrefetchContextType {
   // Location
   userLocation: UserLocation | null;
@@ -57,9 +63,14 @@ interface PrefetchContextType {
   profileData: ProfileData | null;
   profileLoading: boolean;
   
+  // Feed data (prefetched for instant feed loading)
+  feedData: FeedData | null;
+  feedLoading: boolean;
+  
   // Manual refresh
   refreshNearbyPlaces: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshFeed: () => Promise<void>;
   
   // Status
   isInitialized: boolean;
@@ -70,10 +81,11 @@ const PrefetchContext = createContext<PrefetchContextType | null>(null);
 // Default location (Tel Aviv)
 const DEFAULT_LOCATION = { latitude: 32.0853, longitude: 34.7818 };
 
-// Cache duration: 5 minutes for places, 10 minutes for location, 2 minutes for profile
+// Cache duration: 5 minutes for places, 10 minutes for location, 2 minutes for profile/feed
 const PLACES_CACHE_DURATION = 5 * 60 * 1000;
 const LOCATION_CACHE_DURATION = 10 * 60 * 1000;
 const PROFILE_CACHE_DURATION = 2 * 60 * 1000;
+const FEED_CACHE_DURATION = 2 * 60 * 1000;
 
 export function PrefetchProvider({ children }: { children: React.ReactNode }) {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
@@ -83,10 +95,13 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
   const [nearbyPlacesError, setNearbyPlacesError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [feedData, setFeedData] = useState<FeedData | null>(null);
+  const [feedLoading, setFeedLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   
   const fetchingRef = useRef(false);
   const profileFetchingRef = useRef(false);
+  const feedFetchingRef = useRef(false);
   const locationFetchedRef = useRef(false);
 
   // Get user's location
@@ -231,7 +246,56 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profileData]);
 
-  // Initialize on mount - get location and prefetch places + profile in parallel
+  // Fetch feed data (for instant feed loading when user navigates to feed)
+  const fetchFeedData = useCallback(async (location: UserLocation) => {
+    // Check if we have cached data that's still valid
+    if (feedData && Date.now() - feedData.timestamp < FEED_CACHE_DURATION) {
+      setFeedLoading(false);
+      return;
+    }
+
+    if (feedFetchingRef.current) return;
+    
+    feedFetchingRef.current = true;
+    setFeedLoading(true);
+
+    try {
+      // Fetch both tabs in parallel for instant tab switching
+      const [forYouResponse, followingResponse] = await Promise.all([
+        fetch(`/api/feed/reviews?page=0&limit=5&latitude=${location.latitude}&longitude=${location.longitude}&radius=5000&tab=foryou`),
+        fetch(`/api/feed/reviews?page=0&limit=5&latitude=${location.latitude}&longitude=${location.longitude}&radius=5000&tab=following`),
+      ]);
+      
+      const [forYouData, followingData] = await Promise.all([
+        forYouResponse.ok ? forYouResponse.json() : { reviews: [] },
+        followingResponse.ok ? followingResponse.json() : { reviews: [] },
+      ]);
+      
+      setFeedData({
+        forYou: forYouData.reviews || [],
+        following: followingData.reviews || [],
+        timestamp: Date.now(),
+      });
+      
+      // Also save to sessionStorage for feed page to pick up
+      if (typeof window !== 'undefined') {
+        const hasData = (forYouData.reviews?.length > 0) || (followingData.reviews?.length > 0);
+        sessionStorage.setItem('pachu_feed_data', JSON.stringify({
+          forYou: forYouData.reviews || [],
+          following: followingData.reviews || [],
+          timestamp: Date.now(),
+          hasData,
+        }));
+      }
+    } catch (error) {
+      console.error('Error prefetching feed:', error);
+    } finally {
+      setFeedLoading(false);
+      feedFetchingRef.current = false;
+    }
+  }, [feedData]);
+
+  // Initialize on mount - get location and prefetch everything in parallel
   useEffect(() => {
     if (locationFetchedRef.current) return;
     locationFetchedRef.current = true;
@@ -243,23 +307,27 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
         // Start profile fetch immediately (doesn't need location)
         fetchProfileData();
         
-        // Get location and then fetch nearby places
+        // Get location and then fetch nearby places + feed in parallel
         const location = await getUserLocation();
         setLocationLoading(false);
         
-        // Fetch places
-        await fetchNearbyPlaces(location);
+        // Fetch places AND feed data in parallel - this is the key optimization!
+        await Promise.all([
+          fetchNearbyPlaces(location),
+          fetchFeedData(location),
+        ]);
       } catch (error) {
         console.error('Initialization error:', error);
         setLocationLoading(false);
         setNearbyPlacesLoading(false);
+        setFeedLoading(false);
       } finally {
         setIsInitialized(true);
       }
     };
 
     initialize();
-  }, [getUserLocation, fetchNearbyPlaces, fetchProfileData]);
+  }, [getUserLocation, fetchNearbyPlaces, fetchProfileData, fetchFeedData]);
 
   // Manual refresh functions
   const refreshNearbyPlaces = useCallback(async () => {
@@ -273,6 +341,13 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
     await fetchProfileData();
   }, [fetchProfileData]);
 
+  const refreshFeed = useCallback(async () => {
+    // Force refresh by resetting timestamp
+    setFeedData(prev => prev ? { ...prev, timestamp: 0 } : null);
+    const location = await getUserLocation();
+    await fetchFeedData(location);
+  }, [getUserLocation, fetchFeedData]);
+
   return (
     <PrefetchContext.Provider
       value={{
@@ -283,8 +358,11 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
         nearbyPlacesError,
         profileData,
         profileLoading,
+        feedData,
+        feedLoading,
         refreshNearbyPlaces,
         refreshProfile,
+        refreshFeed,
         isInitialized,
       }}
     >
