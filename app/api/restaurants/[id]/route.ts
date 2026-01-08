@@ -42,7 +42,7 @@ export async function GET(
     ]);
 
     const user = userResult.data?.user;
-    let restaurant = restaurantResult.data;
+    const restaurant = restaurantResult.data;
     const restaurantError = restaurantResult.error;
 
     // If not found by Google Place ID, try to fetch from Google API

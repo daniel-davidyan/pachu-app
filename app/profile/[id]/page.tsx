@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -95,18 +95,16 @@ export default function UserProfilePage() {
   const mutualFriends = data?.mutualFriends || [];
   const loading = isLoading && !cachedData;
   
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isOwnProfile, setIsOwnProfile] = useState(false);
-  const [localStats, setLocalStats] = useState(stats);
-
-  // Update local state when API data arrives
-  useEffect(() => {
-    if (apiData) {
-      setIsFollowing(apiData.isFollowing || false);
-      setIsOwnProfile(apiData.isOwnProfile || false);
-      setLocalStats(apiData.stats);
-    }
-  }, [apiData]);
+  // Derive isOwnProfile directly from API data (no need for local state)
+  const isOwnProfile = apiData?.isOwnProfile || false;
+  
+  // Track user-initiated follow state changes (null = use API value)
+  const [followOverride, setFollowOverride] = useState<boolean | null>(null);
+  const [statsOverride, setStatsOverride] = useState<{ followersCount: number; followingCount: number; reviewsCount: number; averageRating: number } | null>(null);
+  
+  // Compute effective values: user override takes precedence, then API data
+  const isFollowing = followOverride !== null ? followOverride : (apiData?.isFollowing || false);
+  const localStats = statsOverride || apiData?.stats || stats;
 
   const handleFollow = async () => {
     try {
@@ -117,21 +115,23 @@ export default function UserProfilePage() {
         body: JSON.stringify({ userId: profileId, action }),
       });
 
-      const data = await response.json();
-
       if (response.ok) {
-        setIsFollowing(!isFollowing);
-        setLocalStats({
+        // Optimistic update via override
+        setFollowOverride(!isFollowing);
+        setStatsOverride({
           ...localStats,
           followersCount: isFollowing ? localStats.followersCount - 1 : localStats.followersCount + 1,
         });
         showToast(isFollowing ? 'Unfollowed' : 'Following', 'success');
-        // Revalidate the SWR cache
-        mutate();
+        // Revalidate the SWR cache, then clear overrides
+        mutate().then(() => {
+          setFollowOverride(null);
+          setStatsOverride(null);
+        });
       } else {
         showToast(`Failed to ${action}`, 'error');
       }
-    } catch (error) {
+    } catch {
       showToast('Failed to update follow status', 'error');
     }
   };
