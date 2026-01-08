@@ -467,65 +467,48 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
         setConversationContext(agentData.context);
       }
 
-      // If ready to recommend, call the recommend API
-      if (agentData.readyToRecommend) {
-        const recommendResponse = await fetch('/api/agent/recommend', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: conversationHistory,
-            latitude: location.lat,
-            longitude: location.lng,
-            radiusMeters: 5000,
-            conversationId: currentChatId,
-            context: agentData.context,
-          })
-        });
+      // If ready to recommend, use the recommendations from the chat response
+      if (agentData.readyToRecommend && agentData.recommendations?.length > 0) {
+        // Map recommendations to restaurant format
+        const restaurants = agentData.recommendations.map((rec: any) => ({
+          id: rec.restaurant.id || rec.restaurant.google_place_id,
+          name: rec.restaurant.name,
+          address: rec.restaurant.address,
+          rating: rec.restaurant.google_rating || rec.restaurant.rating || 0,
+          totalReviews: rec.restaurant.google_reviews_count || 0,
+          cuisineTypes: rec.restaurant.categories || rec.restaurant.cuisineTypes || [],
+          priceLevel: rec.restaurant.price_level || rec.restaurant.priceLevel,
+          photoUrl: rec.restaurant.photos?.[0]?.photo_reference 
+            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photo_reference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
+            : undefined,
+          latitude: rec.restaurant.latitude,
+          longitude: rec.restaurant.longitude,
+          matchPercentage: rec.matchScore,
+          reason: rec.reason, // Personal reason from LLM
+          source: 'google' as const,
+          googlePlaceId: rec.restaurant.google_place_id,
+        }));
 
-        const recommendData = await recommendResponse.json();
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentData.message,
+          restaurants,
+        };
 
-        if (recommendData.recommendations && recommendData.recommendations.length > 0) {
-          const restaurants = recommendData.recommendations.map((rec: any) => ({
-            id: rec.restaurant.id,
-            name: rec.restaurant.name,
-            address: rec.restaurant.address,
-            rating: rec.restaurant.googleRating || rec.restaurant.rating || 0,
-            totalReviews: rec.restaurant.googleReviewsCount || 0,
-            cuisineTypes: rec.restaurant.cuisineTypes,
-            priceLevel: rec.restaurant.priceLevel,
-            photoUrl: rec.restaurant.photos?.[0]?.url || 
-              (rec.restaurant.photos?.[0]?.photoReference 
-                ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${rec.restaurant.photos[0].photoReference}&key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}`
-                : undefined),
-            latitude: rec.restaurant.latitude,
-            longitude: rec.restaurant.longitude,
-            matchPercentage: rec.matchScore,
-            source: 'google' as const,
-            googlePlaceId: rec.restaurant.googlePlaceId,
-            website: rec.restaurant.website,
-          }));
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-            content: recommendData.explanation || agentData.message,
-            restaurants,
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-          onRestaurantsFound?.(restaurants);
-          setCurrentChips([]);
-        } else {
-          // No recommendations found
-          const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: agentData.message || "Let me search for some options...",
-            chips: agentData.chips,
-          };
-          setMessages(prev => [...prev, assistantMessage]);
-          setCurrentChips(agentData.chips || []);
-      }
+        setMessages(prev => [...prev, assistantMessage]);
+        onRestaurantsFound?.(restaurants);
+        setCurrentChips([]);
+      } else if (agentData.readyToRecommend) {
+        // Ready to recommend but no results
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentData.message || "לא מצאתי מסעדות מתאימות, נסה לתאר מה אתה מחפש",
+          chips: agentData.chips,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setCurrentChips(agentData.chips || []);
       } else {
         // Not ready yet, show agent response with chips
         const assistantMessage: Message = {

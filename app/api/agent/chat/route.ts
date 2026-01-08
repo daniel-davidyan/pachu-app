@@ -163,23 +163,16 @@ export async function POST(request: NextRequest) {
     const cleanResponse = agentResponse.replace(/\[READY_TO_RECOMMEND\]/g, '').trim();
 
     if (isReadyToRecommend) {
-      // Extract context from conversation for recommendation
-      const extractedContext = await extractContextFromConversation(
-        conversationHistory || [],
-        message
-      );
+      console.log('🎯 Ready to recommend! Sending conversation to pipeline...');
       
-      console.log('🎯 Ready to recommend! Extracted context:', extractedContext);
-      
-      // Call recommendation API
+      // Call recommendation API with full conversation
       const requestUrl = new URL(request.url);
       const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
       const cookies = request.headers.get('cookie') || '';
       
       const recommendResponse = await callRecommendationAPI(
-        extractedContext,
-        userLocation,
-        user,
+        conversationHistory || [],
+        message,
         { baseUrl, cookies }
       );
 
@@ -301,108 +294,17 @@ async function getUserProfile(supabase: any, userId?: string): Promise<UserProfi
   };
 }
 
-async function extractContextFromConversation(
-  history: { role: string; content: string }[],
-  currentMessage: string
-): Promise<any> {
-  // Build full conversation text
-  const fullConversation = [
-    ...history.map(m => `${m.role === 'user' ? 'משתמש' : 'פאצ׳ו'}: ${m.content}`),
-    `משתמש: ${currentMessage}`
-  ].join('\n');
-
-  const extractionPrompt = `נתח את השיחה הבאה וחלץ את המידע הרלוונטי לחיפוש מסעדה.
-
-שיחה:
-${fullConversation}
-
-החזר JSON בלבד בפורמט הבא:
-{
-  "withWho": "date" | "friends" | "family" | "solo" | "work" | null,
-  "location": "walking_distance" | "tel_aviv" | "willing_to_travel" | null,
-  "cuisine": "<סוג מטבח באנגלית - ראה רשימה למטה>",
-  "budget": "cheap" | "moderate" | "expensive" | null,
-  "vibe": "romantic" | "casual" | "upscale" | "lively" | null,
-  "when": "now" | "tonight" | "tomorrow" | "weekend" | null,
-  "summary": "<תיאור קצר של מה המשתמש מחפש בעברית>"
-}
-
-## חשוב מאוד - זיהוי סוג אוכל (cuisine):
-- "המבורגר" / "בורגר" / "burger" → cuisine: "burger"
-- "פיצה" / "pizza" → cuisine: "pizza"
-- "סושי" / "יפני" / "sushi" / "japanese" → cuisine: "japanese"
-- "איטלקי" / "פסטה" / "italian" → cuisine: "italian"
-- "אסייתי" / "סיני" / "תאילנדי" / "asian" → cuisine: "asian"
-- "בשרים" / "סטייק" / "steak" / "גריל" → cuisine: "steakhouse"
-- "ישראלי" / "מזרחי" / "חומוס" / "שווארמה" → cuisine: "israeli"
-- "מקסיקני" / "mexican" / "טאקו" / "בוריטו" → cuisine: "mexican"
-- "בריא" / "סלט" / "טבעוני" / "צמחוני" → cuisine: "healthy"
-- "דגים" / "פירות ים" / "seafood" → cuisine: "seafood"
-- "קפה" / "בית קפה" / "ארוחת בוקר" → cuisine: "cafe"
-- "בר" / "משקאות" / "קוקטיילים" → cuisine: "bar"
-
-## כללים נוספים:
-- "דייט" / "בת זוג" / "זוגי" → withWho: "date"
-- "חברים" / "בנים" / "חבר'ה" → withWho: "friends"
-- "משפחה" / "הורים" / "ילדים" → withWho: "family"
-- "לבד" → withWho: "solo"
-- "עבודה" / "פגישה" → withWho: "work"
-- "קרוב" / "הליכה" → location: "walking_distance"
-- "תל אביב" / "בעיר" → location: "tel_aviv"
-- "זול" / "חסכוני" → budget: "cheap"
-- "בינוני" → budget: "moderate"
-- "מפנק" / "יקר" → budget: "expensive"
-
-## זיהוי זמן (when) - חשוב מאוד!:
-- "עכשיו" / "מיד" / "כרגע" / "פתוח" / "שפתוח" / "פתוח עכשיו" / "מקום פתוח" → when: "now"
-- "הערב" / "הלילה" / "ערב" / "דינר" → when: "tonight"
-- "מחר" / "מחר בערב" → when: "tomorrow"
-- "סופש" / "סוף שבוע" / "שישי" / "שבת" → when: "weekend"
-
-החזר רק JSON, בלי הסברים.`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: extractionPrompt }],
-      temperature: 0,
-      max_tokens: 300,
-    });
-
-    const text = response.choices[0].message.content || '{}';
-    const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error('Context extraction failed:', e);
-    return {
-      withWho: null,
-      location: 'tel_aviv',
-      cuisine: null,
-      budget: null,
-      vibe: null,
-      summary: currentMessage,
-    };
-  }
-}
-
 async function callRecommendationAPI(
-  context: any,
-  userLocation: { lat: number; lng: number } | null,
-  user: { id: string; email?: string } | null | undefined,
+  conversationHistory: { role: string; content: string }[],
+  currentMessage: string,
   requestInfo: { baseUrl: string; cookies: string }
 ): Promise<{ recommendations: any[]; debugData?: any }> {
   
-  const TEL_AVIV_CENTER = { lat: 32.0853, lng: 34.7818 };
-  const effectiveLocation = userLocation || TEL_AVIV_CENTER;
-  
-  const recommendContext = {
-    where: context.location || 'tel_aviv',
-    withWho: context.withWho,
-    purpose: mapOccasionToPurpose(context.withWho),
-    budget: context.budget,
-    when: context.when || null,  // Pass timing preference for opening hours filter
-    cuisinePreference: context.cuisine,
-  };
+  // Build full messages array including current message
+  const messages = [
+    ...conversationHistory,
+    { role: 'user', content: currentMessage }
+  ];
 
   try {
     const controller = new AbortController();
@@ -415,12 +317,8 @@ async function callRecommendationAPI(
         'Cookie': requestInfo.cookies,
       },
       body: JSON.stringify({
-        context: recommendContext,
-        userLocation: effectiveLocation,
-        conversationSummary: context.summary || '',
+        messages,  // Send full conversation
         includeDebugData: true,
-        userEmail: user?.email,
-        userId: user?.id,
       }),
       signal: controller.signal,
     });
@@ -440,18 +338,4 @@ async function callRecommendationAPI(
     console.error('Recommendation API error:', error);
     return { recommendations: [] };
   }
-}
-
-function mapOccasionToPurpose(occasion: string | null): string | null {
-  if (!occasion) return null;
-  
-  const map: Record<string, string> = {
-    'date': 'romantic_dinner',
-    'friends': 'casual_meal',
-    'family': 'casual_meal',
-    'solo': 'casual_meal',
-    'work': 'business',
-  };
-  
-  return map[occasion] || null;
 }
