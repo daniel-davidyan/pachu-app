@@ -63,7 +63,7 @@ interface FeedReview {
 }
 
 // Helper to load cached feed data from sessionStorage
-function loadCachedFeedData(): { forYou: FeedReview[]; following: FeedReview[]; timestamp: number } | null {
+function loadCachedFeedData(): { forYou: FeedReview[]; following: FeedReview[]; timestamp: number; hasData: boolean } | null {
   if (typeof window === 'undefined') return null;
   try {
     const saved = sessionStorage.getItem(FEED_DATA_KEY);
@@ -71,7 +71,9 @@ function loadCachedFeedData(): { forYou: FeedReview[]; following: FeedReview[]; 
       const data = JSON.parse(saved);
       // Check if cache is still valid
       if (Date.now() - data.timestamp < FEED_DATA_EXPIRY) {
-        return data;
+        // Add flag to indicate if cache actually has data
+        const hasData = (data.forYou?.length > 0) || (data.following?.length > 0);
+        return { ...data, hasData };
       }
     }
   } catch {}
