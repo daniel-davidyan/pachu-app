@@ -377,8 +377,14 @@ export default function RestaurantPage() {
   return (
     <MainLayout showTopBar={false} showBottomNav={!showWriteReview && !sheetOpen}>
       <div className="min-h-screen bg-gray-50 pb-20">
-        {/* Header Image */}
-        <div className="relative h-72 bg-gray-200">
+        {/* Header Image - extends to top of screen */}
+        <div 
+          className="relative bg-gray-200"
+          style={{ 
+            height: 'calc(18rem + env(safe-area-inset-top))',
+            marginTop: 'calc(-1 * env(safe-area-inset-top))',
+          }}
+        >
           {restaurant.imageUrl ? (
             <img 
               src={restaurant.imageUrl} 
@@ -394,13 +400,17 @@ export default function RestaurantPage() {
           {/* Back Button */}
           <button
             onClick={() => router.back()}
-            className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center z-20"
+            className="absolute left-4 w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-lg flex items-center justify-center z-20"
+            style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
 
           {/* Action Buttons */}
-          <div className="absolute top-4 right-4 flex gap-2 z-20">
+          <div 
+            className="absolute right-4 flex gap-2 z-20"
+            style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
+          >
             {restaurant.website && (
               <button
                 onClick={() => window.open(restaurant.website, '_blank')}

@@ -189,9 +189,18 @@ export default function UserProfilePage() {
 
   return (
     <MainLayout showTopBar={false}>
-      <div className="pb-24 bg-white min-h-screen">
+      <div 
+        className="pb-24 bg-white min-h-screen"
+        style={{
+          marginTop: 'calc(-1 * env(safe-area-inset-top))',
+          paddingTop: 'env(safe-area-inset-top)',
+        }}
+      >
         {/* Header - Instagram Style */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+        <div 
+          className="sticky z-10 bg-white border-b border-gray-200"
+          style={{ top: 'env(safe-area-inset-top)' }}
+        >
           <div className="flex items-center px-4 h-14">
             <button
               onClick={() => router.back()}

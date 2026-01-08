@@ -313,37 +313,40 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
     }
   }, [user, activeReviewId, comments]);
 
-  // Show loader if we have no reviews AND haven't completed first load yet
-  // This prevents flicker - we stay on loader until we have data or confirmed empty
-  if (reviews.length === 0 && !hasLoadedOnce) {
+  // Show loader if we have no reviews - covers ALL loading scenarios
+  // This prevents ANY flicker of empty state
+  if (reviews.length === 0) {
+    // Only show empty state if we've loaded AND are not currently loading anything
+    const showEmptyState = hasLoadedOnce && !isLoading && !isInitialLoading;
+    
+    if (showEmptyState) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-black">
+          <div className="text-center text-white p-8 max-w-sm">
+            <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-white/10 flex items-center justify-center">
+              <span className="text-5xl">🍽️</span>
+            </div>
+            <h3 className="text-xl font-bold mb-2">No reviews with photos</h3>
+            <p className="text-white/60 mb-6">
+              This feed shows reviews with photos and videos. Share your food experience with photos to appear here!
+            </p>
+            <a
+              href="/search"
+              className="inline-block px-6 py-3 bg-primary text-white font-semibold rounded-full hover:bg-primary/90 transition-colors"
+            >
+              Find a place to review
+            </a>
+          </div>
+        </div>
+      );
+    }
+    
+    // Otherwise show loader (waiting for data)
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
         <div className="text-center">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
           <p className="text-white/50 text-sm">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Only show empty state AFTER we've loaded once and confirmed there's no data
-  if (reviews.length === 0 && hasLoadedOnce && !isLoading && !isInitialLoading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-black">
-        <div className="text-center text-white p-8 max-w-sm">
-          <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-white/10 flex items-center justify-center">
-            <span className="text-5xl">🍽️</span>
-          </div>
-          <h3 className="text-xl font-bold mb-2">No reviews with photos</h3>
-          <p className="text-white/60 mb-6">
-            This feed shows reviews with photos and videos. Share your food experience with photos to appear here!
-          </p>
-          <a
-            href="/search"
-            className="inline-block px-6 py-3 bg-primary text-white font-semibold rounded-full hover:bg-primary/90 transition-colors"
-          >
-            Find a place to review
-          </a>
         </div>
       </div>
     );
