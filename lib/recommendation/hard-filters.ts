@@ -102,7 +102,7 @@ function isOpenAtFromPeriods(
       return true;
     }
     
-    let closeTime = parseTimeToMinutes(period.close.time);
+    const closeTime = parseTimeToMinutes(period.close.time);
     
     // Handle overnight closing (e.g., open 18:00, close 02:00)
     if (period.close.day !== period.open.day) {

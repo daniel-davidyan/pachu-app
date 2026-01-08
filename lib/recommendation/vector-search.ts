@@ -225,11 +225,11 @@ export async function performVectorSearchSQL(
   }
   
   // Transform results to ScoredRestaurant format
-  return (data || []).map((r: any) => ({
+  return (data || []).map((r: Record<string, unknown>) => ({
     ...r,
-    vectorScore: r.similarity || 0.5,
-    summaryScore: r.similarity || 0.5,
+    vectorScore: (r.similarity as number) || 0.5,
+    summaryScore: (r.similarity as number) || 0.5,
     reviewsScore: 0,
-    distanceMeters: r.distance_meters,
-  }));
+    distanceMeters: r.distance_meters as number | undefined,
+  })) as ScoredRestaurant[];
 }

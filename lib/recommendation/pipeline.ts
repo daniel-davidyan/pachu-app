@@ -14,7 +14,6 @@ import {
   ChatMessage,
   UserLocation,
   PipelineResult,
-  PipelineDebug,
   Recommendation,
 } from './types';
 

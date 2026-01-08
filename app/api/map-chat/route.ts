@@ -21,7 +21,8 @@ function detectLanguage(message: string): 'he' | 'en' | 'other' {
 
 // Helper function to detect if user is doing a focused search for a specific restaurant
 function detectFocusedSearch(message: string, language: string): { isFocused: boolean; restaurantName?: string; isQuestion: boolean } {
-  const lowerMessage = message.toLowerCase().trim();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _lowerMessage = message.toLowerCase().trim();
   
   // Patterns for asking opinion about a place (English)
   const questionPatternsEn = [
@@ -138,7 +139,8 @@ export async function POST(request: NextRequest) {
     }
     
     // Detect if this is a focused search for a specific restaurant
-    const focusedSearch = detectFocusedSearch(message, detectedLanguage);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _focusedSearch = detectFocusedSearch(message, detectedLanguage);
     
     // Count how many questions we've asked and how many the user has answered
     const assistantMessages = conversationHistory.filter((m: any) => m.role === 'assistant');
@@ -437,7 +439,7 @@ Recommend 3 specific restaurants. Format:
     for (const line of lines) {
       const match = line.match(/^[\d\-\*•]\s*[\.\):]?\s*(.+)$/);
       if (match && match[1]) {
-        let name = match[1].trim().replace(/^["']|["']$/g, '');
+        const name = match[1].trim().replace(/^["']|["']$/g, '');
         if (name && name.length > 2) {
           restaurantNames.push(name);
         }
