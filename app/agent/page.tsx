@@ -82,6 +82,64 @@ const getPriceLevel = (priceLevel?: number): string => {
   return '$'.repeat(priceLevel);
 };
 
+// Parse message content and render inline restaurant mentions as styled components
+function renderMessageWithRestaurantMentions(
+  content: string, 
+  restaurants?: Restaurant[],
+  onRestaurantClick?: (restaurant: Restaurant) => void
+): React.ReactNode {
+  // Match [[Restaurant Name]] pattern
+  const regex = /\[\[([^\]]+)\]\]/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(content.substring(lastIndex, match.index));
+    }
+
+    const restaurantName = match[1];
+    // Find matching restaurant from the recommendations
+    const matchedRestaurant = restaurants?.find(
+      r => r.name.toLowerCase() === restaurantName.toLowerCase() || 
+           r.name.includes(restaurantName) ||
+           restaurantName.includes(r.name)
+    );
+
+    // Render inline restaurant chip
+    parts.push(
+      <button
+        key={`mention-${match.index}`}
+        onClick={() => matchedRestaurant && onRestaurantClick?.(matchedRestaurant)}
+        className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 bg-gradient-to-r from-primary/10 to-pink-100 text-primary font-semibold rounded-lg hover:from-primary/20 hover:to-pink-200 transition-all cursor-pointer border border-primary/20 hover:border-primary/40 hover:scale-[1.02] active:scale-[0.98]"
+        style={{ 
+          verticalAlign: 'baseline',
+          lineHeight: 'inherit',
+        }}
+      >
+        <span className="text-sm">🍽️</span>
+        <span className="text-sm">{restaurantName}</span>
+      </button>
+    );
+
+    lastIndex = regex.lastIndex;
+  }
+
+  // Add remaining text after last match
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+
+  // If no matches found, return original content
+  if (parts.length === 0) {
+    return content;
+  }
+
+  return <>{parts}</>;
+}
+
 // Restaurant card component - Modern design with full image overlay
 function RestaurantCard({ restaurant, messageId, index, onRestaurantClick }: { 
   restaurant: Restaurant; 
@@ -696,8 +754,9 @@ export default function AgentPage() {
                         style={{
                           background: 'linear-gradient(135deg, #EC4899, #C5459C)',
                         }}
+                        dir="rtl"
                       >
-                        <p className="text-sm text-white whitespace-pre-wrap font-medium">{message.content}</p>
+                        <p className="text-sm text-white whitespace-pre-wrap font-medium text-right">{message.content}</p>
                       </div>
                     )}
                     
@@ -727,8 +786,15 @@ export default function AgentPage() {
                           <div
                             className="bg-white/80 backdrop-blur-sm rounded-2xl rounded-tl-md px-4 py-3 shadow-md border border-white/50"
                             style={{ maxWidth: '95%' }}
+                            dir="rtl"
                           >
-                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed text-right">
+                              {renderMessageWithRestaurantMentions(
+                                message.content, 
+                                message.restaurants,
+                                handleRestaurantClick
+                              )}
+                            </p>
                           </div>
                         )}
                       </div>

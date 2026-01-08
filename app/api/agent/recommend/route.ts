@@ -182,12 +182,64 @@ export async function POST(request: NextRequest) {
     console.log('✅ PIPELINE COMPLETE');
     console.log('========================================\n');
 
+    // Generate natural summary message using LLM
+    const summaryMessage = await generateNaturalSummary(recommendations, conversationText);
+
     return NextResponse.json({
       recommendations,
-      message: generateResultMessage(recommendations),
+      message: summaryMessage,
       debugData: includeDebugData ? {
-        totalRestaurants: allRestaurants.length,
-        top30: top30.map(r => ({ name: r.name, score: r.vectorScore })),
+        // Step 1: Database & Hard Filters (currently no hard filters, so same as total)
+        step1: {
+          totalInDb: allRestaurants.length,
+          afterFilter: allRestaurants.length, // No hard filters in V3
+          sampleRestaurants: scoredRestaurants.slice(0, 10).map(r => ({
+            id: r.id,
+            name: r.name,
+            categories: r.categories,
+            city: r.city,
+          })),
+        },
+        // Step 2: Vector Search
+        step2: {
+          queryText: searchIntent,
+          totalScored: allRestaurants.length,
+          topByVector: top30.map(r => ({
+            id: r.id,
+            name: r.name,
+            categories: r.categories,
+            vectorScore: r.vectorScore,
+            summary: r.summary?.substring(0, 100),
+          })),
+        },
+        // Step 3: Re-ranking (pass-through in V3 - same as vector search)
+        step3: {
+          totalReranked: top30.length,
+          topByRerank: top30.map(r => ({
+            id: r.id,
+            name: r.name,
+            categories: r.categories,
+            vectorScore: r.vectorScore,
+            finalScore: r.vectorScore, // Same in V3
+            socialScore: 0, // Not used in V3
+          })),
+        },
+        // Step 4: LLM Selection
+        step4: {
+          candidatesSentToLLM: top30.map(r => ({
+            id: r.id,
+            name: r.name,
+            categories: r.categories,
+            summary: r.summary?.substring(0, 100),
+          })),
+          finalRecommendations: recommendations.map(rec => ({
+            id: rec.restaurant.id,
+            name: rec.restaurant.name,
+            categories: rec.restaurant.categories,
+            reason: rec.reason,
+            matchScore: rec.matchScore,
+          })),
+        },
       } : undefined,
     });
 
@@ -416,12 +468,64 @@ ${restaurantList}
 }
 
 // ============================================
-// Helper Functions
+// Natural Summary Generation
 // ============================================
 
-function generateResultMessage(recommendations: Recommendation[]): string {
+async function generateNaturalSummary(
+  recommendations: Recommendation[],
+  conversationText: string
+): Promise<string> {
   if (recommendations.length === 0) {
     return 'לא מצאתי התאמות, אולי תנסה לתאר מה אתה מחפש?';
   }
-  return 'הנה 3 המלצות בשבילך! 🍽️';
+
+  const restaurantNames = recommendations.map(r => r.restaurant.name);
+  const reasons = recommendations.map(r => r.reason);
+
+  const prompt = `אתה פאצ'ו, חבר שעוזר למצוא מסעדות.
+
+המשתמש ביקש: ${conversationText.split('\n').filter(l => l.startsWith('User:')).pop()?.replace('User:', '').trim() || 'מסעדה טובה'}
+
+בחרתי 3 מסעדות:
+1. ${restaurantNames[0]} - ${reasons[0]}
+2. ${restaurantNames[1]} - ${reasons[1]}  
+3. ${restaurantNames[2]} - ${reasons[2]}
+
+כתוב הודעת סיכום טבעית וזורמת בעברית שמציגה את 3 ההמלצות.
+
+## כללים חשובים:
+- השתמש ב-[[שם מסעדה]] בדיוק כמו שכתבתי למעלה (עם סוגריים מרובעים כפולים)
+- כל מסעדה בשורה חדשה! (ירידת שורה אחרי כל המלצה)
+- הודעה קצרה וטבעית, כמו חבר שממליץ
+- תן טעם למה כל מקום מתאים
+- בלי אימוג'ים בכלל!
+- אל תמספר את המסעדות (1, 2, 3) - תזרום טבעי
+
+## דוגמה לפורמט טוב:
+"אז תשמע, אם אתה מחפש המבורגרים טרנדיים וטעימים, זה המקום בשבילך עם הצ'יפס כמהין המיוחד - [[Bodega Burger]]
+אם אתה רוצה חוויה באווירה תוססת, במרכז תל אביב תתאים לך בול - [[ויטרינה]]
+ובשביל קצת קלילות, מציע המבורגרים מעולים באווירה נוחה ופשוט כיף להיות שם! - [[בגן ברדס פלורנטין]]"
+
+כתוב רק את ההודעה, בלי הסברים:`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8,
+      max_tokens: 300,
+    });
+
+    return response.choices[0].message.content?.trim() || generateFallbackMessage(recommendations);
+  } catch (e) {
+    console.error('Failed to generate natural summary:', e);
+    return generateFallbackMessage(recommendations);
+  }
+}
+
+function generateFallbackMessage(recommendations: Recommendation[]): string {
+  return `מצאתי לך 3 מקומות מעולים!
+הייתי הולך על [[${recommendations[0].restaurant.name}]] - ${recommendations[0].reason}
+אופציה נוספת היא [[${recommendations[1].restaurant.name}]] - ${recommendations[1].reason}
+ואם בא לך משהו אחר - [[${recommendations[2].restaurant.name}]] - ${recommendations[2].reason}`;
 }

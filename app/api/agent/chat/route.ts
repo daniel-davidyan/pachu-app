@@ -174,25 +174,13 @@ export async function POST(request: NextRequest) {
         { baseUrl, cookies }
       );
 
-      // Build response message - clean format without markdown
+      // Use the natural summary message from the recommendation API
+      // The message contains [[Restaurant Name]] markers that the frontend will render as components
       let fullMessage = '';
       
       if (recommendResponse.recommendations && recommendResponse.recommendations.length > 0) {
-        // Build short intro with one-line reason per restaurant
-        const intros = [
-          'הנה 3 המלצות בשבילך! 🍽️',
-          'מצאתי לך 3 מקומות שווים! 🎯',
-          'יש לי בדיוק מה שחיפשת! ✨',
-        ];
-        fullMessage = intros[Math.floor(Math.random() * intros.length)];
-        
-        // Add restaurant names and reasons (clean format)
-        fullMessage += '\n\n';
-        recommendResponse.recommendations.forEach((rec: any, index: number) => {
-          const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-          fullMessage += `${emoji} ${rec.restaurant.name}\n${rec.reason}\n\n`;
-        });
-        fullMessage = fullMessage.trim();
+        // Use the naturally generated message from the recommendation API
+        fullMessage = recommendResponse.message || cleanResponse;
       } else if (cleanResponse) {
         fullMessage = cleanResponse;
       }
@@ -296,7 +284,7 @@ async function callRecommendationAPI(
   conversationHistory: { role: string; content: string }[],
   currentMessage: string,
   requestInfo: { baseUrl: string; cookies: string }
-): Promise<{ recommendations: any[]; debugData?: any }> {
+): Promise<{ recommendations: any[]; message?: string; debugData?: any }> {
   
   // Build full messages array including current message
   const messages = [
@@ -330,6 +318,7 @@ async function callRecommendationAPI(
     const data = await recommendResponse.json();
     return {
       recommendations: data.recommendations || [],
+      message: data.message,
       debugData: data.debugData,
     };
   } catch (error) {
