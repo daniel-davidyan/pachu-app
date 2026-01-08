@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     let debuggedFirst = false;
     const scoredRestaurants = allRestaurants.map(r => {
       // Parse embedding - handle multiple formats (array, JSON string, pgvector string)
-      let embedding = parseEmbedding(r.summary_embedding);
+      const embedding = parseEmbedding(r.summary_embedding);
       
       // Debug first restaurant
       if (!debuggedFirst) {
@@ -365,6 +365,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 async function selectWithLLM(
   candidates: Restaurant[],
   conversationText: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userId?: string
 ): Promise<Recommendation[]> {
   
