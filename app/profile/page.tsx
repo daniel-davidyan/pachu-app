@@ -2,6 +2,7 @@
 
 import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
+import { usePrefetch } from '@/hooks/use-prefetch';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
 import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus } from 'lucide-react';
@@ -82,6 +83,7 @@ type ProfileTab = 'published' | 'unpublished' | 'saved';
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useUser();
+  const { profileData, profileLoading, refreshProfile } = usePrefetch();
   const { showToast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats>({ experiences: 0, followers: 0, following: 0 });
@@ -103,23 +105,95 @@ export default function ProfilePage() {
   const supabase = createClient();
 
 
+  // Use prefetched data on initial load for instant display
   useEffect(() => {
-    if (user) {
-      fetchProfile();
-      fetchStats();
+    if (profileData && !profile) {
+      // Use prefetched data immediately
+      if (profileData.profile) {
+        setProfile(profileData.profile);
+      }
+      if (profileData.stats) {
+        setStats(profileData.stats);
+      }
+      if (profileData.reviews && activeTab === 'published') {
+        setReviews(profileData.reviews);
+      }
+      setLoading(false);
+      setLoadingTab(false);
     }
-  }, [user]);
+  }, [profileData, profile, activeTab]);
 
+  // Optimized: Single API call for profile, stats, and reviews
+  const fetchProfileDataFromAPI = async (tab: string = activeTab) => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await fetch(`/api/profile/me?tab=${tab}`);
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('API error:', data.error);
+        return;
+      }
+      
+      // Set all data at once
+      if (data.profile) {
+        setProfile(data.profile);
+      }
+      if (data.stats) {
+        setStats(data.stats);
+      }
+      if (data.reviews) {
+        setReviews(data.reviews);
+      }
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    } finally {
+      setLoading(false);
+      setLoadingTab(false);
+    }
+  };
+
+  // Initial load - use prefetched data or fetch if not available
   useEffect(() => {
-    if (user) {
+    if (user && !profileData && !profile) {
+      setLoading(true);
+      fetchProfileDataFromAPI('published');
+    }
+  }, [user, profileData, profile]);
+
+  // Tab change - only fetch reviews for that tab
+  useEffect(() => {
+    if (user && profile) {
       if (activeTab === 'published' || activeTab === 'unpublished') {
-        fetchReviews();
+        setLoadingTab(true);
+        fetchReviewsOnly();
       } else {
         fetchCollections();
       }
     }
-  }, [user, activeTab]);
+  }, [activeTab]);
 
+  // Light-weight reviews fetch for tab switching
+  const fetchReviewsOnly = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await fetch(`/api/profile/me?tab=${activeTab}`);
+      const data = await response.json();
+      
+      if (data.reviews) {
+        setReviews(data.reviews);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      setReviews([]);
+    } finally {
+      setLoadingTab(false);
+    }
+  };
+
+  // Keep these for backwards compatibility and refresh functionality
   const fetchProfile = async () => {
     try {
       const { data, error } = await supabase
@@ -132,107 +206,25 @@ export default function ProfilePage() {
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
   const fetchStats = async () => {
+    // Refresh stats after actions like delete/follow
     try {
-      if (!user?.id) return;
-
-      console.log('Fetching stats for user:', user.id);
-
-      // Get experiences (reviews) count
-      const { count: experiencesCount } = await supabase
-        .from('reviews')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      
-      console.log('Experiences count:', experiencesCount);
-
-      // Get followers count - people who follow this user
-      let followersCount = 0;
-      try {
-        // Try standard column name first
-        const { count: count1, error: error1 } = await supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('following_id', user.id);
-        
-        if (!error1 && count1 !== null) {
-          followersCount = count1;
-        } else {
-          // Try legacy column name
-          const { count: count2 } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('followed_id', user.id);
-          followersCount = count2 || 0;
-        }
-      } catch (err) {
-        console.error('Error fetching followers:', err);
+      const response = await fetch(`/api/profile/me?tab=${activeTab}`);
+      const data = await response.json();
+      if (data.stats) {
+        setStats(data.stats);
       }
-
-      // Get following count - people this user follows
-      let followingCount = 0;
-      try {
-        const { count, error } = await supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('follower_id', user.id);
-        
-        if (!error && count !== null) {
-          followingCount = count;
-        }
-      } catch (err) {
-        console.error('Error fetching following:', err);
-      }
-
-      console.log('Final stats:', { 
-        experiences: experiencesCount || 0, 
-        followers: followersCount, 
-        following: followingCount 
-      });
-
-      setStats({
-        experiences: experiencesCount || 0,
-        followers: followersCount,
-        following: followingCount,
-      });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
   };
 
   const fetchReviews = async () => {
-    if (!user?.id) return;
-    
     setLoadingTab(true);
-    try {
-      // Build URL with published filter based on active tab
-      let url = `/api/reviews?userId=${user.id}`;
-      if (activeTab === 'published') {
-        url += '&published=true';
-      } else if (activeTab === 'unpublished') {
-        url += '&published=false';
-      }
-      
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      if (data.error) {
-        console.error('API error:', data.error);
-        setReviews([]);
-      } else {
-        setReviews(data.reviews || []);
-      }
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-      setReviews([]);
-    } finally {
-      setLoadingTab(false);
-    }
+    await fetchReviewsOnly();
   };
 
   const fetchWishlist = async () => {

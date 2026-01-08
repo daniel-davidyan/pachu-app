@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { ToastProvider } from '@/components/ui/toast';
 import { SWRProvider, FeedDataProvider } from '@/components/providers';
+import { PrefetchProvider } from '@/hooks/use-prefetch';
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -84,7 +85,9 @@ export default function RootLayout({
           <FeedDataProvider>
             <AuthProvider>
               <ToastProvider>
-                {children}
+                <PrefetchProvider>
+                  {children}
+                </PrefetchProvider>
               </ToastProvider>
             </AuthProvider>
           </FeedDataProvider>

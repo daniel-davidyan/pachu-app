@@ -71,19 +71,38 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
   const { user } = useUser();
   const { showToast } = useToast();
   
-  // BULLETPROOF: Track if we've EVER had data in this component instance
-  // This ref ensures we NEVER show empty state until we've confirmed data exists or doesn't
-  const hasEverHadDataRef = useRef(reviews.length > 0);
-  const hasConfirmedEmptyRef = useRef(false);
+  // BULLETPROOF: Use state with delayed confirmation to prevent ANY flicker
+  // Empty state only shows after we've been in "confirmed empty" state for 500ms
+  const [canShowEmptyState, setCanShowEmptyState] = useState(false);
+  const emptyConfirmTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Update refs when reviews change
-  if (reviews.length > 0) {
-    hasEverHadDataRef.current = true;
-  }
-  // Only confirm empty if we've loaded AND have no data AND parent says loaded
-  if (hasLoadedOnce && reviews.length === 0 && !isLoading && !isInitialLoading) {
-    hasConfirmedEmptyRef.current = true;
-  }
+  // Effect to handle empty state confirmation with delay
+  useEffect(() => {
+    // Clear any existing timer
+    if (emptyConfirmTimerRef.current) {
+      clearTimeout(emptyConfirmTimerRef.current);
+      emptyConfirmTimerRef.current = null;
+    }
+    
+    // If we have reviews, reset empty state
+    if (reviews.length > 0) {
+      setCanShowEmptyState(false);
+      return;
+    }
+    
+    // If conditions suggest empty AND loading is done, wait 500ms then confirm
+    if (hasLoadedOnce && !isLoading && !isInitialLoading && reviews.length === 0) {
+      emptyConfirmTimerRef.current = setTimeout(() => {
+        setCanShowEmptyState(true);
+      }, 500);
+    }
+    
+    return () => {
+      if (emptyConfirmTimerRef.current) {
+        clearTimeout(emptyConfirmTimerRef.current);
+      }
+    };
+  }, [reviews.length, hasLoadedOnce, isLoading, isInitialLoading]);
   
   // Restore position from sessionStorage on mount
   const [currentIndex, setCurrentIndex] = useState(() => {
@@ -327,13 +346,11 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
     }
   }, [user, activeReviewId, comments]);
 
-  // Show loader if we have no reviews - covers ALL loading scenarios
-  // This prevents ANY flicker of empty state
+  // BULLETPROOF empty state logic - only show after delayed confirmation
+  // This guarantees loader shows first, then empty state only after 500ms of confirmed empty
   if (reviews.length === 0) {
-    // Only show empty state if we've loaded AND are not currently loading anything
-    const showEmptyState = hasLoadedOnce && !isLoading && !isInitialLoading;
-    
-    if (showEmptyState) {
+    // Only show empty state if the delayed confirmation has completed
+    if (canShowEmptyState) {
       return (
         <div className="w-full h-full flex items-center justify-center bg-black">
           <div className="text-center text-white p-8 max-w-sm">
@@ -355,7 +372,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
       );
     }
     
-    // Otherwise show loader (waiting for data)
+    // DEFAULT: Always show loader when no reviews
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
         <div className="text-center">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Search, MapPin, User, Star, Loader2, UserPlus, UserCheck } from 'lucide-react';
 import { formatAddress } from '@/lib/address-utils';
+import { usePrefetch } from '@/hooks/use-prefetch';
 
 type SearchTab = 'places' | 'users';
 
@@ -43,18 +44,17 @@ interface UserResult {
 
 export default function SearchPage() {
   const router = useRouter();
+  const { nearbyPlaces, nearbyPlacesLoading, userLocation } = usePrefetch();
   const [activeTab, setActiveTab] = useState<SearchTab>('places');
   const [searchQuery, setSearchQuery] = useState('');
   const [placesResults, setPlacesResults] = useState<PlaceResult[]>([]);
   const [usersResults, setUsersResults] = useState<UserResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [trendingPlaces, setTrendingPlaces] = useState<PlaceResult[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<UserResult[]>([]);
-  const [loadingTrending, setLoadingTrending] = useState(false);
   const [loadingSuggested, setLoadingSuggested] = useState(false);
   const [followingUsers, setFollowingUsers] = useState<Set<string>>(new Set());
 
-  // Search for places
+  // Search for places - uses cached location for instant search
   useEffect(() => {
     if (!searchQuery.trim() || activeTab !== 'places') {
       setPlacesResults([]);
@@ -64,12 +64,12 @@ export default function SearchPage() {
     const searchPlaces = async () => {
       setSearching(true);
       try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject);
-        }).catch(() => ({ coords: { latitude: 32.0853, longitude: 34.7818 } } as GeolocationPosition));
+        // Use cached location from prefetch context (instant!) or fallback to default
+        const lat = userLocation?.latitude || 32.0853;
+        const lng = userLocation?.longitude || 34.7818;
 
         const response = await fetch(
-          `/api/restaurants/search?query=${encodeURIComponent(searchQuery)}&latitude=${position.coords.latitude}&longitude=${position.coords.longitude}`
+          `/api/restaurants/search?query=${encodeURIComponent(searchQuery)}&latitude=${lat}&longitude=${lng}`
         );
         const data = await response.json();
         setPlacesResults(data.restaurants || []);
@@ -84,7 +84,7 @@ export default function SearchPage() {
     // Debounce search
     const timeoutId = setTimeout(searchPlaces, 500);
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, activeTab]);
+  }, [searchQuery, activeTab, userLocation]);
 
   // Search for users
   useEffect(() => {
@@ -111,60 +111,6 @@ export default function SearchPage() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, activeTab]);
 
-  const loadTrendingPlaces = useCallback(async () => {
-    setLoadingTrending(true);
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      }).catch(() => ({ coords: { latitude: 32.0853, longitude: 34.7818 } } as GeolocationPosition));
-
-      const userLat = position.coords.latitude;
-      const userLng = position.coords.longitude;
-
-      const response = await fetch(
-        `/api/restaurants/nearby?latitude=${userLat}&longitude=${userLng}&radius=2000`
-      );
-      const data = await response.json();
-      
-      // Calculate distance and sort by closest
-      const placesWithDistance = (data.restaurants || []).map((r: any) => {
-        const lat = r.latitude || 0;
-        const lng = r.longitude || 0;
-        // Haversine distance in meters
-        const R = 6371000;
-        const dLat = (lat - userLat) * Math.PI / 180;
-        const dLng = (lng - userLng) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(userLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
-                  Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
-        
-        return {
-          googlePlaceId: r.googlePlaceId || r.id,
-          name: r.name,
-          address: r.address,
-          rating: r.rating,
-          photoUrl: r.photoUrl,
-          visitedByFollowing: r.visitedByFollowing || [],
-          distance: Math.round(distance), // meters
-        };
-      });
-      
-      // Sort by distance (closest first) and take top 5
-      const nearbyPlaces = placesWithDistance
-        .sort((a: any, b: any) => a.distance - b.distance)
-        .slice(0, 5);
-      
-      setTrendingPlaces(nearbyPlaces);
-    } catch (error) {
-      console.error('Error loading nearby places:', error);
-      setTrendingPlaces([]);
-    } finally {
-      setLoadingTrending(false);
-    }
-  }, []);
-
   const loadSuggestedUsers = useCallback(async () => {
     setLoadingSuggested(true);
     try {
@@ -179,13 +125,6 @@ export default function SearchPage() {
       setLoadingSuggested(false);
     }
   }, []);
-
-  // Load trending places near user
-  useEffect(() => {
-    if (activeTab === 'places' && !searchQuery) {
-      loadTrendingPlaces();
-    }
-  }, [activeTab, searchQuery, loadTrendingPlaces]);
 
   // Load suggested users
   useEffect(() => {
@@ -384,20 +323,20 @@ export default function SearchPage() {
                 </>
               ) : (
                 <>
-                  {/* Places Near You Section */}
+                  {/* Places Near You Section - Uses prefetched data for instant load */}
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-1.5">
                       <span className="text-base">📍</span>
                       Places Near You
                     </h2>
-                    {loadingTrending ? (
+                    {nearbyPlacesLoading ? (
                       <div className="text-center py-8">
                         <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
                         <p className="text-sm text-gray-500">Finding places near you...</p>
                       </div>
-                    ) : trendingPlaces.length > 0 ? (
+                    ) : nearbyPlaces.length > 0 ? (
                       <div className="space-y-2.5">
-                        {trendingPlaces.map((place) => (
+                        {nearbyPlaces.map((place) => (
                           <button
                             key={place.googlePlaceId}
                             onClick={() => handlePlaceClick(place)}
