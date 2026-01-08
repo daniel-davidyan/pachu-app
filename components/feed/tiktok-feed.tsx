@@ -71,6 +71,20 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
   const { user } = useUser();
   const { showToast } = useToast();
   
+  // BULLETPROOF: Track if we've EVER had data in this component instance
+  // This ref ensures we NEVER show empty state until we've confirmed data exists or doesn't
+  const hasEverHadDataRef = useRef(reviews.length > 0);
+  const hasConfirmedEmptyRef = useRef(false);
+  
+  // Update refs when reviews change
+  if (reviews.length > 0) {
+    hasEverHadDataRef.current = true;
+  }
+  // Only confirm empty if we've loaded AND have no data AND parent says loaded
+  if (hasLoadedOnce && reviews.length === 0 && !isLoading && !isInitialLoading) {
+    hasConfirmedEmptyRef.current = true;
+  }
+  
   // Restore position from sessionStorage on mount
   const [currentIndex, setCurrentIndex] = useState(() => {
     if (typeof window !== 'undefined') {
