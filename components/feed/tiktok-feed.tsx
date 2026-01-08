@@ -61,10 +61,11 @@ interface TikTokFeedProps {
   onLoadMore: () => void;
   hasMore: boolean;
   isLoading: boolean;
+  isInitialLoading?: boolean; // True when fetching initial data
   onCommentsVisibilityChange?: (isOpen: boolean) => void;
 }
 
-export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onCommentsVisibilityChange }: TikTokFeedProps) {
+export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialLoading = false, onCommentsVisibilityChange }: TikTokFeedProps) {
   const router = useRouter();
   const { user } = useUser();
   const { showToast } = useToast();
@@ -311,7 +312,9 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
     }
   }, [user, activeReviewId, comments]);
 
-  if (reviews.length === 0 && !isLoading) {
+  // Only show empty state if we're not loading anything (initial or more)
+  // This prevents flicker when first arriving at feed
+  if (reviews.length === 0 && !isLoading && !isInitialLoading) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
         <div className="text-center text-white p-8 max-w-sm">
@@ -328,6 +331,18 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, onComments
           >
             Find a place to review
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loader if we have no reviews but are loading
+  if (reviews.length === 0 && (isLoading || isInitialLoading)) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
+          <p className="text-white/50 text-sm">Loading...</p>
         </div>
       </div>
     );

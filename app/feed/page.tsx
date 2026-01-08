@@ -110,8 +110,12 @@ export default function FeedPage() {
   const page = activeTab === 'foryou' ? forYouPage : followingPage;
   const hasMore = activeTab === 'foryou' ? forYouHasMore : followingHasMore;
   
-  // User location
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // User location - start with default (Tel Aviv) for faster initial load
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number }>({ 
+    latitude: 32.0853, 
+    longitude: 34.7818 
+  });
+  const [hasAccurateLocation, setHasAccurateLocation] = useState(false);
   
   // Handle tab change - instant switch with cached data
   const handleTabChange = useCallback((tab: 'following' | 'foryou') => {
@@ -136,22 +140,33 @@ export default function FeedPage() {
     }
   }, [forYouReviews, followingReviews]);
 
-  // Get user location on mount
+  // Get accurate user location (we already start with default for fast initial load)
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setUserLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
+        const newLat = position.coords.latitude;
+        const newLng = position.coords.longitude;
+        
+        // Only update and refetch if location is significantly different (>1km)
+        const latDiff = Math.abs(newLat - userLocation.latitude);
+        const lngDiff = Math.abs(newLng - userLocation.longitude);
+        const significantChange = latDiff > 0.01 || lngDiff > 0.01; // ~1km
+        
+        if (significantChange && !hasAccurateLocation) {
+          setUserLocation({ latitude: newLat, longitude: newLng });
+          setHasAccurateLocation(true);
+          // Will trigger refetch via the filter change effect
+        } else {
+          setHasAccurateLocation(true);
+        }
       },
       (error) => {
-        console.warn('Could not get location:', error);
-        // Default to Tel Aviv
-        setUserLocation({ latitude: 32.0853, longitude: 34.7818 });
-      }
+        console.warn('Could not get location, using default:', error);
+        setHasAccurateLocation(true); // Mark as done even on failure
+      },
+      { timeout: 5000, maximumAge: 60000 } // Faster timeout, allow cached location
     );
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch reviews for a specific tab
   const fetchReviewsForTab = useCallback(async (tab: 'following' | 'foryou', pageNum: number, reset: boolean = false, isBackgroundRefresh: boolean = false) => {
@@ -260,26 +275,15 @@ export default function FeedPage() {
       />
 
       {/* Main Feed Content - Full screen, video behind everything */}
-      <div 
-        className="w-full h-full"
-      >
-        {loading && reviews.length === 0 ? (
-          <div className="fixed inset-0 bg-black flex items-center justify-center z-10">
-            <div className="text-center">
-              {/* Simple fast loader */}
-              <div className="w-12 h-12 mx-auto mb-3 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
-              <p className="text-white/50 text-sm">Loading...</p>
-            </div>
-          </div>
-        ) : (
-          <TikTokFeed
-            reviews={reviews}
-            onLoadMore={handleLoadMore}
-            hasMore={hasMore}
-            isLoading={loadingMore}
-            onCommentsVisibilityChange={setShowComments}
-          />
-        )}
+      <div className="w-full h-full">
+        <TikTokFeed
+          reviews={reviews}
+          onLoadMore={handleLoadMore}
+          hasMore={hasMore}
+          isLoading={loadingMore}
+          isInitialLoading={loading}
+          onCommentsVisibilityChange={setShowComments}
+        />
       </div>
 
       {/* Bottom Navigation - always visible */}
