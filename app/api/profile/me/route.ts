@@ -16,9 +16,15 @@ export async function GET(request: NextRequest) {
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
+    console.log('[profile/me] Auth check:', { 
+      hasUser: !!user, 
+      userId: user?.id?.slice(0, 8), 
+      userError: userError?.message 
+    });
+    
     if (userError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized', details: userError?.message },
         { status: 401 }
       );
     }
@@ -111,34 +117,63 @@ export async function GET(request: NextRequest) {
         
         // Get user metadata for profile creation
         const email = user.email || '';
-        const username = user.user_metadata?.username || 
-                        user.user_metadata?.full_name?.toLowerCase().replace(/\s+/g, '_') ||
-                        email.split('@')[0] ||
-                        `user_${user.id.slice(0, 8)}`;
+        let baseUsername = user.user_metadata?.username || 
+                          user.user_metadata?.full_name?.toLowerCase().replace(/[^a-z0-9_]/g, '_') ||
+                          email.split('@')[0]?.replace(/[^a-z0-9_]/g, '_') ||
+                          'user';
+        
+        // Ensure username is valid (alphanumeric and underscores only, 3-30 chars)
+        baseUsername = baseUsername.slice(0, 25).replace(/^[^a-z]+/, ''); // Remove leading non-letters
+        if (baseUsername.length < 3) {
+          baseUsername = 'user';
+        }
+        
         const fullName = user.user_metadata?.full_name || 
                         user.user_metadata?.name ||
-                        username;
+                        baseUsername;
         const avatarUrl = user.user_metadata?.avatar_url ||
                          user.user_metadata?.picture ||
                          null;
         
-        // Create the profile
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            username: username,
-            full_name: fullName,
-            avatar_url: avatarUrl,
-            bio: null,
-          })
-          .select()
-          .single();
+        // Try to create profile with unique username
+        let username = baseUsername;
+        let attempts = 0;
+        let newProfile = null;
+        let createError = null;
         
-        if (createError) {
+        while (attempts < 5) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              username: username,
+              full_name: fullName,
+              avatar_url: avatarUrl,
+              bio: null,
+            })
+            .select()
+            .single();
+          
+          if (!error) {
+            newProfile = data;
+            break;
+          }
+          
+          // If username conflict, try with random suffix
+          if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+            attempts++;
+            username = `${baseUsername}_${Math.random().toString(36).slice(2, 6)}`;
+            console.log(`Username conflict, trying: ${username}`);
+          } else {
+            createError = error;
+            break;
+          }
+        }
+        
+        if (createError || !newProfile) {
           console.error('Error creating profile:', createError);
           return NextResponse.json(
-            { error: 'Failed to create profile' },
+            { error: 'Failed to create profile', details: createError?.message },
             { status: 500 }
           );
         }
@@ -147,7 +182,7 @@ export async function GET(request: NextRequest) {
       } else {
         console.error('Error fetching profile:', profileResult.error);
         return NextResponse.json(
-          { error: 'Failed to fetch profile' },
+          { error: 'Failed to fetch profile', details: profileResult.error.message },
           { status: 500 }
         );
       }
