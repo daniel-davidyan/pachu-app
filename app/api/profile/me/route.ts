@@ -153,6 +153,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Ensure profile exists at this point
+    if (!profile) {
+      return NextResponse.json(
+        { error: 'Profile not found' },
+        { status: 404 }
+      );
+    }
+
     const reviews = reviewsResult.data || [];
 
     // Get review IDs for likes/comments counts
