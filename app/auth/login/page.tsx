@@ -14,11 +14,17 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  // Pre-fill email from URL parameter if present
+  // Pre-fill email from URL parameter and show errors from callback
   useEffect(() => {
     const emailParam = searchParams.get('email');
     if (emailParam) {
       setEmail(emailParam);
+    }
+    
+    // Show error from OAuth callback if present
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
     }
   }, [searchParams]);
 
