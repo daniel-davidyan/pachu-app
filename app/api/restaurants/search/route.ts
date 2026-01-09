@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
     const lng = longitude ? parseFloat(longitude) : 34.7818;
 
     // Search Google Places API using Text Search
-    const googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${lat},${lng}&radius=50000&type=restaurant&key=${apiKey}&language=he`;
+    // Note: We don't filter by type to include cafes, bars, bakeries, etc.
+    const googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${lat},${lng}&radius=50000&key=${apiKey}&language=he`;
     
     console.log(`🔍 Google Places Search: "${query}" near (${lat}, ${lng})`);
     
