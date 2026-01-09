@@ -58,12 +58,39 @@ function MapPageContent() {
         const response = await fetch('/api/user/taste-profile');
         if (response.ok) {
           const data = await response.json();
-          // Show banner if user has profile but hasn't completed onboarding
-          if (data.hasProfile && !data.onboardingCompleted) {
+          
+          // If no profile at all, show banner
+          if (!data.hasProfile) {
             setShowOnboardingBanner(true);
-          } else if (!data.hasProfile) {
-            // First time user - show banner
-            setShowOnboardingBanner(true);
+            return;
+          }
+          
+          // If profile exists, check if user has filled in ANYTHING
+          const profile = data.profile;
+          if (profile) {
+            const hasAnyData = 
+              profile.isKosher ||
+              profile.isVegetarian ||
+              profile.isVegan ||
+              profile.glutenFree ||
+              (profile.likes && profile.likes.length > 0) ||
+              (profile.dislikes && profile.dislikes.length > 0) ||
+              (profile.freeText && profile.freeText.trim().length > 0) ||
+              (profile.dateRestaurants && profile.dateRestaurants.length > 0) ||
+              (profile.friendsRestaurants && profile.friendsRestaurants.length > 0) ||
+              (profile.familyRestaurants && profile.familyRestaurants.length > 0) ||
+              (profile.soloRestaurants && profile.soloRestaurants.length > 0) ||
+              (profile.workRestaurants && profile.workRestaurants.length > 0) ||
+              (profile.dislikedRestaurants && profile.dislikedRestaurants.length > 0) ||
+              (profile.googleFavorites && profile.googleFavorites.length > 0) ||
+              profile.birthDate ||
+              profile.gender ||
+              profile.phone;
+            
+            // Only show banner if user hasn't filled in anything
+            if (!hasAnyData) {
+              setShowOnboardingBanner(true);
+            }
           }
         }
       } catch (error) {
@@ -477,12 +504,6 @@ function MapPageContent() {
             top: 'calc(4rem + env(safe-area-inset-top))',
           }}
         >
-          <button 
-            onClick={() => setShowOnboardingBanner(false)}
-            className="absolute top-2 right-2 p-1 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <X className="w-4 h-4 text-white" />
-          </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
               <Sparkles className="w-5 h-5 text-white" />
@@ -491,12 +512,20 @@ function MapPageContent() {
               <p className="text-white font-semibold text-sm">Get Better Recommendations!</p>
               <p className="text-white/80 text-xs">Tell us your taste in 2 minutes</p>
             </div>
-            <button
-              onClick={() => router.push('/onboarding')}
-              className="px-4 py-2 bg-white text-primary rounded-full text-xs font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all flex-shrink-0"
-            >
-              Start
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => router.push('/onboarding')}
+                className="px-4 py-2 bg-white text-primary rounded-full text-xs font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+              >
+                Start
+              </button>
+              <button 
+                onClick={() => setShowOnboardingBanner(false)}
+                className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
           </div>
         </div>
       )}
