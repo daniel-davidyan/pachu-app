@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// Tel Aviv bounds - same as in populate script
-const TEL_AVIV_BOUNDS = {
-  south: 32.035,
-  north: 32.135,
-  west: 34.740,
-  east: 34.815,
-};
-
-function isInTelAviv(lat: number, lng: number): boolean {
-  return (
-    lat >= TEL_AVIV_BOUNDS.south &&
-    lat <= TEL_AVIV_BOUNDS.north &&
-    lng >= TEL_AVIV_BOUNDS.west &&
-    lng <= TEL_AVIV_BOUNDS.east
-  );
-}
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('query');
@@ -33,55 +16,61 @@ export async function GET(request: NextRequest) {
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
 
+  if (!apiKey) {
+    console.error('Google Places API key not configured');
+    return NextResponse.json(
+      { error: 'Search service not configured' },
+      { status: 500 }
+    );
+  }
+
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // LOCAL DB ONLY MODE with FUZZY SEARCH
-    const { data: localResults, error: localError } = await supabase.rpc(
-      'search_restaurants_fuzzy',
-      {
-        search_query: query,
-        max_results: 15
-      }
-    );
+    // Use user location or default to Tel Aviv
+    const lat = latitude ? parseFloat(latitude) : 32.0853;
+    const lng = longitude ? parseFloat(longitude) : 34.7818;
 
-    if (localError) {
-      console.error('Error searching local DB:', localError);
+    // Search Google Places API using Text Search
+    const googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${lat},${lng}&radius=50000&type=restaurant&key=${apiKey}&language=he`;
+    
+    console.log(`🔍 Google Places Search: "${query}" near (${lat}, ${lng})`);
+    
+    const googleResponse = await fetch(googleUrl);
+    const googleData = await googleResponse.json();
+
+    if (googleData.status !== 'OK' && googleData.status !== 'ZERO_RESULTS') {
+      console.error('Google Places API error:', googleData.status, googleData.error_message);
       return NextResponse.json({ restaurants: [] });
     }
 
-    console.log(`🔍 Fuzzy Search "${query}": Found ${localResults?.length || 0} in local DB`);
-    
-    // Transform local results to match expected format
-    const restaurants = (localResults || []).map((place: any) => {
-      // photos is JSONB, need to parse if string
-      let photos = place.photos;
-      if (typeof photos === 'string') {
-        try { photos = JSON.parse(photos); } catch { photos = []; }
-      }
-      const photoRef = photos?.[0]?.photo_reference;
+    const googleResults = googleData.results || [];
+    console.log(`📍 Google Places returned ${googleResults.length} results`);
+
+    // Transform Google Places results to match expected format
+    const restaurants = googleResults.map((place: any) => {
+      const photoRef = place.photos?.[0]?.photo_reference;
       
       return {
-        googlePlaceId: place.google_place_id,
+        googlePlaceId: place.place_id,
         name: place.name,
-        address: place.address,
-        latitude: place.latitude,
-        longitude: place.longitude,
-        photoUrl: photoRef && apiKey
+        address: place.formatted_address || place.vicinity || '',
+        latitude: place.geometry?.location?.lat,
+        longitude: place.geometry?.location?.lng,
+        photoUrl: photoRef
           ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoRef}&key=${apiKey}`
           : undefined,
-        rating: place.google_rating || 0,
+        rating: place.rating || 0,
         priceLevel: place.price_level,
-        cuisineTypes: place.categories || [],
-        source: 'cache',
+        types: place.types || [],
+        source: 'google',
         visitedByFollowing: [],
-        similarityScore: place.similarity_score, // Include fuzzy match score
       };
     });
 
     // Enrich with following data if user is logged in
-    if (user) {
+    if (user && restaurants.length > 0) {
       await enrichWithFollowingData(supabase, user.id, restaurants);
     }
 

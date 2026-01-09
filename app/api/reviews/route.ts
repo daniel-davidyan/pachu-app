@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { addTasteSignal, updateUserReviewsEmbedding } from '@/lib/taste-signals';
+import { enrichAndCacheRestaurant } from '@/lib/restaurant-enrichment';
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
             console.log('Location update skipped (PostGIS function may not exist)');
           }
         }
+
+        // Enrich restaurant in background (don't block the response)
+        enrichAndCacheRestaurant(restaurant.googlePlaceId, supabase)
+          .catch(err => console.error('[Reviews API] Background enrichment failed:', err));
       }
     } else if (restaurant.id) {
       // Fallback: use provided restaurant ID (for legacy support)

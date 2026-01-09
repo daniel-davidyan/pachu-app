@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { addTasteSignal } from '@/lib/taste-signals';
+import { enrichAndCacheRestaurant } from '@/lib/restaurant-enrichment';
 
 /**
  * GET /api/wishlist?userId=xxx&collectionId=xxx
@@ -128,6 +129,10 @@ export async function POST(request: NextRequest) {
         }
 
         finalRestaurantId = newRestaurant.id;
+
+        // Enrich restaurant in background (don't block the response)
+        enrichAndCacheRestaurant(googlePlaceId, supabase)
+          .catch(err => console.error('[Wishlist API] Background enrichment failed:', err));
       }
     }
 
