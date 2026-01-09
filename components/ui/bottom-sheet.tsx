@@ -79,6 +79,13 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return;
     
+    // Don't prevent default on input elements - this blocks keyboard on iOS PWA
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      setIsDragging(false);
+      return;
+    }
+    
     const content = contentRef.current;
     const newY = e.touches[0].clientY;
     const deltaY = newY - startY;
@@ -87,7 +94,7 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
     // 1. Dragging down (deltaY > 0)
     // 2. Content is scrolled to top (scrollTop === 0)
     if (content && content.scrollTop === 0 && deltaY > 0) {
-      // Prevent default to stop background scrolling
+      // Prevent default to stop background scrolling (but not on inputs)
       e.preventDefault();
       setCurrentY(newY);
     } else if (content && content.scrollTop > 0) {

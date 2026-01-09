@@ -4,6 +4,7 @@ import { AuthProvider } from '@/components/auth/auth-provider';
 import { ToastProvider } from '@/components/ui/toast';
 import { SWRProvider, FeedDataProvider } from '@/components/providers';
 import { PrefetchProvider } from '@/hooks/use-prefetch';
+import { IOSPWAKeyboardFix } from '@/components/ios-pwa-keyboard-fix';
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -14,8 +15,8 @@ const ICON_VERSION = 'v2';
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5, // Allow some zoom for accessibility and iOS PWA keyboard fix
+  userScalable: true, // Enable for better iOS PWA keyboard support
   viewportFit: 'cover',
   themeColor: '#C5459C',
   interactiveWidget: 'resizes-content', // Makes keyboard behavior better on iOS
@@ -81,6 +82,7 @@ export default function RootLayout({
         <link rel="apple-touch-startup-image" href={`/apple-touch-icon.png?v=${ICON_VERSION}`} />
       </head>
       <body className={inter.className}>
+        <IOSPWAKeyboardFix />
         <SWRProvider>
           <FeedDataProvider>
             <AuthProvider>

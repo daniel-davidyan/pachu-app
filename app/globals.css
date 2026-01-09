@@ -51,6 +51,20 @@ body {
     margin: 0;
   }
 
+  /* iOS PWA keyboard fix - ensure inputs can receive focus */
+  input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
+  /* Standalone PWA mode specific fixes */
+  @media all and (display-mode: standalone) {
+    input, textarea {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+  }
+
   /* Hide scrollbar but keep functionality */
   ::-webkit-scrollbar {
     width: 0px;

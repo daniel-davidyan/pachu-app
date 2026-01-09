@@ -305,10 +305,16 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
 
   // Handle drag start
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
+    // Don't prevent default - this blocks keyboard on iOS PWA
+    // Only start dragging if the target is the drag handle itself
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return; // Let inputs handle their own events
+    }
+    
     setIsDragging(true);
     dragStartHeight.current = sheetHeight;
     dragStartY.current = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    e.preventDefault();
   };
 
   // Handle drag
