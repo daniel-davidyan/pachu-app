@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
 
-    // Build query
+    // Build query - use left join for actor (actor_id might be null for old notifications)
     let query = supabase
       .from('notifications')
       .select(`
@@ -36,13 +36,7 @@ export async function GET(request: NextRequest) {
         read,
         created_at,
         actor_id,
-        reference_id,
-        actor:profiles!notifications_actor_id_fkey (
-          id,
-          username,
-          full_name,
-          avatar_url
-        )
+        reference_id
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -71,11 +65,32 @@ export async function GET(request: NextRequest) {
       console.error('Error counting unread notifications:', countError);
     }
 
+    // Get unique actor IDs to fetch their profiles
+    const actorIds = [...new Set(
+      notifications
+        ?.map(n => n.actor_id)
+        .filter((id): id is string => id !== null && id !== undefined) || []
+    )];
+
+    // Fetch actor profiles if there are any
+    let actorProfiles: Record<string, { id: string; username: string; full_name: string; avatar_url: string | null }> = {};
+    if (actorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .in('id', actorIds);
+      
+      if (profiles) {
+        actorProfiles = profiles.reduce((acc, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {} as typeof actorProfiles);
+      }
+    }
+
     // Transform notifications to a cleaner format
     const formattedNotifications = notifications?.map(notification => {
-      const actor = Array.isArray(notification.actor) 
-        ? notification.actor[0] 
-        : notification.actor;
+      const actor = notification.actor_id ? actorProfiles[notification.actor_id] : null;
 
       return {
         id: notification.id,
