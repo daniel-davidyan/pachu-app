@@ -101,16 +101,58 @@ export async function GET(request: NextRequest) {
       })(),
     ]);
 
-    // Check for profile error
+    // Check for profile error - auto-create profile if it doesn't exist
+    let profile = profileResult.data;
+    
     if (profileResult.error) {
-      console.error('Error fetching profile:', profileResult.error);
-      return NextResponse.json(
-        { error: 'Failed to fetch profile' },
-        { status: 500 }
-      );
+      // Profile doesn't exist - create it automatically
+      if (profileResult.error.code === 'PGRST116') {
+        console.log('Profile not found, creating one for user:', user.id);
+        
+        // Get user metadata for profile creation
+        const email = user.email || '';
+        const username = user.user_metadata?.username || 
+                        user.user_metadata?.full_name?.toLowerCase().replace(/\s+/g, '_') ||
+                        email.split('@')[0] ||
+                        `user_${user.id.slice(0, 8)}`;
+        const fullName = user.user_metadata?.full_name || 
+                        user.user_metadata?.name ||
+                        username;
+        const avatarUrl = user.user_metadata?.avatar_url ||
+                         user.user_metadata?.picture ||
+                         null;
+        
+        // Create the profile
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            username: username,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+            bio: null,
+          })
+          .select()
+          .single();
+        
+        if (createError) {
+          console.error('Error creating profile:', createError);
+          return NextResponse.json(
+            { error: 'Failed to create profile' },
+            { status: 500 }
+          );
+        }
+        
+        profile = newProfile;
+      } else {
+        console.error('Error fetching profile:', profileResult.error);
+        return NextResponse.json(
+          { error: 'Failed to fetch profile' },
+          { status: 500 }
+        );
+      }
     }
 
-    const profile = profileResult.data;
     const reviews = reviewsResult.data || [];
 
     // Get review IDs for likes/comments counts
