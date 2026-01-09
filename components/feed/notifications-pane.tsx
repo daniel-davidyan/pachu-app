@@ -36,61 +36,71 @@ export function NotificationsPane({ isOpen, onClose, onNotificationsRead }: Noti
   const [dragOffset, setDragOffset] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
   const startY = useRef(0);
-
-  // Fetch notifications when pane opens
-  const fetchNotifications = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/notifications?limit=50');
-      const data = await response.json();
-      
-      if (data.notifications) {
-        setNotifications(data.notifications);
-      }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Mark all as read (TikTok/Instagram style - auto when opened)
-  const markAllAsRead = useCallback(async () => {
-    if (hasMarkedAsRead) return;
-    
-    try {
-      const response = await fetch('/api/notifications/read', {
-        method: 'PATCH',
-      });
-      
-      if (response.ok) {
-        setHasMarkedAsRead(true);
-        // Update local state to reflect read status
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-        // Notify parent to update badge count
-        onNotificationsRead?.();
-      }
-    } catch (error) {
-      console.error('Error marking notifications as read:', error);
-    }
-  }, [hasMarkedAsRead, onNotificationsRead]);
-
-  // Fetch and mark as read when pane opens
+  
+  // Use refs to prevent re-fetching and double marking
+  const hasFetchedRef = useRef(false);
+  const hasMarkedAsReadRef = useRef(false);
+  const onNotificationsReadRef = useRef(onNotificationsRead);
+  
+  // Keep callback ref updated
   useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-      // Small delay before marking as read (feels more natural)
-      const timer = setTimeout(() => {
-        markAllAsRead();
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      // Reset state when closed
-      setHasMarkedAsRead(false);
+    onNotificationsReadRef.current = onNotificationsRead;
+  }, [onNotificationsRead]);
+
+  // Fetch and mark as read when pane opens - single effect, no dependencies that cause re-runs
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset refs when closed
+      hasFetchedRef.current = false;
+      hasMarkedAsReadRef.current = false;
+      setLoading(true);
+      return;
     }
-  }, [isOpen, fetchNotifications, markAllAsRead]);
+    
+    // Already fetched for this open session
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
+    const fetchAndMarkAsRead = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/notifications?limit=50');
+        const data = await response.json();
+        
+        if (data.notifications) {
+          setNotifications(data.notifications);
+        }
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      } finally {
+        setLoading(false);
+      }
+      
+      // Mark as read after a small delay (feels more natural like TikTok/Instagram)
+      setTimeout(async () => {
+        if (hasMarkedAsReadRef.current) return;
+        hasMarkedAsReadRef.current = true;
+        
+        try {
+          const response = await fetch('/api/notifications/read', {
+            method: 'PATCH',
+          });
+          
+          if (response.ok) {
+            // Update local state to reflect read status
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            // Notify parent to update badge count
+            onNotificationsReadRef.current?.();
+          }
+        } catch (error) {
+          console.error('Error marking notifications as read:', error);
+        }
+      }, 500);
+    };
+
+    fetchAndMarkAsRead();
+  }, [isOpen]);
 
   // Handle notification click - navigate to source
   const handleNotificationClick = useCallback((notification: Notification) => {
