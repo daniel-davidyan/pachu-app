@@ -21,12 +21,11 @@ export async function PATCH() {
     }
 
     // Mark all unread notifications as read
-    const { error, count } = await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ read: true })
       .eq('user_id', user.id)
-      .eq('read', false)
-      .select('id', { count: 'exact' });
+      .eq('read', false);
 
     if (error) {
       console.error('Error marking notifications as read:', error);
@@ -35,7 +34,6 @@ export async function PATCH() {
 
     return NextResponse.json({
       success: true,
-      markedAsRead: count || 0,
     });
   } catch (error) {
     console.error('Error in mark notifications read API:', error);
