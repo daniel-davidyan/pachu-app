@@ -108,18 +108,19 @@ export default function ProfilePage() {
   // Use prefetched data on initial load for instant display
   useEffect(() => {
     if (profileData && !profile) {
-      // Use prefetched data immediately
+      // Use prefetched data immediately - but only if profile exists
       if (profileData.profile) {
         setProfile(profileData.profile);
+        if (profileData.stats) {
+          setStats(profileData.stats);
+        }
+        if (profileData.reviews && activeTab === 'published') {
+          setReviews(profileData.reviews);
+        }
+        setLoading(false);
+        setLoadingTab(false);
       }
-      if (profileData.stats) {
-        setStats(profileData.stats);
-      }
-      if (profileData.reviews && activeTab === 'published') {
-        setReviews(profileData.reviews);
-      }
-      setLoading(false);
-      setLoadingTab(false);
+      // If profileData exists but profile is null, we need to fetch fresh
     }
   }, [profileData, profile, activeTab]);
 
@@ -132,7 +133,9 @@ export default function ProfilePage() {
       const data = await response.json();
       
       if (data.error) {
-        console.error('API error:', data.error);
+        console.error('API error:', data.error, data.details);
+        // Still try to set loading to false but profile stays null
+        setLoading(false);
         return;
       }
       
@@ -146,9 +149,10 @@ export default function ProfilePage() {
       if (data.reviews) {
         setReviews(data.reviews);
       }
+      setLoading(false);
+      setLoadingTab(false);
     } catch (error) {
       console.error('Error fetching profile data:', error);
-    } finally {
       setLoading(false);
       setLoadingTab(false);
     }
@@ -156,7 +160,9 @@ export default function ProfilePage() {
 
   // Initial load - use prefetched data or fetch if not available
   useEffect(() => {
-    if (user && !profileData && !profile) {
+    // Fetch if: user exists AND (no prefetch data OR prefetch had no profile) AND we don't have profile yet
+    const needsFetch = user && !profile && (!profileData || !profileData.profile);
+    if (needsFetch) {
       setLoading(true);
       fetchProfileDataFromAPI('published');
     }
