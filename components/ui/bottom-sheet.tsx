@@ -71,6 +71,12 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   }, [isOpen, skipBodyLock]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Don't intercept touch events on input elements - this blocks keyboard on iOS PWA
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('input, textarea')) {
+      return;
+    }
+    
     setIsDragging(true);
     setStartY(e.touches[0].clientY);
     setCurrentY(e.touches[0].clientY);

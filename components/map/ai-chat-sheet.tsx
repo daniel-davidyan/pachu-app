@@ -633,10 +633,15 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
               onFocus={handleActivate}
               placeholder="What are you craving? 🍽️"
               rows={1}
+              inputMode="text"
+              enterKeyHint="send"
+              autoComplete="off"
+              autoCorrect="on"
               className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 font-medium resize-none overflow-hidden py-0.5"
               style={{
                 maxHeight: '100px',
-                minHeight: '20px'
+                minHeight: '20px',
+                fontSize: '16px', // Prevents iOS zoom on focus
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
@@ -971,9 +976,14 @@ export function AIChatSheet({ onFilterChange, onRestaurantsFound, onRestaurantCl
                   }}
                   placeholder="מה בא לך? 🍽️"
                   rows={1}
+                  inputMode="text"
+                  enterKeyHint="send"
+                  autoComplete="off"
+                  autoCorrect="on"
                   className="flex-1 bg-transparent outline-none text-sm text-gray-800 placeholder-gray-500 resize-none overflow-hidden py-0.5 max-h-32"
                   style={{
-                    minHeight: '20px'
+                    minHeight: '20px',
+                    fontSize: '16px', // Prevents iOS zoom on focus
                   }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;

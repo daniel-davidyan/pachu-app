@@ -172,6 +172,12 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
 
   // Handle vertical swipe - TikTok style smooth scrolling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Don't intercept touch events on input elements - this blocks keyboard on iOS PWA
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('input, textarea')) {
+      return;
+    }
+    
     touchStartY.current = e.touches[0].clientY;
     touchStartTime.current = Date.now();
     setIsDragging(true);
@@ -179,6 +185,12 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (touchStartY.current === null) return;
+    
+    // Don't intercept touch events on input elements
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('input, textarea')) {
+      return;
+    }
     
     const currentY = e.touches[0].clientY;
     const deltaY = currentY - touchStartY.current;
@@ -464,6 +476,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
           setComments([]);
         }}
         title="Comments"
+        skipBodyLock={true}
       >
         <div className="flex flex-col h-full">
           {/* Comments List */}
@@ -543,6 +556,10 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
               <div className="flex items-center gap-3">
                 <input
                   type="text"
+                  inputMode="text"
+                  enterKeyHint="send"
+                  autoComplete="off"
+                  autoCorrect="on"
                   placeholder="Add a comment..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
@@ -553,6 +570,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
                     }
                   }}
                   className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
+                  style={{ fontSize: '16px' }} // Prevents iOS zoom on focus
                 />
                 <button
                   onClick={handlePostComment}

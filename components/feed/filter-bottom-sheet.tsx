@@ -148,6 +148,12 @@ export function FilterBottomSheet({
   const currentYRef = useRef(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Don't intercept touch events on input elements - this blocks keyboard on iOS PWA
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('input, textarea')) {
+      return;
+    }
+    
     isDraggingRef.current = true;
     startYRef.current = e.touches[0].clientY;
     currentYRef.current = e.touches[0].clientY;
@@ -163,6 +169,15 @@ export function FilterBottomSheet({
 
     const handleTouchMoveNative = (e: TouchEvent) => {
       if (!isDraggingRef.current) return;
+      
+      // Don't intercept touch events on input elements - this blocks keyboard on iOS PWA
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('input, textarea')) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        return;
+      }
+      
       const content = contentRef.current;
       const newY = e.touches[0].clientY;
       const deltaY = newY - startYRef.current;

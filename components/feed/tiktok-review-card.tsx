@@ -122,6 +122,12 @@ export function TikTokReviewCard({
   const EDGE_ZONE_WIDTH = 50;
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Don't intercept touch events on input elements - this blocks keyboard on iOS PWA
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('input, textarea')) {
+      return;
+    }
+    
     const touchX = e.touches[0].clientX;
     const screenWidth = window.innerWidth;
     
