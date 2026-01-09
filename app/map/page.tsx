@@ -444,6 +444,22 @@ function MapPageContent() {
         .animate-fade-in {
           animation: fade-in 0.3s ease-in-out;
         }
+        
+        /* Modern dots loader */
+        @keyframes dotPulse {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 0.5;
+          }
+          50% {
+            transform: scale(1.3);
+            opacity: 1;
+          }
+        }
+        
+        .loader-dot {
+          animation: dotPulse 1s ease-in-out infinite;
+        }
       `}</style>
 
       {/* Category Carousel - Top */}
@@ -530,23 +546,19 @@ function MapPageContent() {
         </div>
       )}
 
-      {/* Loading Indicator */}
+      {/* Loading Indicator - Modern centered loader */}
       {loading && (
-        <div 
-          className="absolute left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-2 z-30 animate-fade-in"
-          style={{
-            top: showOnboardingBanner ? 'calc(9rem + env(safe-area-inset-top))' : 'calc(4rem + env(safe-area-inset-top))',
-            boxShadow: '0 4px 16px rgba(197, 69, 156, 0.2), 0 0 0 2px white',
-          }}
-        >
-          <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-r from-primary via-pink-500 to-orange-500 animate-spin" 
-            style={{
-              background: 'conic-gradient(from 0deg, #C5459C, #EC4899, #F97316, #C5459C)',
-            }}
-          />
-          <span className="text-xs font-semibold text-black">
-            Finding places...
-          </span>
+        <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl px-10 py-8 flex flex-col items-center gap-5 shadow-2xl animate-fade-in">
+            {/* 4 Dots Loader */}
+            <div className="flex items-center gap-3">
+              <div className="w-3.5 h-3.5 rounded-full bg-primary loader-dot" style={{ animationDelay: '0ms' }} />
+              <div className="w-3.5 h-3.5 rounded-full bg-pink-500 loader-dot" style={{ animationDelay: '150ms' }} />
+              <div className="w-3.5 h-3.5 rounded-full bg-orange-400 loader-dot" style={{ animationDelay: '300ms' }} />
+              <div className="w-3.5 h-3.5 rounded-full bg-primary loader-dot" style={{ animationDelay: '450ms' }} />
+            </div>
+            <p className="text-sm font-medium text-gray-600">Discovering places nearby</p>
+          </div>
         </div>
       )}
 

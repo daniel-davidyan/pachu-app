@@ -95,6 +95,7 @@ export default function FeedPage() {
   const [showComments, setShowComments] = useState(false);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [distanceKm, setDistanceKm] = useState(5);
+  const [notificationCount, setNotificationCount] = useState(0);
   
   // Determine initial data: prefer prefetched > cached > empty
   const getInitialData = () => {
@@ -317,6 +318,27 @@ export default function FeedPage() {
     }
   }, [loadingMore, hasMore, page, activeTab, fetchReviewsForTab]);
 
+  // Fetch notification count
+  const fetchNotificationCount = useCallback(async () => {
+    try {
+      const response = await fetch('/api/notifications?limit=1&unreadOnly=true');
+      const data = await response.json();
+      setNotificationCount(data.unreadCount || 0);
+    } catch (error) {
+      console.error('Error fetching notification count:', error);
+    }
+  }, []);
+
+  // Fetch notification count on mount
+  useEffect(() => {
+    fetchNotificationCount();
+  }, [fetchNotificationCount]);
+
+  // Handle notifications marked as read
+  const handleNotificationsRead = useCallback(() => {
+    setNotificationCount(0);
+  }, []);
+
   // Check if filters are active
   const hasActiveFilters = selectedCity !== null || distanceKm !== 5;
 
@@ -329,7 +351,7 @@ export default function FeedPage() {
         onOpenFilters={() => setShowFilters(true)}
         onOpenNotifications={() => setShowNotifications(true)}
         hasActiveFilters={hasActiveFilters}
-        notificationCount={6}
+        notificationCount={notificationCount}
       />
 
       {/* Main Feed Content - Full screen, video behind everything */}
@@ -362,6 +384,7 @@ export default function FeedPage() {
       <NotificationsPane
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
+        onNotificationsRead={handleNotificationsRead}
       />
     </div>
   );

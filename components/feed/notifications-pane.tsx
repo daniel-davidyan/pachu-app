@@ -1,75 +1,114 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { X, Heart, MessageCircle, UserPlus } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { X, Heart, MessageCircle, UserPlus, Loader2, Bell } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+interface NotificationActor {
+  id: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+}
 
 interface Notification {
   id: string;
-  type: 'like' | 'comment' | 'follow';
-  user: {
-    name: string;
-    avatarUrl?: string;
-  };
-  content?: string;
-  restaurantName?: string;
-  time: string;
+  type: 'like' | 'comment' | 'follow' | 'mention';
+  title: string;
+  message: string;
+  link?: string;
+  read: boolean;
+  createdAt: string;
+  referenceId?: string;
+  actor: NotificationActor | null;
 }
 
 interface NotificationsPaneProps {
   isOpen: boolean;
   onClose: () => void;
+  onNotificationsRead?: () => void;
 }
 
-// Static mock notifications for design preview
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'like',
-    user: { name: 'Sarah Cohen' },
-    restaurantName: 'Miznon',
-    time: '2m ago',
-  },
-  {
-    id: '2',
-    type: 'comment',
-    user: { name: 'Dan Levi' },
-    content: 'Looks amazing! Need to try this place 🔥',
-    restaurantName: 'Opa',
-    time: '15m ago',
-  },
-  {
-    id: '3',
-    type: 'follow',
-    user: { name: 'Maya Ben-Ari' },
-    time: '1h ago',
-  },
-  {
-    id: '4',
-    type: 'like',
-    user: { name: 'Yoni Shapira' },
-    restaurantName: 'Port Said',
-    time: '2h ago',
-  },
-  {
-    id: '5',
-    type: 'comment',
-    user: { name: 'Noa Goldberg' },
-    content: 'This is my favorite spot too!',
-    restaurantName: 'Santa Katarina',
-    time: '3h ago',
-  },
-  {
-    id: '6',
-    type: 'follow',
-    user: { name: 'Amit Katz' },
-    time: '5h ago',
-  },
-];
-
-export function NotificationsPane({ isOpen, onClose }: NotificationsPaneProps) {
+export function NotificationsPane({ isOpen, onClose, onNotificationsRead }: NotificationsPaneProps) {
+  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
   const startY = useRef(0);
+
+  // Fetch notifications when pane opens
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/notifications?limit=50');
+      const data = await response.json();
+      
+      if (data.notifications) {
+        setNotifications(data.notifications);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Mark all as read (TikTok/Instagram style - auto when opened)
+  const markAllAsRead = useCallback(async () => {
+    if (hasMarkedAsRead) return;
+    
+    try {
+      const response = await fetch('/api/notifications/read', {
+        method: 'PATCH',
+      });
+      
+      if (response.ok) {
+        setHasMarkedAsRead(true);
+        // Update local state to reflect read status
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        // Notify parent to update badge count
+        onNotificationsRead?.();
+      }
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  }, [hasMarkedAsRead, onNotificationsRead]);
+
+  // Fetch and mark as read when pane opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications();
+      // Small delay before marking as read (feels more natural)
+      const timer = setTimeout(() => {
+        markAllAsRead();
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // Reset state when closed
+      setHasMarkedAsRead(false);
+    }
+  }, [isOpen, fetchNotifications, markAllAsRead]);
+
+  // Handle notification click - navigate to source
+  const handleNotificationClick = useCallback((notification: Notification) => {
+    // Close the pane first
+    onClose();
+    
+    // Navigate based on notification type
+    if (notification.type === 'follow' && notification.actor) {
+      // For follows, go to the follower's profile
+      router.push(`/profile/${notification.actor.id}`);
+    } else if (notification.link) {
+      // For likes/comments, use the link (points to review)
+      router.push(notification.link);
+    } else if (notification.referenceId) {
+      // Fallback to reference ID
+      router.push(`/review/${notification.referenceId}`);
+    }
+  }, [onClose, router]);
 
   // Drag handlers for closing
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -102,36 +141,57 @@ export function NotificationsPane({ isOpen, onClose }: NotificationsPaneProps) {
       case 'like':
         return <Heart className="w-4 h-4 text-red-500" fill="currentColor" />;
       case 'comment':
+      case 'mention':
         return <MessageCircle className="w-4 h-4 text-blue-500" fill="currentColor" />;
       case 'follow':
         return <UserPlus className="w-4 h-4 text-primary" />;
+      default:
+        return <Bell className="w-4 h-4 text-white/70" />;
     }
   };
 
   const getNotificationText = (notification: Notification) => {
+    const actorName = notification.actor?.fullName || notification.actor?.username || 'Someone';
+    
     switch (notification.type) {
       case 'like':
         return (
           <>
-            <span className="font-semibold text-white">{notification.user.name}</span>
-            <span className="text-white/70"> liked your review of </span>
-            <span className="font-semibold text-white">{notification.restaurantName}</span>
+            <span className="font-semibold text-white">{actorName}</span>
+            <span className="text-white/70"> liked your review</span>
           </>
         );
       case 'comment':
         return (
           <>
-            <span className="font-semibold text-white">{notification.user.name}</span>
+            <span className="font-semibold text-white">{actorName}</span>
             <span className="text-white/70"> commented on your review</span>
+          </>
+        );
+      case 'mention':
+        return (
+          <>
+            <span className="font-semibold text-white">{actorName}</span>
+            <span className="text-white/70"> mentioned you in a comment</span>
           </>
         );
       case 'follow':
         return (
           <>
-            <span className="font-semibold text-white">{notification.user.name}</span>
+            <span className="font-semibold text-white">{actorName}</span>
             <span className="text-white/70"> started following you</span>
           </>
         );
+      default:
+        return <span className="text-white/70">{notification.message}</span>;
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: false });
+    } catch {
+      return '';
     }
   };
 
@@ -170,38 +230,65 @@ export function NotificationsPane({ isOpen, onClose }: NotificationsPaneProps) {
 
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto">
-          {mockNotifications.map((notification) => (
-            <div
-              key={notification.id}
-              className="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5"
-            >
-              {/* User Avatar */}
-              <div className="relative flex-shrink-0">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/50 to-primary flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">
-                    {notification.user.name.charAt(0)}
-                  </span>
-                </div>
-                {/* Notification Type Icon */}
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-black flex items-center justify-center border border-white/20">
-                  {getNotificationIcon(notification.type)}
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm leading-tight">
-                  {getNotificationText(notification)}
-                </p>
-                {notification.type === 'comment' && notification.content && (
-                  <p className="text-xs text-white/50 mt-1 truncate">
-                    &ldquo;{notification.content}&rdquo;
-                  </p>
-                )}
-                <p className="text-[10px] text-white/40 mt-1">{notification.time}</p>
-              </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-white/50 animate-spin" />
             </div>
-          ))}
+          ) : notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-8">
+              <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
+                <Bell className="w-8 h-8 text-white/30" />
+              </div>
+              <p className="text-white/70 font-medium text-center">No notifications yet</p>
+              <p className="text-white/40 text-sm text-center mt-1">
+                When someone likes, comments, or follows you, you'll see it here
+              </p>
+            </div>
+          ) : (
+            notifications.map((notification) => (
+              <div
+                key={notification.id}
+                onClick={() => handleNotificationClick(notification)}
+                className={`flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 ${
+                  !notification.read ? 'bg-white/5' : ''
+                }`}
+              >
+                {/* User Avatar */}
+                <div className="relative flex-shrink-0">
+                  {notification.actor?.avatarUrl ? (
+                    <img
+                      src={notification.actor.avatarUrl}
+                      alt={notification.actor.fullName || ''}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/50 to-primary flex items-center justify-center">
+                      <span className="text-white text-sm font-bold">
+                        {(notification.actor?.fullName || notification.actor?.username || '?').charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  {/* Notification Type Icon */}
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-black flex items-center justify-center border border-white/20">
+                    {getNotificationIcon(notification.type)}
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm leading-tight">
+                    {getNotificationText(notification)}
+                  </p>
+                  <p className="text-[10px] text-white/40 mt-1">{formatTime(notification.createdAt)}</p>
+                </div>
+
+                {/* Unread indicator */}
+                {!notification.read && (
+                  <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
+                )}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Bottom drag indicator */}
