@@ -445,20 +445,20 @@ function MapPageContent() {
           animation: fade-in 0.3s ease-in-out;
         }
         
-        /* Modern dots loader */
+        /* Minimal dots loader */
         @keyframes dotPulse {
           0%, 100% {
-            transform: scale(1);
-            opacity: 0.5;
+            transform: scale(0.8);
+            opacity: 0.4;
           }
           50% {
-            transform: scale(1.3);
+            transform: scale(1);
             opacity: 1;
           }
         }
         
         .loader-dot {
-          animation: dotPulse 1s ease-in-out infinite;
+          animation: dotPulse 0.8s ease-in-out infinite;
         }
       `}</style>
 
@@ -546,18 +546,13 @@ function MapPageContent() {
         </div>
       )}
 
-      {/* Loading Indicator - Modern centered loader */}
+      {/* Loading Indicator - Minimal modern loader */}
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-          <div className="bg-white/95 backdrop-blur-md rounded-3xl px-10 py-8 flex flex-col items-center gap-5 shadow-2xl animate-fade-in">
-            {/* 4 Dots Loader */}
-            <div className="flex items-center gap-3">
-              <div className="w-3.5 h-3.5 rounded-full bg-primary loader-dot" style={{ animationDelay: '0ms' }} />
-              <div className="w-3.5 h-3.5 rounded-full bg-pink-500 loader-dot" style={{ animationDelay: '150ms' }} />
-              <div className="w-3.5 h-3.5 rounded-full bg-orange-400 loader-dot" style={{ animationDelay: '300ms' }} />
-              <div className="w-3.5 h-3.5 rounded-full bg-primary loader-dot" style={{ animationDelay: '450ms' }} />
-            </div>
-            <p className="text-sm font-medium text-gray-600">Discovering places nearby</p>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-primary/80 loader-dot" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full bg-primary/80 loader-dot" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 rounded-full bg-primary/80 loader-dot" style={{ animationDelay: '300ms' }} />
           </div>
         </div>
       )}
