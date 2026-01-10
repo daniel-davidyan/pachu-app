@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
     
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     
     // Build location map from restaurant data (now includes latitude/longitude from DB)
     // with fallbacks for restaurants that don't have coordinates yet
-    let locationMap = new Map<string, { latitude: number; longitude: number }>();
+    const locationMap = new Map<string, { latitude: number; longitude: number }>();
     const restaurantsWithoutCoords: string[] = [];
     
     // First pass: get coordinates directly from restaurant data
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
             }
           });
         }
-      } catch (e) {
+      } catch {
         console.log('RPC fallback not available, trying restaurant_cache');
       }
       
