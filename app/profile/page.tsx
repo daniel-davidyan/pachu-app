@@ -5,7 +5,7 @@ import { useUser } from '@/hooks/use-user';
 import { usePrefetch } from '@/hooks/use-prefetch';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus } from 'lucide-react';
+import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus, Star } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { PostCard, PostCardData } from '@/components/post/post-card';
@@ -15,6 +15,55 @@ import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
 import { CollectionModal } from '@/components/collections/collection-modal';
+
+// Helper function for grid thumbnail placeholder
+const getGridPlaceholderStyle = (restaurantName?: string): { emoji: string; gradient: string } => {
+  const name = (restaurantName || '').toLowerCase();
+  
+  if (name.includes('coffee') || name.includes('cafe') || name.includes('קפה')) {
+    return { emoji: '☕', gradient: 'from-amber-100 to-orange-100' };
+  }
+  if (name.includes('pizza') || name.includes('פיצה')) {
+    return { emoji: '🍕', gradient: 'from-red-100 to-orange-100' };
+  }
+  if (name.includes('sushi') || name.includes('סושי') || name.includes('japanese')) {
+    return { emoji: '🍱', gradient: 'from-rose-100 to-pink-100' };
+  }
+  if (name.includes('burger') || name.includes('המבורגר')) {
+    return { emoji: '🍔', gradient: 'from-amber-100 to-yellow-100' };
+  }
+  if (name.includes('thai') || name.includes('chinese') || name.includes('asian')) {
+    return { emoji: '🥡', gradient: 'from-red-100 to-amber-100' };
+  }
+  if (name.includes('mexican') || name.includes('taco')) {
+    return { emoji: '🌮', gradient: 'from-yellow-100 to-orange-100' };
+  }
+  if (name.includes('italian') || name.includes('pasta') || name.includes('פסטה')) {
+    return { emoji: '🍝', gradient: 'from-green-100 to-emerald-100' };
+  }
+  if (name.includes('bakery') || name.includes('מאפייה') || name.includes('cake')) {
+    return { emoji: '🥐', gradient: 'from-amber-100 to-yellow-100' };
+  }
+  if (name.includes('ice cream') || name.includes('גלידה') || name.includes('gelato')) {
+    return { emoji: '🍨', gradient: 'from-pink-100 to-purple-100' };
+  }
+  if (name.includes('bar') || name.includes('pub') || name.includes('wine')) {
+    return { emoji: '🍷', gradient: 'from-purple-100 to-violet-100' };
+  }
+  if (name.includes('hummus') || name.includes('falafel') || name.includes('shawarma')) {
+    return { emoji: '🧆', gradient: 'from-amber-100 to-lime-100' };
+  }
+  if (name.includes('steak') || name.includes('meat') || name.includes('grill')) {
+    return { emoji: '🥩', gradient: 'from-red-100 to-rose-100' };
+  }
+  if (name.includes('breakfast') || name.includes('brunch')) {
+    return { emoji: '🍳', gradient: 'from-yellow-100 to-amber-100' };
+  }
+  if (name.includes('salad') || name.includes('healthy') || name.includes('vegan')) {
+    return { emoji: '🥗', gradient: 'from-green-100 to-lime-100' };
+  }
+  return { emoji: '🍽️', gradient: 'from-slate-100 to-gray-100' };
+};
 
 interface Profile {
   id: string;
@@ -596,11 +645,11 @@ export default function ProfilePage() {
             reviews.length > 0 ? (
               <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
                 {reviews.map((review) => {
-                  // Check for video first, then photo, then restaurant image
+                  // Only show user-uploaded content (photos or video thumbnails), not Google restaurant images
                   const hasVideo = (review.review_videos?.length || 0) > 0;
                   const videoThumbnail = review.review_videos?.[0]?.thumbnail_url;
                   const photoUrl = review.review_photos?.[0]?.photo_url;
-                  const thumbnailUrl = videoThumbnail || photoUrl || review.restaurants?.image_url;
+                  const thumbnailUrl = videoThumbnail || photoUrl; // Removed restaurant fallback
                   const hasMultipleMedia = ((review.review_photos?.length || 0) + (review.review_videos?.length || 0)) > 1;
                   
                   return (
@@ -616,9 +665,25 @@ export default function ProfilePage() {
                           className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                          <span className="text-2xl">🍽️</span>
-                        </div>
+                        (() => {
+                          const { emoji, gradient } = getGridPlaceholderStyle(review.restaurants?.name);
+                          return (
+                            <div className={`w-full h-full bg-gradient-to-br ${gradient} flex flex-col items-center justify-center relative overflow-hidden`}>
+                              {/* Subtle decorative elements */}
+                              <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/30 blur-xl" />
+                              <div className="absolute -bottom-4 -left-4 w-12 h-12 rounded-full bg-white/20 blur-lg" />
+                              
+                              {/* Icon */}
+                              <span className="text-3xl mb-1 drop-shadow-sm relative z-10">{emoji}</span>
+                              
+                              {/* Rating badge */}
+                              <div className="flex items-center gap-0.5 bg-white/70 backdrop-blur-sm px-1.5 py-0.5 rounded-full relative z-10">
+                                <Star className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+                                <span className="text-[10px] font-semibold text-gray-700">{review.rating.toFixed(1)}</span>
+                              </div>
+                            </div>
+                          );
+                        })()
                       )}
                       
                       {/* Video Indicator */}

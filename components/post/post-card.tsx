@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical, Camera, Bookmark } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical, Bookmark, Star } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -12,6 +12,74 @@ import { formatAddress } from '@/lib/address-utils';
 import { CollectionPicker } from '@/components/collections/collection-picker';
 import { CollectionModal } from '@/components/collections/collection-modal';
 import { VideoPlayer } from '@/components/feed/video-player';
+
+// Helper function to get restaurant icon based on name/type
+const getRestaurantIconAndGradient = (restaurantName?: string): { emoji: string; gradient: string; accentColor: string } => {
+  const name = (restaurantName || '').toLowerCase();
+  
+  // Coffee & Café
+  if (name.includes('coffee') || name.includes('cafe') || name.includes('קפה') || name.includes('espresso')) {
+    return { emoji: '☕', gradient: 'from-amber-100 via-orange-50 to-amber-50', accentColor: 'text-amber-600' };
+  }
+  // Pizza
+  if (name.includes('pizza') || name.includes('פיצה')) {
+    return { emoji: '🍕', gradient: 'from-red-100 via-orange-50 to-yellow-50', accentColor: 'text-red-500' };
+  }
+  // Sushi & Japanese
+  if (name.includes('sushi') || name.includes('סושי') || name.includes('ramen') || name.includes('japanese') || name.includes('יפני')) {
+    return { emoji: '🍱', gradient: 'from-rose-100 via-pink-50 to-orange-50', accentColor: 'text-rose-500' };
+  }
+  // Burger
+  if (name.includes('burger') || name.includes('המבורגר')) {
+    return { emoji: '🍔', gradient: 'from-amber-100 via-yellow-50 to-orange-50', accentColor: 'text-amber-600' };
+  }
+  // Asian
+  if (name.includes('thai') || name.includes('תאילנדי') || name.includes('chinese') || name.includes('סיני') || name.includes('asian') || name.includes('אסייתי')) {
+    return { emoji: '🥡', gradient: 'from-red-100 via-orange-50 to-amber-50', accentColor: 'text-red-500' };
+  }
+  // Mexican
+  if (name.includes('mexican') || name.includes('מקסיקני') || name.includes('taco') || name.includes('burrito')) {
+    return { emoji: '🌮', gradient: 'from-yellow-100 via-orange-50 to-red-50', accentColor: 'text-orange-500' };
+  }
+  // Italian
+  if (name.includes('italian') || name.includes('איטלקי') || name.includes('pasta') || name.includes('פסטה')) {
+    return { emoji: '🍝', gradient: 'from-green-100 via-emerald-50 to-teal-50', accentColor: 'text-green-600' };
+  }
+  // Bakery & Desserts
+  if (name.includes('bakery') || name.includes('מאפייה') || name.includes('dessert') || name.includes('cake') || name.includes('עוגה') || name.includes('croissant')) {
+    return { emoji: '🥐', gradient: 'from-amber-100 via-yellow-50 to-orange-50', accentColor: 'text-amber-500' };
+  }
+  // Ice Cream
+  if (name.includes('ice cream') || name.includes('גלידה') || name.includes('gelato')) {
+    return { emoji: '🍨', gradient: 'from-pink-100 via-purple-50 to-blue-50', accentColor: 'text-pink-500' };
+  }
+  // Bar & Drinks
+  if (name.includes('bar') || name.includes('pub') || name.includes('beer') || name.includes('wine') || name.includes('יין')) {
+    return { emoji: '🍷', gradient: 'from-purple-100 via-violet-50 to-indigo-50', accentColor: 'text-purple-600' };
+  }
+  // Seafood
+  if (name.includes('fish') || name.includes('דג') || name.includes('seafood') || name.includes('פירות ים')) {
+    return { emoji: '🦐', gradient: 'from-cyan-100 via-blue-50 to-teal-50', accentColor: 'text-cyan-600' };
+  }
+  // Mediterranean & Middle Eastern
+  if (name.includes('hummus') || name.includes('חומוס') || name.includes('falafel') || name.includes('פלאפל') || name.includes('shawarma') || name.includes('שווארמה') || name.includes('mediterranean')) {
+    return { emoji: '🧆', gradient: 'from-amber-100 via-yellow-50 to-lime-50', accentColor: 'text-amber-600' };
+  }
+  // Steakhouse & Meat
+  if (name.includes('steak') || name.includes('סטייק') || name.includes('meat') || name.includes('בשר') || name.includes('grill') || name.includes('גריל')) {
+    return { emoji: '🥩', gradient: 'from-red-100 via-rose-50 to-amber-50', accentColor: 'text-red-600' };
+  }
+  // Breakfast
+  if (name.includes('breakfast') || name.includes('ארוחת בוקר') || name.includes('brunch')) {
+    return { emoji: '🍳', gradient: 'from-yellow-100 via-amber-50 to-orange-50', accentColor: 'text-yellow-600' };
+  }
+  // Salad & Healthy
+  if (name.includes('salad') || name.includes('סלט') || name.includes('healthy') || name.includes('vegan') || name.includes('טבעוני')) {
+    return { emoji: '🥗', gradient: 'from-green-100 via-emerald-50 to-lime-50', accentColor: 'text-green-500' };
+  }
+  // Default restaurant
+  return { emoji: '🍽️', gradient: 'from-slate-100 via-gray-50 to-zinc-50', accentColor: 'text-slate-600' };
+};
 
 interface Comment {
   id: string;
@@ -873,28 +941,41 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
             })()}
           </div>
         ) : (
-          /* Placeholder when no photos - Different for Google reviews vs user posts */
-          isGoogleReview ? (
-            /* Restaurant gradient placeholder for Google reviews */
-            <div className="relative bg-gradient-to-br from-primary/20 to-primary/10">
-              <div className="w-full h-48 flex items-center justify-center">
-                <span className="text-7xl">🍽️</span>
-              </div>
-            </div>
-          ) : (
-            /* Upload placeholder for user posts without photos (profile/my experiences) */
-            <div className="relative bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 border-2 border-dashed border-gray-300">
-              <div className="w-full h-48 flex flex-col items-center justify-center gap-3 py-8">
-                <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center">
-                  <Camera className="w-8 h-8 text-gray-400" />
+          /* Beautiful modern placeholder when no photos */
+          (() => {
+            const { emoji, gradient, accentColor } = getRestaurantIconAndGradient(post.restaurant?.name);
+            return (
+              <div className={`relative bg-gradient-to-br ${gradient} overflow-hidden`}>
+                {/* Decorative background elements */}
+                <div className="absolute inset-0 opacity-30">
+                  <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/50 blur-2xl" />
+                  <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-white/40 blur-xl" />
                 </div>
-                <div className="text-center px-4">
-                  <p className="text-sm font-semibold text-gray-600">No photos yet</p>
-                  <p className="text-xs text-gray-400 mt-1">Add photos to share your experience</p>
+                
+                {/* Main content */}
+                <div className="relative w-full h-48 flex flex-col items-center justify-center py-6">
+                  {/* Icon with subtle shadow */}
+                  <div className="relative mb-3">
+                    <div className="absolute inset-0 blur-xl bg-black/5 scale-150" />
+                    <span className="relative text-6xl drop-shadow-sm">{emoji}</span>
+                  </div>
+                  
+                  {/* Rating badge */}
+                  <div className="flex items-center gap-1.5 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
+                    <Star className={`w-4 h-4 ${accentColor} fill-current`} />
+                    <span className={`text-sm font-semibold ${accentColor}`}>{post.rating.toFixed(1)}</span>
+                  </div>
+                  
+                  {/* Restaurant name hint */}
+                  {post.restaurant?.name && (
+                    <p className="mt-2 text-xs text-gray-500/80 font-medium max-w-[200px] text-center truncate px-4">
+                      {post.restaurant.name}
+                    </p>
+                  )}
                 </div>
               </div>
-            </div>
-          )
+            );
+          })()
         )}
 
         {/* Content section after photos */}
