@@ -58,6 +58,7 @@ interface FeedReview {
 interface TikTokReviewCardProps {
   review: FeedReview;
   isVisible: boolean;
+  isPreloading?: boolean;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
   onOpenComments?: () => void;
@@ -67,6 +68,7 @@ interface TikTokReviewCardProps {
 export function TikTokReviewCard({
   review,
   isVisible,
+  isPreloading = false,
   onSwipeLeft,
   onSwipeRight,
   onOpenComments,
@@ -88,10 +90,11 @@ export function TikTokReviewCard({
   // Track if we've already cached/prefetched for this review
   const hasCachedRef = useRef(false);
 
-  // PERFORMANCE: Cache feed data + prefetch when card becomes visible
+  // PERFORMANCE: Cache feed data + prefetch when card becomes visible or is preloading
   // This enables INSTANT navigation to restaurant/profile pages
   useEffect(() => {
-    if (isVisible && !hasCachedRef.current) {
+    // Trigger prefetch for both visible AND preloading cards
+    if ((isVisible || isPreloading) && !hasCachedRef.current) {
       hasCachedRef.current = true;
       
       // 1. Cache review data for instant rendering on navigation
@@ -115,7 +118,7 @@ export function TikTokReviewCard({
         }
       }, 100); // Small delay to not block UI
     }
-  }, [isVisible, review, user, router, cacheRestaurantFromFeed, cacheProfileFromFeed]);
+  }, [isVisible, isPreloading, review, user, router, cacheRestaurantFromFeed, cacheProfileFromFeed]);
 
   // Handle horizontal swipe for navigation - only from screen edges
   // Edge zone width in pixels - swipes starting from this zone trigger navigation
@@ -315,6 +318,7 @@ export function TikTokReviewCard({
       <MediaCarousel
         media={review.media}
         isVisible={isVisible}
+        isPreloading={isPreloading}
         className="absolute inset-0 w-full h-full"
       />
 

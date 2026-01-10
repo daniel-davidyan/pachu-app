@@ -92,6 +92,7 @@ export async function GET(
     const [
       profilesResult,
       photosResult,
+      videosResult,
       likesResult,
       commentsResult,
       userLikesResult
@@ -102,6 +103,11 @@ export async function GET(
       // Review photos
       reviewIds.length > 0
         ? supabase.from('review_photos').select('review_id, photo_url').in('review_id', reviewIds).order('sort_order', { ascending: true })
+        : Promise.resolve({ data: [] }),
+      
+      // Review videos
+      reviewIds.length > 0
+        ? supabase.from('review_videos').select('review_id, video_url, thumbnail_url, duration_seconds').in('review_id', reviewIds).order('sort_order', { ascending: true })
         : Promise.resolve({ data: [] }),
       
       // Likes counts
@@ -129,6 +135,18 @@ export async function GET(
         photosByReview.set(photo.review_id, []);
       }
       photosByReview.get(photo.review_id)?.push(photo.photo_url);
+    });
+
+    const videosByReview = new Map<string, Array<{ url: string; thumbnailUrl?: string; durationSeconds?: number }>>();
+    (videosResult.data || []).forEach((video: any) => {
+      if (!videosByReview.has(video.review_id)) {
+        videosByReview.set(video.review_id, []);
+      }
+      videosByReview.get(video.review_id)?.push({
+        url: video.video_url,
+        thumbnailUrl: video.thumbnail_url,
+        durationSeconds: video.duration_seconds,
+      });
     });
 
     const likesCounts: Record<string, number> = {};
@@ -163,6 +181,7 @@ export async function GET(
           avatarUrl: profile?.avatar_url,
         },
         photos: photosByReview.get(review.id) || [],
+        videos: videosByReview.get(review.id) || [],
       };
     });
 
@@ -208,9 +227,9 @@ export async function GET(
       });
     }
 
-    // Extract location (defaults for now)
-    const latitude = 32.0853;
-    const longitude = 34.7818;
+    // Extract location from restaurant data, with fallback to defaults (Tel Aviv)
+    const latitude = restaurant.latitude || 32.0853;
+    const longitude = restaurant.longitude || 34.7818;
 
     const response = {
       restaurant: {
@@ -304,9 +323,10 @@ async function handleGooglePlaceId(
 
       const reviewIds = (reviewsResult.data || []).map((r: any) => r.id);
 
-      // PARALLEL: Fetch photos, likes, comments
-      const [photosResult, likesResult, commentsResult, userLikesResult] = await Promise.all([
+      // PARALLEL: Fetch photos, videos, likes, comments
+      const [photosResult, videosResult, likesResult, commentsResult, userLikesResult] = await Promise.all([
         supabase.from('review_photos').select('review_id, photo_url').in('review_id', reviewIds).order('sort_order', { ascending: true }),
+        supabase.from('review_videos').select('review_id, video_url, thumbnail_url, duration_seconds').in('review_id', reviewIds).order('sort_order', { ascending: true }),
         supabase.from('review_likes').select('review_id').in('review_id', reviewIds),
         supabase.from('review_comments').select('review_id').in('review_id', reviewIds),
         supabase.from('review_likes').select('review_id').eq('user_id', user.id).in('review_id', reviewIds)
@@ -318,6 +338,18 @@ async function handleGooglePlaceId(
           photosByReview.set(photo.review_id, []);
         }
         photosByReview.get(photo.review_id)?.push(photo.photo_url);
+      });
+
+      const videosByReview = new Map<string, Array<{ url: string; thumbnailUrl?: string; durationSeconds?: number }>>();
+      (videosResult.data || []).forEach((video: any) => {
+        if (!videosByReview.has(video.review_id)) {
+          videosByReview.set(video.review_id, []);
+        }
+        videosByReview.get(video.review_id)?.push({
+          url: video.video_url,
+          thumbnailUrl: video.thumbnail_url,
+          durationSeconds: video.duration_seconds,
+        });
       });
 
       const likesCounts: Record<string, number> = {};
@@ -349,6 +381,7 @@ async function handleGooglePlaceId(
           avatarUrl: review.profiles.avatar_url,
         },
         photos: photosByReview.get(review.id) || [],
+        videos: videosByReview.get(review.id) || [],
       }));
 
       // Get friends who reviewed

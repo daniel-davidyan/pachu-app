@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get restaurants with reviews from friends (including self)
+    // Include latitude/longitude directly from restaurants table
     const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
       .select(`
@@ -41,13 +42,14 @@ export async function GET(request: NextRequest) {
           id,
           name,
           address,
-          location,
           google_place_id,
           average_rating,
           total_reviews,
           image_url,
           price_level,
-          cuisine_types
+          cuisine_types,
+          latitude,
+          longitude
         ),
         review_photos (
           photo_url
@@ -56,6 +58,79 @@ export async function GET(request: NextRequest) {
       .in('user_id', friendIds)
       .eq('is_published', true) // Only show published reviews
       .order('created_at', { ascending: false });
+    
+    // Build location map from restaurant data (now includes latitude/longitude from DB)
+    // with fallbacks for restaurants that don't have coordinates yet
+    let locationMap = new Map<string, { latitude: number; longitude: number }>();
+    const restaurantsWithoutCoords: string[] = [];
+    
+    // First pass: get coordinates directly from restaurant data
+    reviews?.forEach((review: any) => {
+      if (review.restaurant?.id && review.restaurant.latitude && review.restaurant.longitude) {
+        locationMap.set(review.restaurant.id, {
+          latitude: review.restaurant.latitude,
+          longitude: review.restaurant.longitude,
+        });
+      } else if (review.restaurant?.id) {
+        restaurantsWithoutCoords.push(review.restaurant.id);
+      }
+    });
+    
+    // Fallback for restaurants without direct lat/lng columns
+    if (restaurantsWithoutCoords.length > 0) {
+      try {
+        // Try using the RPC function (extracts coordinates from PostGIS location field)
+        const { data: locationData, error: rpcError } = await supabase
+          .rpc('get_restaurant_coordinates', { restaurant_ids: restaurantsWithoutCoords });
+        
+        if (!rpcError && locationData) {
+          locationData.forEach((loc: any) => {
+            if (loc.latitude && loc.longitude) {
+              locationMap.set(loc.id, { latitude: loc.latitude, longitude: loc.longitude });
+            }
+          });
+        }
+      } catch (e) {
+        console.log('RPC fallback not available, trying restaurant_cache');
+      }
+      
+      // Final fallback: Try restaurant_cache table
+      const stillMissingIds = restaurantsWithoutCoords.filter(id => !locationMap.has(id));
+      if (stillMissingIds.length > 0) {
+        const reviewsWithMissingCoords = reviews?.filter((r: any) => 
+          stillMissingIds.includes(r.restaurant?.id) && r.restaurant?.google_place_id
+        );
+        const googlePlaceIds = [...new Set(reviewsWithMissingCoords?.map((r: any) => r.restaurant.google_place_id) || [])];
+        
+        if (googlePlaceIds.length > 0) {
+          const { data: cacheData } = await supabase
+            .from('restaurant_cache')
+            .select('google_place_id, latitude, longitude')
+            .in('google_place_id', googlePlaceIds);
+          
+          // Build a mapping from google_place_id to coordinates
+          const coordsByPlaceId = new Map<string, { latitude: number; longitude: number }>();
+          cacheData?.forEach((cache: any) => {
+            if (cache.latitude && cache.longitude) {
+              coordsByPlaceId.set(cache.google_place_id, {
+                latitude: cache.latitude,
+                longitude: cache.longitude,
+              });
+            }
+          });
+          
+          // Map back to restaurant IDs
+          reviewsWithMissingCoords?.forEach((review: any) => {
+            if (review.restaurant?.id && review.restaurant?.google_place_id) {
+              const coords = coordsByPlaceId.get(review.restaurant.google_place_id);
+              if (coords) {
+                locationMap.set(review.restaurant.id, coords);
+              }
+            }
+          });
+        }
+      }
+    }
 
     if (reviewsError) {
       console.error('Error fetching reviews:', reviewsError);
@@ -69,31 +144,20 @@ export async function GET(request: NextRequest) {
     const restaurantMap = new Map();
     
     reviews?.forEach((review: any) => {
-      if (!review.restaurant || !review.restaurant.location) return;
+      if (!review.restaurant) return;
       
       const restaurantId = review.restaurant.id;
       const isOwnReview = review.user_id === user.id;
       
+      // Get coordinates from locationMap (fetched via PostGIS functions)
+      const coords = locationMap.get(restaurantId);
+      const latitude = coords?.latitude || 0;
+      const longitude = coords?.longitude || 0;
+      
+      // Skip restaurants without valid coordinates
+      if (latitude === 0 && longitude === 0) return;
+      
       if (!restaurantMap.has(restaurantId)) {
-        // Parse PostGIS point format
-        // Format is like: "0101000020E6100000..." or POINT(lng lat)
-        let longitude = 0;
-        let latitude = 0;
-        
-        try {
-          // This is a simplified parser - you might need to adjust based on actual format
-          const locationStr = review.restaurant.location;
-          if (typeof locationStr === 'string' && locationStr.includes('POINT')) {
-            const match = locationStr.match(/POINT\(([-\d.]+)\s+([-\d.]+)\)/);
-            if (match) {
-              longitude = parseFloat(match[1]);
-              latitude = parseFloat(match[2]);
-            }
-          }
-        } catch (e) {
-          console.error('Error parsing location:', e);
-        }
-
         restaurantMap.set(restaurantId, {
           id: restaurantId,
           name: review.restaurant.name,

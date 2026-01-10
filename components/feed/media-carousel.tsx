@@ -14,10 +14,11 @@ interface MediaItem {
 interface MediaCarouselProps {
   media: MediaItem[];
   isVisible: boolean;
+  isPreloading?: boolean;
   className?: string;
 }
 
-export function MediaCarousel({ media, isVisible, className = '' }: MediaCarouselProps) {
+export function MediaCarousel({ media, isVisible, isPreloading = false, className = '' }: MediaCarouselProps) {
   // Create a stable key for the media array to detect changes
   const mediaKey = useMemo(() => media.map(m => m.id).join(','), [media]);
   

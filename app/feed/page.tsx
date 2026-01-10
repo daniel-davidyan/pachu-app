@@ -119,8 +119,9 @@ export default function FeedPage() {
   const [followingReviews, setFollowingReviews] = useState<FeedReview[]>(
     () => initialData.current.following || []
   );
-  // Only show initial loading if we don't have prefetched or cached data WITH actual content
-  const [loading, setLoading] = useState(!initialData.current.hasData && !prefetchLoading);
+  // Show loading if we don't have data yet
+  // Note: Even if prefetch is loading, we should show our own loading state if no data
+  const [loading, setLoading] = useState(!initialData.current.hasData);
   const [loadingMore, setLoadingMore] = useState(false);
   const [forYouPage, setForYouPage] = useState(0);
   const [followingPage, setFollowingPage] = useState(0);
@@ -157,15 +158,25 @@ export default function FeedPage() {
   // Update from prefetched data when it arrives
   useEffect(() => {
     if (prefetchedFeed && !hasFetchedOnMount.current) {
-      if (prefetchedFeed.forYou.length > 0) {
+      const hasForYouData = prefetchedFeed.forYou.length > 0;
+      const hasFollowingData = prefetchedFeed.following.length > 0;
+      
+      if (hasForYouData) {
         setForYouReviews(prefetchedFeed.forYou);
-        setHasLoadedOnce(true);
-        setLoading(false);
       }
-      if (prefetchedFeed.following.length > 0) {
+      if (hasFollowingData) {
         setFollowingReviews(prefetchedFeed.following);
       }
-      hasFetchedOnMount.current = true;
+      
+      // Only mark as loaded if we actually got data from prefetch
+      // Otherwise, let the direct fetch happen
+      if (hasForYouData || hasFollowingData) {
+        setHasLoadedOnce(true);
+        setLoading(false);
+        hasFetchedOnMount.current = true;
+      }
+      // If prefetch returned empty, don't set hasFetchedOnMount
+      // This allows the direct fetch to run when userLocation is ready
     }
   }, [prefetchedFeed]);
   
@@ -292,16 +303,19 @@ export default function FeedPage() {
   useEffect(() => {
     if (!userLocation) return;
     
-    if (!hasFetchedOnMount.current) {
+    // Fetch if we haven't fetched yet OR if we still don't have data
+    const needsFetch = !hasFetchedOnMount.current || 
+      (forYouReviews.length === 0 && followingReviews.length === 0 && !hasLoadedOnce);
+    
+    if (needsFetch) {
       hasFetchedOnMount.current = true;
       // Only do background refresh if we have actual cached data with content
       // Empty arrays don't count - we need to show loader
-      const hasActualCache = cachedData.current?.hasData || false;
-      fetchReviewsForTab('foryou', 0, true, hasActualCache);
-      fetchReviewsForTab('following', 0, true, hasActualCache);
-      return;
+      const hasActualData = forYouReviews.length > 0 || followingReviews.length > 0;
+      fetchReviewsForTab('foryou', 0, true, hasActualData);
+      fetchReviewsForTab('following', 0, true, hasActualData);
     }
-  }, [userLocation, fetchReviewsForTab]);
+  }, [userLocation, forYouReviews.length, followingReviews.length, hasLoadedOnce, fetchReviewsForTab]);
 
   // Refetch when filters change (not tab - tab switch is now instant)
   useEffect(() => {

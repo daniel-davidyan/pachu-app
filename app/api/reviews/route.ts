@@ -40,16 +40,24 @@ export async function POST(request: NextRequest) {
       if (existingRestaurant) {
         restaurantId = existingRestaurant.id;
       } else {
-        // Create new restaurant with Google Place ID
+        // Create new restaurant with Google Place ID and location
+        const restaurantData: any = {
+          google_place_id: restaurant.googlePlaceId,
+          name: restaurant.name,
+          address: restaurant.address,
+          image_url: restaurant.photoUrl,
+          created_by: user.id,
+        };
+
+        // Include latitude and longitude if provided
+        if (restaurant.latitude && restaurant.longitude) {
+          restaurantData.latitude = restaurant.latitude;
+          restaurantData.longitude = restaurant.longitude;
+        }
+
         const { data: newRestaurant, error: createError } = await supabase
           .from('restaurants')
-          .insert({
-            google_place_id: restaurant.googlePlaceId,
-            name: restaurant.name,
-            address: restaurant.address,
-            image_url: restaurant.photoUrl,
-            created_by: user.id,
-          })
+          .insert(restaurantData)
           .select('id')
           .single();
 
@@ -63,7 +71,7 @@ export async function POST(request: NextRequest) {
 
         restaurantId = newRestaurant.id;
         
-        // Update location separately using SQL if PostGIS is set up
+        // Also try to update PostGIS location if available (for spatial queries)
         if (restaurant.latitude && restaurant.longitude) {
           try {
             await supabase.rpc('update_restaurant_location', {
@@ -72,8 +80,9 @@ export async function POST(request: NextRequest) {
               p_latitude: restaurant.latitude,
             });
           } catch (e) {
-            // Location update is optional, continue without it
-            console.log('Location update skipped (PostGIS function may not exist)');
+            // PostGIS location update is optional, continue without it
+            // The latitude/longitude columns are already saved above
+            console.log('PostGIS location update skipped');
           }
         }
 

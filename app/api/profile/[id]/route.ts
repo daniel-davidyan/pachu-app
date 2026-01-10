@@ -102,10 +102,14 @@ export async function GET(
     // Get review IDs for photos and comments lookup
     const reviewIds = reviewsData.map((r: any) => r.id);
 
-    // PARALLEL: Fetch photos and comments counts
-    const [photosResult, commentsResult] = await Promise.all([
+    // PARALLEL: Fetch photos, videos, and comments counts
+    const [photosResult, videosResult, commentsResult] = await Promise.all([
       reviewIds.length > 0
         ? supabase.from('review_photos').select('review_id, photo_url').in('review_id', reviewIds).order('sort_order', { ascending: true })
+        : Promise.resolve({ data: [] }),
+      
+      reviewIds.length > 0
+        ? supabase.from('review_videos').select('review_id, video_url, thumbnail_url, duration_seconds').in('review_id', reviewIds).order('sort_order', { ascending: true })
         : Promise.resolve({ data: [] }),
       
       reviewIds.length > 0
@@ -120,6 +124,19 @@ export async function GET(
         photosByReview.set(photo.review_id, []);
       }
       photosByReview.get(photo.review_id)?.push(photo.photo_url);
+    });
+
+    // Group videos by review
+    const videosByReview = new Map<string, Array<{ url: string; thumbnailUrl?: string; durationSeconds?: number }>>();
+    (videosResult.data || []).forEach((video: any) => {
+      if (!videosByReview.has(video.review_id)) {
+        videosByReview.set(video.review_id, []);
+      }
+      videosByReview.get(video.review_id)?.push({
+        url: video.video_url,
+        thumbnailUrl: video.thumbnail_url,
+        durationSeconds: video.duration_seconds,
+      });
     });
 
     // Count comments per review
@@ -137,6 +154,7 @@ export async function GET(
       likesCount: review.likes_count || 0,
       commentsCount: commentsCounts[review.id] || 0,
       photos: photosByReview.get(review.id) || [],
+      videos: videosByReview.get(review.id) || [],
       restaurant: review.restaurants ? {
         id: review.restaurants.id,
         name: review.restaurants.name,

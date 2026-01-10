@@ -448,7 +448,8 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
               >
                 <TikTokReviewCard
                   review={review}
-                  isVisible={index === currentIndex || Math.abs(index - currentIndex) === 1}
+                  isVisible={index === currentIndex}
+                  isPreloading={Math.abs(index - currentIndex) === 1}
                   onSwipeRight={() => handleSwipeRight(review)}
                   onSwipeLeft={() => handleSwipeLeft(review)}
                   onOpenComments={() => handleOpenComments(review.id)}

@@ -37,6 +37,7 @@ interface Review {
     avatarUrl?: string;
   };
   photos: string[];
+  videos?: Array<{ url: string; thumbnailUrl?: string; durationSeconds?: number }>;
 }
 
 interface Restaurant {
