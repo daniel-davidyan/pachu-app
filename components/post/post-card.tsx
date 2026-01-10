@@ -78,7 +78,8 @@ const RatingRing = ({ rating, size = 80, emoji }: { rating: number; size?: numbe
   };
   
   const colors = getGradientColors();
-  const uniqueId = `rating-${rating}-${size}-${Math.random().toString(36).substr(2, 9)}`;
+  // Use deterministic ID based on rating, size, and emoji (no Math.random during render)
+  const uniqueId = `rating-${rating}-${size}-${emoji.charCodeAt(0)}`;
   
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>

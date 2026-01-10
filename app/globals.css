@@ -39,6 +39,9 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Prevent pinch-to-zoom on iOS */
+    touch-action: pan-x pan-y;
+    -ms-touch-action: pan-x pan-y;
   }
 
 body {
@@ -49,6 +52,11 @@ body {
     /* Ensure body respects safe areas on mobile */
     padding: 0;
     margin: 0;
+    /* Prevent pinch-to-zoom for native app feel */
+    touch-action: pan-x pan-y;
+    -ms-touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* iOS PWA keyboard fix - ensure inputs can receive focus */
@@ -63,6 +71,16 @@ body {
     input, textarea {
       font-size: 16px; /* Prevents iOS zoom on focus */
     }
+  }
+
+  /* Prevent double-tap zoom on all interactive elements */
+  a, button, input, textarea, select, label {
+    touch-action: manipulation;
+  }
+
+  /* Prevent text selection that can trigger zoom UI */
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Hide scrollbar but keep functionality */

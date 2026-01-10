@@ -15,8 +15,8 @@ const ICON_VERSION = 'v2';
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5, // Allow some zoom for accessibility and iOS PWA keyboard fix
-  userScalable: true, // Enable for better iOS PWA keyboard support
+  maximumScale: 1, // Prevent zoom for native app feel
+  userScalable: false, // Disable pinch-to-zoom for native app feel
   viewportFit: 'cover',
   themeColor: '#C5459C',
   interactiveWidget: 'resizes-content', // Makes keyboard behavior better on iOS
