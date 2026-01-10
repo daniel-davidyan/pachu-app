@@ -336,7 +336,7 @@ export function InstagramPostCard({
 
         {/* Rating */}
         <div className="flex-shrink-0 ml-2">
-          <CompactRating rating={post.rating} />
+          <CompactRating rating={post.rating} size={36} />
         </div>
       </div>
 
@@ -484,7 +484,7 @@ export function InstagramPostCard({
         )}
 
         {/* Timestamp */}
-        <p className="text-[10px] text-gray-400 uppercase tracking-wide mt-2 mb-3">
+        <p className="text-[10px] text-gray-400 uppercase tracking-wide mt-2 pb-4">
           {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
         </p>
       </div>

@@ -106,19 +106,30 @@ function UserProfileFeedContent() {
 
   // Scroll to the clicked post after loading with highlight effect
   useEffect(() => {
-    if (!loading && startId && !hasScrolled.current) {
+    if (!loading && startId && !hasScrolled.current && reviews.length > 0) {
       hasScrolled.current = true;
-      setTimeout(() => {
+      
+      const scrollToPost = () => {
         const element = document.getElementById(`post-${startId}`);
         if (element) {
+          // scrollIntoView respects the scroll-margin-top CSS property
           element.scrollIntoView({ behavior: 'instant', block: 'start' });
+          
           // Add highlight effect
           setHighlightedPostId(startId);
           setTimeout(() => setHighlightedPostId(null), 1000);
         }
-      }, 100);
+      };
+      
+      // Wait for DOM to be fully painted and images to start loading
+      requestAnimationFrame(() => {
+        // First scroll attempt
+        setTimeout(scrollToPost, 50);
+        // Retry after images might have loaded and adjusted layout
+        setTimeout(scrollToPost, 500);
+      });
     }
-  }, [loading, startId]);
+  }, [loading, startId, reviews.length]);
 
   // Touch handlers for swipe back gesture (mobile only)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -237,7 +248,7 @@ function UserProfileFeedContent() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {reviews.length > 0 ? (
-          <div className="divide-y divide-gray-200">
+          <div>
             {reviews.map((review) => {
               const postData: InstagramPostData = {
                 id: review.id,
@@ -270,6 +281,7 @@ function UserProfileFeedContent() {
                   id={`post-${review.id}`}
                   ref={setPostRef(review.id)}
                   data-post-id={review.id}
+                  style={{ scrollMarginTop: 'calc(44px + env(safe-area-inset-top))' }}
                 >
                   <InstagramPostCard
                     post={postData}

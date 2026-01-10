@@ -166,9 +166,10 @@ export function ModernRating({
 // Alternative compact version - circular progress style
 interface CompactRatingProps {
   rating: number;
+  size?: number;
 }
 
-export function CompactRating({ rating }: CompactRatingProps) {
+export function CompactRating({ rating, size = 40 }: CompactRatingProps) {
   const percentage = (rating / 5) * 100;
   
   // Dynamic gradient colors based on rating
@@ -215,8 +216,7 @@ export function CompactRating({ rating }: CompactRatingProps) {
   const colors = getGradientColors();
   
   // Compact size configuration
-  const size = 40;
-  const strokeWidth = 4;
+  const strokeWidth = Math.max(3, size * 0.1);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
@@ -267,7 +267,10 @@ export function CompactRating({ rating }: CompactRatingProps) {
       
       {/* Rating number */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-xs font-bold text-gray-700 leading-none">
+        <span 
+          className="font-bold text-gray-700 leading-none"
+          style={{ fontSize: size <= 36 ? '10px' : '12px' }}
+        >
           {rating.toFixed(1)}
         </span>
       </div>
