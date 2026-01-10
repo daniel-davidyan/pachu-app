@@ -538,9 +538,19 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
     setSubmitting(true);
     setSubmitType(publish ? 'publish' : 'save'); // Track which button was clicked
     try {
+      console.log('[WriteReviewModal] ====== SUBMIT START ======');
       console.log('[WriteReviewModal] handleSubmit called with publish:', publish);
       console.log('[WriteReviewModal] Current mediaItems:', mediaItems.length);
       console.log('[WriteReviewModal] existingReview:', existingReview?.id);
+      console.log('[WriteReviewModal] filesRef size:', filesRef.current.size);
+      console.log('[WriteReviewModal] Media items details:', mediaItems.map(m => ({
+        id: m.id,
+        type: m.type,
+        hasUrl: !!m.url,
+        isBlob: m.url?.startsWith('blob:'),
+        fileKey: m.fileKey,
+        hasFileInRef: m.fileKey ? filesRef.current.has(m.fileKey) : false,
+      })));
       
       // Process all media items and upload new ones
       const finalPhotoUrls: string[] = [];
@@ -586,28 +596,64 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
             }
           }
           
-          console.log(`[WriteReviewModal] Uploading new ${item.type}:`, fileName, 'size:', file.size, 'originalType:', file.type, 'contentType:', contentType);
+          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+          console.log(`[WriteReviewModal] Uploading new ${item.type}:`, fileName, 'size:', fileSizeMB + 'MB', 'originalType:', file.type, 'contentType:', contentType, 'bucket:', bucket);
           
-          // Upload with explicit content type for better quality preservation
-          const { data, error } = await supabase.storage
-            .from(bucket)
-            .upload(`reviews/${fileName}`, file, {
-              contentType,
-              cacheControl: '3600',
-              upsert: false,
-            });
+          // Check file size before upload
+          const maxSizeMB = item.type === 'video' ? 100 : 10; // 100MB for video, 10MB for photo
+          if (file.size > maxSizeMB * 1024 * 1024) {
+            showToast(`${item.type === 'video' ? 'Video' : 'Photo'} is too large. Max ${maxSizeMB}MB.`, 'error');
+            setSubmitting(false);
+            return;
+          }
+          
+          // Upload with timeout using Promise.race
+          const timeoutMs = item.type === 'video' ? 180000 : 60000; // 3 min for video, 1 min for photo
+          
+          const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) => {
+            setTimeout(() => {
+              console.error(`[WriteReviewModal] Upload timeout after ${timeoutMs}ms for ${item.type}`);
+              resolve({ data: null, error: { message: `Upload timed out after ${timeoutMs / 1000} seconds. Try a smaller file or check your connection.` } });
+            }, timeoutMs);
+          });
+          
+          const uploadPromise = (async () => {
+            console.log(`[WriteReviewModal] Starting upload to ${bucket}... (timeout: ${timeoutMs / 1000}s)`);
+            try {
+              const result = await supabase.storage
+                .from(bucket)
+                .upload(`reviews/${fileName}`, file, {
+                  contentType,
+                  cacheControl: '3600',
+                  upsert: false,
+                });
+              console.log(`[WriteReviewModal] Upload completed:`, result.data ? 'success' : 'error', result.error?.message);
+              return result;
+            } catch (e: any) {
+              console.error(`[WriteReviewModal] Upload exception:`, e);
+              return { data: null, error: { message: e.message || 'Upload failed unexpectedly' } };
+            }
+          })();
+          
+          const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
           
           if (error) {
             console.error(`${item.type} upload error:`, error);
             // Provide more helpful error messages
             let errorMessage = `Failed to upload ${item.type}`;
-            if (error.message?.includes('mime type')) {
+            if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {
+              errorMessage = `Upload timed out. Try a smaller ${item.type === 'video' ? 'video' : 'photo'}.`;
+            } else if (error.message?.includes('mime type') || error.message?.includes('mime_type')) {
               errorMessage = `Video format not supported. Try converting to MP4.`;
-            } else if (error.message?.includes('size')) {
-              errorMessage = `${item.type === 'video' ? 'Video' : 'Photo'} is too large`;
-            } else if (error.message?.includes('not found') || error.message?.includes('bucket')) {
-              errorMessage = `Upload service unavailable. Please try again.`;
+            } else if (error.message?.includes('size') || error.message?.includes('payload')) {
+              errorMessage = `${item.type === 'video' ? 'Video' : 'Photo'} is too large. Max 100MB for video.`;
+            } else if (error.message?.includes('not found') || error.message?.includes('bucket') || error.message?.includes('Bucket')) {
+              errorMessage = `Upload service unavailable. Storage bucket may not exist.`;
               console.error('[WriteReviewModal] Storage bucket may not exist! Run migration 117-update-review-videos-bucket.sql');
+            } else if (error.message?.includes('policy') || error.message?.includes('Policy')) {
+              errorMessage = `Permission denied. Please log in again.`;
+            } else {
+              errorMessage = `Failed to upload ${item.type}: ${error.message}`;
             }
             showToast(errorMessage, 'error');
             setSubmitting(false);
