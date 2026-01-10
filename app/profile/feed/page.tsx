@@ -2,7 +2,7 @@
 
 import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
-import { useEffect, useState, useRef, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense, useCallback } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { PostCard, PostCardData } from '@/components/post/post-card';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -77,6 +77,36 @@ function ProfileFeedContent() {
   
   const startPostRef = useRef<HTMLDivElement>(null);
   const hasScrolled = useRef(false);
+  const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
+  const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Intersection Observer for video autoplay
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            setVisiblePostId(entry.target.getAttribute('data-post-id'));
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    postRefs.current.forEach((el) => {
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [reviews]);
+
+  const setPostRef = useCallback((id: string) => (el: HTMLDivElement | null) => {
+    if (el) {
+      postRefs.current.set(id, el);
+    } else {
+      postRefs.current.delete(id);
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -233,7 +263,12 @@ function ProfileFeedContent() {
               };
 
               return (
-                <div key={review.id} id={`post-${review.id}`}>
+                <div 
+                  key={review.id} 
+                  id={`post-${review.id}`}
+                  ref={setPostRef(review.id)}
+                  data-post-id={review.id}
+                >
                   <PostCard
                     post={postData}
                     showRestaurantInfo={true}
@@ -241,6 +276,7 @@ function ProfileFeedContent() {
                     onDelete={handleDeleteReview}
                     onSheetStateChange={setSheetOpen}
                     onUpdate={fetchReviews}
+                    isVisible={visiblePostId === review.id}
                   />
                 </div>
               );

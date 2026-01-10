@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
 import { CollectionPicker } from '@/components/collections/collection-picker';
 import { CollectionModal } from '@/components/collections/collection-modal';
+import { VideoPlayer } from '@/components/feed/video-player';
 
 interface Comment {
   id: string;
@@ -67,9 +68,10 @@ interface PostCardProps {
   onUpdate?: () => void;
   onSheetStateChange?: (isOpen: boolean) => void;
   embedded?: boolean;
+  isVisible?: boolean;
 }
 
-export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, onUpdate, onSheetStateChange, embedded = false }: PostCardProps) {
+export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, onUpdate, onSheetStateChange, embedded = false, isVisible = false }: PostCardProps) {
   const { user } = useUser();
   const { showToast } = useToast();
   const [isLiked, setIsLiked] = useState(post.isLiked);
@@ -822,11 +824,10 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
               if (mediaItems.length === 1) {
                 const item = mediaItems[0];
                 return item.type === 'video' ? (
-                  <video
+                  <VideoPlayer
                     src={item.url}
                     poster={item.thumbnailUrl}
-                    controls
-                    playsInline
+                    isVisible={isVisible}
                     className="w-full h-64 object-cover bg-black"
                   />
                 ) : (
@@ -843,15 +844,18 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                   <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4">
                     {mediaItems.map((item, index) => (
                       item.type === 'video' ? (
-                        <video
+                        <div 
                           key={index}
-                          src={item.url}
-                          poster={item.thumbnailUrl}
-                          controls
-                          playsInline
-                          className="flex-shrink-0 h-64 object-cover rounded-2xl snap-start bg-black"
+                          className="flex-shrink-0 h-64 rounded-2xl snap-start overflow-hidden"
                           style={{ width: 'calc(80vw - 2rem)' }}
-                        />
+                        >
+                          <VideoPlayer
+                            src={item.url}
+                            poster={item.thumbnailUrl}
+                            isVisible={isVisible && index === 0}
+                            className="w-full h-full bg-black"
+                          />
+                        </div>
                       ) : (
                         <img
                           key={index}

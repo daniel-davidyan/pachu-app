@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -133,6 +133,36 @@ export default function RestaurantPage() {
   const [showingNonFriendReviews, setShowingNonFriendReviews] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
   const [openingHours, setOpeningHours] = useState<Restaurant['openingHours'] | null>(null);
+  const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
+  const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Intersection Observer for video autoplay
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            setVisiblePostId(entry.target.getAttribute('data-post-id'));
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    postRefs.current.forEach((el) => {
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [reviews]);
+
+  const setPostRef = useCallback((id: string) => (el: HTMLDivElement | null) => {
+    if (el) {
+      postRefs.current.set(id, el);
+    } else {
+      postRefs.current.delete(id);
+    }
+  }, []);
 
   // Update local state when API data arrives
   useEffect(() => {
@@ -669,15 +699,21 @@ export default function RestaurantPage() {
           ) : (
             <div className="space-y-4">
               {reviews.map((review: Review) => (
-                <PostCard
+                <div
                   key={review.id}
-                  post={review}
-                  showRestaurantInfo={false}
-                  onEdit={handleEditReview}
-                  onDelete={handleDeleteReview}
-                  onSheetStateChange={setSheetOpen}
-                  onUpdate={fetchRestaurant}
-                />
+                  ref={setPostRef(review.id)}
+                  data-post-id={review.id}
+                >
+                  <PostCard
+                    post={review}
+                    showRestaurantInfo={false}
+                    onEdit={handleEditReview}
+                    onDelete={handleDeleteReview}
+                    onSheetStateChange={setSheetOpen}
+                    onUpdate={fetchRestaurant}
+                    isVisible={visiblePostId === review.id}
+                  />
+                </div>
               ))}
             </div>
           )}

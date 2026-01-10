@@ -19,6 +19,7 @@ interface Review {
   likesCount: number;
   commentsCount: number;
   photos: string[];
+  videos?: Array<{ url: string; thumbnailUrl?: string }>;
   restaurant: {
     id: string;
     name: string;
@@ -330,8 +331,10 @@ export default function UserProfilePage() {
         {reviews.length > 0 ? (
           <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
             {reviews.map((review: Review) => {
-              const thumbnailUrl = review.photos?.[0] || review.restaurant?.imageUrl;
-              const hasMultiplePhotos = (review.photos?.length || 0) > 1;
+              // Only show user-uploaded content (photos or video thumbnails), not Google restaurant images
+              const thumbnailUrl = review.photos?.[0] || review.videos?.[0]?.thumbnailUrl;
+              const hasMultipleMedia = ((review.photos?.length || 0) + (review.videos?.length || 0)) > 1;
+              const hasVideo = (review.videos?.length || 0) > 0 && !review.photos?.[0];
               
               return (
                 <Link
@@ -351,8 +354,15 @@ export default function UserProfilePage() {
                     </div>
                   )}
                   
-                  {/* Multiple Photos Indicator */}
-                  {hasMultiplePhotos && (
+                  {/* Video Indicator */}
+                  {hasVideo && (
+                    <div className="absolute top-2 right-2">
+                      <Play className="w-5 h-5 text-white drop-shadow-lg fill-white" />
+                    </div>
+                  )}
+                  
+                  {/* Multiple Media Indicator */}
+                  {hasMultipleMedia && !hasVideo && (
                     <div className="absolute top-2 right-2">
                       <svg className="w-5 h-5 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M4 6h2v2H4V6zm0 5h2v2H4v-2zm0 5h2v2H4v-2zm16-10h-2V4h2v2zm-4 0H8V4h8v2zm4 5h-2v-2h2v2zm0 5h-2v-2h2v2zM8 20h8v-2H8v2z"/>
