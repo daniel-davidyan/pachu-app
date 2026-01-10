@@ -285,9 +285,9 @@ export default function UserProfilePage() {
           marginTop: 'calc(-1 * env(safe-area-inset-top))',
         }}
       >
-        {/* Header - Instagram Style */}
+        {/* Header */}
         <div 
-          className="sticky top-0 z-10 bg-white border-b border-gray-200"
+          className="sticky top-0 z-10 bg-white"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="flex items-center px-4 h-14">
@@ -297,7 +297,7 @@ export default function UserProfilePage() {
             >
               <ArrowLeft className="w-6 h-6 text-gray-900" />
             </button>
-            <h1 className="flex-1 text-center font-semibold text-gray-900 pr-10">
+            <h1 className="font-semibold text-gray-900 ml-1">
               {profile.username}
             </h1>
           </div>
