@@ -14,3 +14,5 @@ export * from './video-player';
 export * from './feed-header';
 export * from './filter-bottom-sheet';
 
+// Instagram-style feed components
+export * from './instagram-post-card';

@@ -125,6 +125,50 @@ body {
     animation: slide-in-right 0.3s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
+  /* Instagram-style page transitions */
+  .animate-slide-in-left {
+    animation: slide-in-from-right 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .animate-slide-out-right {
+    animation: slide-out-to-right 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  }
+
+  .animate-highlight-post {
+    animation: highlight-post 1s ease-out;
+  }
+
+  @keyframes slide-in-from-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0.8;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-out-to-right {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes highlight-post {
+    0% {
+      background-color: rgba(197, 69, 156, 0.15);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
   @keyframes slide-up {
     from {
       transform: translateY(100%);
