@@ -5,7 +5,7 @@ import { useUser } from '@/hooks/use-user';
 import { usePrefetch } from '@/hooks/use-prefetch';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus, Star } from 'lucide-react';
+import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { PostCard, PostCardData } from '@/components/post/post-card';
@@ -16,53 +16,92 @@ import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
 import { CollectionModal } from '@/components/collections/collection-modal';
 
-// Helper function for grid thumbnail placeholder
-const getGridPlaceholderStyle = (restaurantName?: string): { emoji: string; gradient: string } => {
+// Subtle pastel gradient palettes for varied backgrounds
+const subtleGradients = [
+  'from-rose-50/70 via-white to-orange-50/50',
+  'from-violet-50/70 via-white to-pink-50/50',
+  'from-sky-50/70 via-white to-indigo-50/50',
+  'from-emerald-50/70 via-white to-teal-50/50',
+  'from-amber-50/70 via-white to-yellow-50/50',
+  'from-fuchsia-50/70 via-white to-rose-50/50',
+  'from-cyan-50/70 via-white to-blue-50/50',
+  'from-lime-50/70 via-white to-green-50/50',
+  'from-orange-50/70 via-white to-amber-50/50',
+  'from-purple-50/70 via-white to-violet-50/50',
+  'from-teal-50/70 via-white to-cyan-50/50',
+  'from-pink-50/70 via-white to-fuchsia-50/50',
+];
+
+const getSubtleGradient = (postId?: string, restaurantName?: string): string => {
+  const str = postId || restaurantName || 'default';
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return subtleGradients[Math.abs(hash) % subtleGradients.length];
+};
+
+const getRestaurantIcon = (restaurantName?: string): string => {
   const name = (restaurantName || '').toLowerCase();
+  if (name.includes('coffee') || name.includes('cafe') || name.includes('קפה')) return '☕';
+  if (name.includes('pizza') || name.includes('פיצה')) return '🍕';
+  if (name.includes('sushi') || name.includes('סושי') || name.includes('japanese')) return '🍱';
+  if (name.includes('burger') || name.includes('המבורגר')) return '🍔';
+  if (name.includes('thai') || name.includes('chinese') || name.includes('asian')) return '🥡';
+  if (name.includes('mexican') || name.includes('taco')) return '🌮';
+  if (name.includes('italian') || name.includes('pasta') || name.includes('פסטה')) return '🍝';
+  if (name.includes('bakery') || name.includes('מאפייה') || name.includes('cake')) return '🥐';
+  if (name.includes('ice cream') || name.includes('גלידה') || name.includes('gelato')) return '🍨';
+  if (name.includes('bar') || name.includes('pub') || name.includes('wine')) return '🍷';
+  if (name.includes('hummus') || name.includes('falafel') || name.includes('shawarma')) return '🧆';
+  if (name.includes('steak') || name.includes('meat') || name.includes('grill')) return '🥩';
+  if (name.includes('breakfast') || name.includes('brunch')) return '🍳';
+  if (name.includes('salad') || name.includes('healthy') || name.includes('vegan')) return '🥗';
+  return '🍽️';
+};
+
+// Mini rating ring for grid thumbnails
+const MiniRatingRing = ({ rating, emoji }: { rating: number; emoji: string }) => {
+  const size = 52;
+  const percentage = (rating / 5) * 100;
+  const strokeWidth = 3;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (percentage / 100) * circumference;
   
-  if (name.includes('coffee') || name.includes('cafe') || name.includes('קפה')) {
-    return { emoji: '☕', gradient: 'from-amber-100 to-orange-100' };
-  }
-  if (name.includes('pizza') || name.includes('פיצה')) {
-    return { emoji: '🍕', gradient: 'from-red-100 to-orange-100' };
-  }
-  if (name.includes('sushi') || name.includes('סושי') || name.includes('japanese')) {
-    return { emoji: '🍱', gradient: 'from-rose-100 to-pink-100' };
-  }
-  if (name.includes('burger') || name.includes('המבורגר')) {
-    return { emoji: '🍔', gradient: 'from-amber-100 to-yellow-100' };
-  }
-  if (name.includes('thai') || name.includes('chinese') || name.includes('asian')) {
-    return { emoji: '🥡', gradient: 'from-red-100 to-amber-100' };
-  }
-  if (name.includes('mexican') || name.includes('taco')) {
-    return { emoji: '🌮', gradient: 'from-yellow-100 to-orange-100' };
-  }
-  if (name.includes('italian') || name.includes('pasta') || name.includes('פסטה')) {
-    return { emoji: '🍝', gradient: 'from-green-100 to-emerald-100' };
-  }
-  if (name.includes('bakery') || name.includes('מאפייה') || name.includes('cake')) {
-    return { emoji: '🥐', gradient: 'from-amber-100 to-yellow-100' };
-  }
-  if (name.includes('ice cream') || name.includes('גלידה') || name.includes('gelato')) {
-    return { emoji: '🍨', gradient: 'from-pink-100 to-purple-100' };
-  }
-  if (name.includes('bar') || name.includes('pub') || name.includes('wine')) {
-    return { emoji: '🍷', gradient: 'from-purple-100 to-violet-100' };
-  }
-  if (name.includes('hummus') || name.includes('falafel') || name.includes('shawarma')) {
-    return { emoji: '🧆', gradient: 'from-amber-100 to-lime-100' };
-  }
-  if (name.includes('steak') || name.includes('meat') || name.includes('grill')) {
-    return { emoji: '🥩', gradient: 'from-red-100 to-rose-100' };
-  }
-  if (name.includes('breakfast') || name.includes('brunch')) {
-    return { emoji: '🍳', gradient: 'from-yellow-100 to-amber-100' };
-  }
-  if (name.includes('salad') || name.includes('healthy') || name.includes('vegan')) {
-    return { emoji: '🥗', gradient: 'from-green-100 to-lime-100' };
-  }
-  return { emoji: '🍽️', gradient: 'from-slate-100 to-gray-100' };
+  const getGradientColors = () => {
+    if (rating >= 4.5) return { start: '#C5459C', middle: '#D975B3', end: '#E8A3CA' };
+    if (rating >= 4) return { start: '#B8548E', middle: '#CA83AC', end: '#DCB1C9' };
+    if (rating >= 3) return { start: '#A86B8A', middle: '#BC92A8', end: '#D0B9C6' };
+    return { start: '#9A7F8E', middle: '#B29FAC', end: '#CABFCA' };
+  };
+  
+  const colors = getGradientColors();
+  const uniqueId = `mini-rating-${rating}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <defs>
+          <linearGradient id={uniqueId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={colors.start} />
+            <stop offset="50%" stopColor={colors.middle} />
+            <stop offset="100%" stopColor={colors.end} />
+          </linearGradient>
+        </defs>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#F3F4F6" strokeWidth={strokeWidth} />
+        <circle
+          cx={size / 2} cy={size / 2} r={radius} fill="none"
+          stroke={`url(#${uniqueId})`} strokeWidth={strokeWidth} strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-xl">{emoji}</span>
+      </div>
+    </div>
+  );
 };
 
 interface Profile {
@@ -666,21 +705,20 @@ export default function ProfilePage() {
                         />
                       ) : (
                         (() => {
-                          const { emoji, gradient } = getGridPlaceholderStyle(review.restaurants?.name);
+                          const emoji = getRestaurantIcon(review.restaurants?.name);
+                          const gradient = getSubtleGradient(review.id, review.restaurants?.name);
                           return (
-                            <div className={`w-full h-full bg-gradient-to-br ${gradient} flex flex-col items-center justify-center relative overflow-hidden`}>
-                              {/* Subtle decorative elements */}
-                              <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/30 blur-xl" />
-                              <div className="absolute -bottom-4 -left-4 w-12 h-12 rounded-full bg-white/20 blur-lg" />
+                            <div className={`w-full h-full bg-gradient-to-br ${gradient} flex flex-col items-center justify-center p-1.5`}>
+                              {/* Restaurant name - at top */}
+                              <p className="text-[10px] font-bold text-gray-600 text-center leading-tight line-clamp-1 mb-1 px-0.5">
+                                {review.restaurants?.name || 'Restaurant'}
+                              </p>
                               
-                              {/* Icon */}
-                              <span className="text-3xl mb-1 drop-shadow-sm relative z-10">{emoji}</span>
+                              {/* Rating ring with icon */}
+                              <MiniRatingRing rating={review.rating} emoji={emoji} />
                               
-                              {/* Rating badge */}
-                              <div className="flex items-center gap-0.5 bg-white/70 backdrop-blur-sm px-1.5 py-0.5 rounded-full relative z-10">
-                                <Star className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
-                                <span className="text-[10px] font-semibold text-gray-700">{review.rating.toFixed(1)}</span>
-                              </div>
+                              {/* Rating number */}
+                              <p className="text-[10px] font-bold text-gray-600 mt-0.5">{review.rating.toFixed(1)}</p>
                             </div>
                           );
                         })()
