@@ -284,26 +284,41 @@ export async function POST(request: NextRequest) {
     let videoInsertError: string | null = null;
     
     if (videoUrls?.length > 0) {
-      const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
-        review_id: newReview.id,
-        video_url: video.url,
-        thumbnail_url: video.thumbnailUrl,
-        sort_order: index,
-      }));
+      try {
+        const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
+          review_id: newReview.id,
+          video_url: video.url,
+          thumbnail_url: video.thumbnailUrl,
+          sort_order: index,
+        }));
 
-      console.log('[API reviews] Inserting videos:', JSON.stringify(videoInserts));
-      
-      const { data: insertedVideos, error: videoError } = await supabase
-        .from('review_videos')
-        .insert(videoInserts)
-        .select();
-      
-      if (videoError) {
-        console.error('[API reviews] Video insert error:', videoError);
-        videoInsertError = videoError.message;
-      } else {
-        videosInserted = insertedVideos?.length || 0;
-        console.log('[API reviews] Videos inserted successfully:', videosInserted);
+        console.log('[API reviews] Inserting videos:', JSON.stringify(videoInserts));
+        
+        const { data: insertedVideos, error: videoError } = await supabase
+          .from('review_videos')
+          .insert(videoInserts)
+          .select();
+        
+        if (videoError) {
+          console.error('[API reviews] Video insert error:', videoError);
+          console.error('[API reviews] Video insert error details:', {
+            message: videoError.message,
+            details: videoError.details,
+            hint: videoError.hint,
+            code: videoError.code
+          });
+          videoInsertError = videoError.message;
+          // If the table doesn't exist, log a helpful message
+          if (videoError.code === '42P01' || videoError.message?.includes('relation') || videoError.message?.includes('does not exist')) {
+            console.error('[API reviews] The review_videos table may not exist! Run migration 117-update-review-videos-bucket.sql');
+          }
+        } else {
+          videosInserted = insertedVideos?.length || 0;
+          console.log('[API reviews] Videos inserted successfully:', videosInserted);
+        }
+      } catch (videoError: any) {
+        console.error('[API reviews] Video insert exception:', videoError);
+        videoInsertError = videoError?.message || 'Unknown error';
       }
     }
 

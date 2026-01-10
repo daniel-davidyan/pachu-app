@@ -293,8 +293,11 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
         showToast('Video must be under 50MB', 'error');
         return;
       }
-      // Check if it's actually a video
-      if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|mov|webm|m4v|quicktime)$/i)) {
+      // Check if it's actually a video - be more permissive with MIME types (especially for iOS)
+      const isVideoByType = file.type.startsWith('video/') || file.type === '' || file.type === 'application/octet-stream';
+      const isVideoByExtension = /\.(mp4|mov|webm|m4v|qt|avi|3gp|mkv|hevc)$/i.test(file.name);
+      if (!isVideoByType && !isVideoByExtension) {
+        console.error('[WriteReviewModal] Invalid video file:', { name: file.name, type: file.type, size: file.size });
         showToast('Please select a video file', 'error');
         return;
       }
@@ -561,20 +564,52 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           const fileName = `${Date.now()}-${i}-${Math.random().toString(36).substring(7)}.${fileExt}`;
           const bucket = item.type === 'video' ? 'review-videos' : 'review-photos';
           
-          console.log(`[WriteReviewModal] Uploading new ${item.type}:`, fileName, 'size:', file.size, 'type:', file.type);
+          // Determine content type based on file extension if file.type is unreliable
+          let contentType = file.type;
+          if (!contentType || contentType === 'application/octet-stream') {
+            const ext = fileExt.toLowerCase();
+            if (item.type === 'video') {
+              const videoMimeTypes: { [key: string]: string } = {
+                'mp4': 'video/mp4',
+                'mov': 'video/quicktime',
+                'qt': 'video/quicktime',
+                'webm': 'video/webm',
+                'm4v': 'video/x-m4v',
+                'avi': 'video/x-msvideo',
+                '3gp': 'video/3gpp',
+                'mkv': 'video/x-matroska',
+                'hevc': 'video/mp4',
+              };
+              contentType = videoMimeTypes[ext] || 'video/mp4';
+            } else {
+              contentType = 'image/jpeg';
+            }
+          }
+          
+          console.log(`[WriteReviewModal] Uploading new ${item.type}:`, fileName, 'size:', file.size, 'originalType:', file.type, 'contentType:', contentType);
           
           // Upload with explicit content type for better quality preservation
           const { data, error } = await supabase.storage
             .from(bucket)
             .upload(`reviews/${fileName}`, file, {
-              contentType: file.type || (item.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+              contentType,
               cacheControl: '3600',
               upsert: false,
             });
           
           if (error) {
             console.error(`${item.type} upload error:`, error);
-            showToast(`Failed to upload ${item.type}`, 'error');
+            // Provide more helpful error messages
+            let errorMessage = `Failed to upload ${item.type}`;
+            if (error.message?.includes('mime type')) {
+              errorMessage = `Video format not supported. Try converting to MP4.`;
+            } else if (error.message?.includes('size')) {
+              errorMessage = `${item.type === 'video' ? 'Video' : 'Photo'} is too large`;
+            } else if (error.message?.includes('not found') || error.message?.includes('bucket')) {
+              errorMessage = `Upload service unavailable. Please try again.`;
+              console.error('[WriteReviewModal] Storage bucket may not exist! Run migration 117-update-review-videos-bucket.sql');
+            }
+            showToast(errorMessage, 'error');
             setSubmitting(false);
             return;
           }
@@ -862,7 +897,8 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 <input
                   ref={videoInputRef}
                   type="file"
-                  accept="video/*"
+                  accept="video/*,video/mp4,video/quicktime,video/webm,video/x-m4v,.mp4,.mov,.webm,.m4v,.qt"
+                  multiple
                   onChange={handleVideoSelect}
                   className="hidden"
                 />
