@@ -164,12 +164,16 @@ export async function POST(request: NextRequest) {
           console.log('[API reviews] Deleted photos count:', deleteCount);
         }
 
-        // Add new photos
-        const photoInserts = photoUrls.map((url: string, index: number) => ({
-          review_id: reviewId,
-          photo_url: url,
-          sort_order: index,
-        }));
+        // Add new photos - handle both old format (string[]) and new format ({url, sortOrder}[])
+        const photoInserts = photoUrls.map((photo: string | { url: string; sortOrder: number }, index: number) => {
+          const url = typeof photo === 'string' ? photo : photo.url;
+          const sortOrder = typeof photo === 'string' ? index : photo.sortOrder;
+          return {
+            review_id: reviewId,
+            photo_url: url,
+            sort_order: sortOrder,
+          };
+        });
 
         console.log('[API reviews] Inserting photos:', photoInserts.length);
         const { error: insertError } = await supabase.from('review_photos').insert(photoInserts);
@@ -205,12 +209,12 @@ export async function POST(request: NextRequest) {
             .delete()
             .eq('review_id', reviewId);
 
-          // Add new videos
-          const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
+          // Add new videos - handle both old format and new format with sortOrder
+          const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string; sortOrder?: number }, index: number) => ({
             review_id: reviewId,
             video_url: video.url,
             thumbnail_url: video.thumbnailUrl,
-            sort_order: index,
+            sort_order: video.sortOrder !== undefined ? video.sortOrder : index,
           }));
 
           await supabase.from('review_videos').insert(videoInserts);
@@ -268,13 +272,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Add photos
+    // Add photos - handle both old format (string[]) and new format ({url, sortOrder}[])
     if (photoUrls?.length > 0) {
-      const photoInserts = photoUrls.map((url: string, index: number) => ({
-        review_id: newReview.id,
-        photo_url: url,
-        sort_order: index,
-      }));
+      const photoInserts = photoUrls.map((photo: string | { url: string; sortOrder: number }, index: number) => {
+        const url = typeof photo === 'string' ? photo : photo.url;
+        const sortOrder = typeof photo === 'string' ? index : photo.sortOrder;
+        return {
+          review_id: newReview.id,
+          photo_url: url,
+          sort_order: sortOrder,
+        };
+      });
 
       await supabase.from('review_photos').insert(photoInserts);
     }
@@ -285,11 +293,12 @@ export async function POST(request: NextRequest) {
     
     if (videoUrls?.length > 0) {
       try {
-        const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string }, index: number) => ({
+        // Handle both old format and new format with sortOrder
+        const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string; sortOrder?: number }, index: number) => ({
           review_id: newReview.id,
           video_url: video.url,
           thumbnail_url: video.thumbnailUrl,
-          sort_order: index,
+          sort_order: video.sortOrder !== undefined ? video.sortOrder : index,
         }));
 
         console.log('[API reviews] Inserting videos:', JSON.stringify(videoInserts));
@@ -489,15 +498,39 @@ export async function GET(request: NextRequest) {
       commentsCounts[comment.review_id] = (commentsCounts[comment.review_id] || 0) + 1;
     });
 
-    // Format reviews with counts and user profiles
+    // Format reviews with counts, user profiles, and combined media array
     const formattedReviews = reviews?.map(review => {
       const profile = profilesMap.get(review.user_id);
+      
+      // Build combined media array with correct sort order
+      const photos = (review.review_photos as any[]) || [];
+      const videos = (review.review_videos as any[]) || [];
+      
+      const mediaItems: Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string; sortOrder: number }> = [
+        ...photos.map((p: any) => ({
+          type: 'photo' as const,
+          url: p.photo_url,
+          sortOrder: p.sort_order ?? 0,
+        })),
+        ...videos.map((v: any) => ({
+          type: 'video' as const,
+          url: v.video_url,
+          thumbnailUrl: v.thumbnail_url,
+          sortOrder: v.sort_order ?? 0,
+        })),
+      ];
+      
+      // Sort by sortOrder to get correct combined order
+      mediaItems.sort((a, b) => a.sortOrder - b.sortOrder);
+      
       return {
         ...review,
         likesCount: likesCounts[review.id] || 0,
         commentsCount: commentsCounts[review.id] || 0,
         isLiked: userLikes.includes(review.id),
         isPublished: review.is_published,
+        // Combined media array with correct order (use this instead of separate review_photos/review_videos)
+        media: mediaItems,
         user: profile ? {
           id: profile.id,
           username: profile.username,

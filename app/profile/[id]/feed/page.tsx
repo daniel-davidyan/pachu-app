@@ -15,6 +15,8 @@ interface Review {
   commentsCount: number;
   photos: string[];
   videos?: Array<{ url: string; thumbnailUrl?: string }>;
+  // Combined media array with correct sort order (preferred over separate photos/videos)
+  media?: Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string; sortOrder?: number }>;
   restaurant: {
     id: string;
     name: string;
@@ -266,6 +268,8 @@ function UserProfileFeedContent() {
                 },
                 photos: review.photos || [],
                 videos: review.videos || [],
+                // Pass the combined media array for correct sort order
+                media: review.media,
                 restaurant: review.restaurant ? {
                   id: review.restaurant.id,
                   name: review.restaurant.name,

@@ -32,6 +32,8 @@ interface Review {
   };
   review_photos: Array<{ photo_url: string }>;
   review_videos?: Array<{ video_url: string; thumbnail_url?: string }>;
+  // Combined media array with correct sort order
+  media?: Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string; sortOrder: number }>;
 }
 
 interface Profile {
@@ -341,6 +343,8 @@ function ProfileFeedContent() {
                 },
                 photos: review.review_photos?.map(p => p.photo_url) || [],
                 videos: review.review_videos?.map(v => ({ url: v.video_url, thumbnailUrl: v.thumbnail_url })) || [],
+                // Pass the combined media array for correct sort order
+                media: review.media,
                 restaurant: {
                   id: review.restaurants?.id || '',
                   name: review.restaurants?.name || 'Restaurant',

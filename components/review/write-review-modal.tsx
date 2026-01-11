@@ -553,8 +553,9 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
       })));
       
       // Process all media items and upload new ones
-      const finalPhotoUrls: string[] = [];
-      const finalVideoUrls: { url: string; thumbnailUrl?: string }[] = [];
+      // IMPORTANT: We track global sort order to maintain the correct order across photos AND videos
+      const finalPhotoUrls: { url: string; sortOrder: number }[] = [];
+      const finalVideoUrls: { url: string; thumbnailUrl?: string; sortOrder: number }[] = [];
       
       for (let i = 0; i < mediaItems.length; i++) {
         const item = mediaItems[i];
@@ -683,16 +684,19 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
                 thumbnailPublicUrl = thumbUrl;
               }
             }
-            finalVideoUrls.push({ url: publicUrl, thumbnailUrl: thumbnailPublicUrl });
+            // Use global index 'i' for sortOrder to maintain correct order across all media
+            finalVideoUrls.push({ url: publicUrl, thumbnailUrl: thumbnailPublicUrl, sortOrder: i });
           } else {
-            finalPhotoUrls.push(publicUrl);
+            // Use global index 'i' for sortOrder to maintain correct order across all media
+            finalPhotoUrls.push({ url: publicUrl, sortOrder: i });
           }
         } else if (!item.url.startsWith('blob:')) {
           // This is an existing URL from the database
+          // Use global index 'i' for sortOrder to maintain correct order across all media
           if (item.type === 'video') {
-            finalVideoUrls.push({ url: item.url, thumbnailUrl: item.thumbnailUrl });
+            finalVideoUrls.push({ url: item.url, thumbnailUrl: item.thumbnailUrl, sortOrder: i });
           } else {
-            finalPhotoUrls.push(item.url);
+            finalPhotoUrls.push({ url: item.url, sortOrder: i });
           }
         } else if (item.url.startsWith('blob:') && !file) {
           // Blob URL but file was lost - this is a bug

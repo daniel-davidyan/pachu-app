@@ -30,6 +30,8 @@ export interface InstagramPostData {
   };
   photos: string[];
   videos?: Array<{ url: string; thumbnailUrl?: string }>;
+  // Combined media array with correct sort order (preferred over separate photos/videos)
+  media?: Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string; sortOrder?: number }>;
   restaurant?: {
     id: string;
     name: string;
@@ -73,11 +75,13 @@ export function InstagramPostCard({
   const mediaContainerRef = useRef<HTMLDivElement>(null);
   const shouldShowExpand = post.content.length > 100;
 
-  // Combine photos and videos into a single media array
-  const mediaItems: Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string }> = [
-    ...(post.videos || []).map(v => ({ type: 'video' as const, url: v.url, thumbnailUrl: v.thumbnailUrl })),
-    ...(post.photos || []).map(p => ({ type: 'photo' as const, url: p })),
-  ];
+  // Use the combined media array if available (preserves correct sort order), otherwise fall back to legacy format
+  const mediaItems: Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string }> = post.media && post.media.length > 0
+    ? post.media.map(m => ({ type: m.type, url: m.url, thumbnailUrl: m.thumbnailUrl }))
+    : [
+        ...(post.videos || []).map(v => ({ type: 'video' as const, url: v.url, thumbnailUrl: v.thumbnailUrl })),
+        ...(post.photos || []).map(p => ({ type: 'photo' as const, url: p })),
+      ];
 
   // Notify parent when sheet state changes
   useEffect(() => {

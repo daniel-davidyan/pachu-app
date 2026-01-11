@@ -102,14 +102,14 @@ export async function GET(
     // Get review IDs for photos and comments lookup
     const reviewIds = reviewsData.map((r: any) => r.id);
 
-    // PARALLEL: Fetch photos, videos, and comments counts
+    // PARALLEL: Fetch photos, videos (with sort_order), and comments counts
     const [photosResult, videosResult, commentsResult] = await Promise.all([
       reviewIds.length > 0
-        ? supabase.from('review_photos').select('review_id, photo_url').in('review_id', reviewIds).order('sort_order', { ascending: true })
+        ? supabase.from('review_photos').select('review_id, photo_url, sort_order').in('review_id', reviewIds).order('sort_order', { ascending: true })
         : Promise.resolve({ data: [] }),
       
       reviewIds.length > 0
-        ? supabase.from('review_videos').select('review_id, video_url, thumbnail_url, duration_seconds').in('review_id', reviewIds).order('sort_order', { ascending: true })
+        ? supabase.from('review_videos').select('review_id, video_url, thumbnail_url, duration_seconds, sort_order').in('review_id', reviewIds).order('sort_order', { ascending: true })
         : Promise.resolve({ data: [] }),
       
       reviewIds.length > 0
@@ -117,7 +117,41 @@ export async function GET(
         : Promise.resolve({ data: [] })
     ]);
 
-    // Group photos by review
+    // Build combined media array for each review (maintains correct order across photos and videos)
+    const mediaByReview = new Map<string, Array<{ type: 'photo' | 'video'; url: string; thumbnailUrl?: string; durationSeconds?: number; sortOrder: number }>>();
+    
+    // Add photos with sortOrder
+    (photosResult.data || []).forEach((photo: any) => {
+      if (!mediaByReview.has(photo.review_id)) {
+        mediaByReview.set(photo.review_id, []);
+      }
+      mediaByReview.get(photo.review_id)?.push({
+        type: 'photo',
+        url: photo.photo_url,
+        sortOrder: photo.sort_order,
+      });
+    });
+    
+    // Add videos with sortOrder
+    (videosResult.data || []).forEach((video: any) => {
+      if (!mediaByReview.has(video.review_id)) {
+        mediaByReview.set(video.review_id, []);
+      }
+      mediaByReview.get(video.review_id)?.push({
+        type: 'video',
+        url: video.video_url,
+        thumbnailUrl: video.thumbnail_url,
+        durationSeconds: video.duration_seconds,
+        sortOrder: video.sort_order,
+      });
+    });
+    
+    // Sort each review's media by sortOrder
+    mediaByReview.forEach((media) => {
+      media.sort((a, b) => a.sortOrder - b.sortOrder);
+    });
+
+    // Legacy: Group photos by review (for backwards compatibility)
     const photosByReview = new Map<string, string[]>();
     (photosResult.data || []).forEach((photo: any) => {
       if (!photosByReview.has(photo.review_id)) {
@@ -126,7 +160,7 @@ export async function GET(
       photosByReview.get(photo.review_id)?.push(photo.photo_url);
     });
 
-    // Group videos by review
+    // Legacy: Group videos by review (for backwards compatibility)
     const videosByReview = new Map<string, Array<{ url: string; thumbnailUrl?: string; durationSeconds?: number }>>();
     (videosResult.data || []).forEach((video: any) => {
       if (!videosByReview.has(video.review_id)) {
@@ -155,6 +189,8 @@ export async function GET(
       commentsCount: commentsCounts[review.id] || 0,
       photos: photosByReview.get(review.id) || [],
       videos: videosByReview.get(review.id) || [],
+      // Combined media array with correct sort order (use this instead of separate photos/videos)
+      media: mediaByReview.get(review.id) || [],
       restaurant: review.restaurants ? {
         id: review.restaurants.id,
         name: review.restaurants.name,
