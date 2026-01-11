@@ -747,6 +747,7 @@ export default function RestaurantPage() {
             rating: editingReview.rating,
             content: editingReview.content || '',
             photos: editingReview.photos || [],
+            videos: editingReview.videos?.map(v => v.url) || [],
           } : undefined}
           onSuccess={() => {
             setShowWriteReview(false);

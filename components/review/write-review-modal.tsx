@@ -110,9 +110,12 @@ export function WriteReviewModal({ isOpen, onClose, restaurant: initialRestauran
           id: `video-${i}`,
           type: 'video' as const,
           url,
+          // For existing videos, we'll show a placeholder - actual thumbnail can be generated on demand
+          thumbnailUrl: undefined,
         })),
       ];
       setMediaItems(existingMedia);
+      console.log('[WriteReviewModal] Loaded existing media:', existingMedia.length, 'items (photos:', existingReview.photos?.length, 'videos:', existingReview.videos?.length, ')');
     } else {
       // Create mode - start fresh
       setRating(0);

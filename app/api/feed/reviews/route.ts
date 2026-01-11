@@ -216,18 +216,23 @@ export async function GET(request: NextRequest) {
           address,
           city,
           google_place_id,
-          image_url
+          image_url,
+          latitude,
+          longitude
         )
       `)
-      .in('restaurant_id', nearbyRestaurantIds)
       .eq('is_published', true)
       .order('created_at', { ascending: false });
 
     if (tab === 'following') {
+      // For following tab: show ALL reviews from people you follow (not filtered by location)
       if (followingIds.length === 0) {
         return NextResponse.json({ reviews: [], hasMore: false });
       }
       reviewsQuery = reviewsQuery.in('user_id', followingIds);
+    } else {
+      // For foryou tab: filter by nearby restaurants
+      reviewsQuery = reviewsQuery.in('restaurant_id', nearbyRestaurantIds);
     }
 
     // PARALLEL: Fetch reviews and videos simultaneously
@@ -475,7 +480,11 @@ export async function GET(request: NextRequest) {
           ? matchScores.get(restaurant.google_place_id) || 75
           : Math.floor(Math.random() * 20 + 70);
 
-        const distanceMeters: number = distanceMap.get(review.restaurant_id) || 0;
+        // Calculate distance - use distanceMap if available, otherwise calculate from lat/lng
+        let distanceMeters: number = distanceMap.get(review.restaurant_id) || 0;
+        if (distanceMeters === 0 && restaurant?.latitude && restaurant?.longitude) {
+          distanceMeters = calculateDistance(latitude, longitude, restaurant.latitude, restaurant.longitude);
+        }
 
         return {
           id: review.id,

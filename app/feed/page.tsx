@@ -127,14 +127,15 @@ export default function FeedPage() {
   const [followingPage, setFollowingPage] = useState(0);
   const [forYouHasMore, setForYouHasMore] = useState(true);
   const [followingHasMore, setFollowingHasMore] = useState(true);
-  // Track if we've completed at least one successful load (prevents empty state flicker)
-  // ONLY true if we have actual data
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(!!initialData.current.hasData);
+  // Track if we've completed at least one successful load PER TAB (prevents empty state flicker)
+  const [forYouHasLoadedOnce, setForYouHasLoadedOnce] = useState(initialData.current.forYou?.length > 0);
+  const [followingHasLoadedOnce, setFollowingHasLoadedOnce] = useState(initialData.current.following?.length > 0);
   
   // Get current tab's data
   const reviews = activeTab === 'foryou' ? forYouReviews : followingReviews;
   const page = activeTab === 'foryou' ? forYouPage : followingPage;
   const hasMore = activeTab === 'foryou' ? forYouHasMore : followingHasMore;
+  const hasLoadedOnce = activeTab === 'foryou' ? forYouHasLoadedOnce : followingHasLoadedOnce;
   
   // User location - use prefetched location if available, otherwise default (Tel Aviv)
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number }>(() => {
@@ -163,15 +164,16 @@ export default function FeedPage() {
       
       if (hasForYouData) {
         setForYouReviews(prefetchedFeed.forYou);
+        setForYouHasLoadedOnce(true);
       }
       if (hasFollowingData) {
         setFollowingReviews(prefetchedFeed.following);
+        setFollowingHasLoadedOnce(true);
       }
       
       // Only mark as loaded if we actually got data from prefetch
       // Otherwise, let the direct fetch happen
       if (hasForYouData || hasFollowingData) {
-        setHasLoadedOnce(true);
         setLoading(false);
         hasFetchedOnMount.current = true;
       }
@@ -266,6 +268,7 @@ export default function FeedPage() {
           const setReviews = tab === 'foryou' ? setForYouReviews : setFollowingReviews;
           const setPageNum = tab === 'foryou' ? setForYouPage : setFollowingPage;
           const setHasMoreTab = tab === 'foryou' ? setForYouHasMore : setFollowingHasMore;
+          const setTabHasLoadedOnce = tab === 'foryou' ? setForYouHasLoadedOnce : setFollowingHasLoadedOnce;
           
           if (reset) {
             setReviews(data.reviews);
@@ -283,14 +286,15 @@ export default function FeedPage() {
           }
           setHasMoreTab(data.hasMore);
           setPageNum(pageNum);
-          // Mark that we've completed at least one successful load
-          setHasLoadedOnce(true);
+          // Mark that we've completed at least one successful load for this tab
+          setTabHasLoadedOnce(true);
         }
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);
       // Even on error, mark as loaded to prevent infinite loader
-      setHasLoadedOnce(true);
+      const setTabHasLoadedOnce = tab === 'foryou' ? setForYouHasLoadedOnce : setFollowingHasLoadedOnce;
+      setTabHasLoadedOnce(true);
     } finally {
       if (requestId === latestRequestId.current) {
         setLoading(false);
@@ -303,9 +307,9 @@ export default function FeedPage() {
   useEffect(() => {
     if (!userLocation) return;
     
-    // Fetch if we haven't fetched yet OR if we still don't have data
+    // Fetch if we haven't fetched yet OR if we still don't have data for either tab
     const needsFetch = !hasFetchedOnMount.current || 
-      (forYouReviews.length === 0 && followingReviews.length === 0 && !hasLoadedOnce);
+      (!forYouHasLoadedOnce && !followingHasLoadedOnce);
     
     if (needsFetch) {
       hasFetchedOnMount.current = true;
@@ -315,7 +319,7 @@ export default function FeedPage() {
       fetchReviewsForTab('foryou', 0, true, hasActualData);
       fetchReviewsForTab('following', 0, true, hasActualData);
     }
-  }, [userLocation, forYouReviews.length, followingReviews.length, hasLoadedOnce, fetchReviewsForTab]);
+  }, [userLocation, forYouHasLoadedOnce, followingHasLoadedOnce, fetchReviewsForTab]);
 
   // Refetch when filters change (not tab - tab switch is now instant)
   useEffect(() => {
