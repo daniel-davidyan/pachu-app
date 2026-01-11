@@ -76,6 +76,9 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
   const [canShowEmptyState, setCanShowEmptyState] = useState(false);
   const emptyConfirmTimerRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Track previous reviews array to detect tab switches
+  const prevReviewsRef = useRef<FeedReview[]>(reviews);
+  
   // Effect to handle empty state confirmation with delay
   useEffect(() => {
     // Clear any existing timer
@@ -103,6 +106,22 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
       }
     };
   }, [reviews.length, hasLoadedOnce, isLoading, isInitialLoading]);
+  
+  // Reset position when reviews array changes (tab switch)
+  useEffect(() => {
+    // Detect if this is a completely different reviews array (tab switch)
+    // by checking if the first review ID is different
+    const prevFirstId = prevReviewsRef.current[0]?.id;
+    const newFirstId = reviews[0]?.id;
+    
+    if (prevFirstId !== newFirstId && reviews.length > 0) {
+      // Reset to first item on tab switch
+      setCurrentIndex(0);
+      setCanShowEmptyState(false);
+    }
+    
+    prevReviewsRef.current = reviews;
+  }, [reviews]);
   
   // Restore position from sessionStorage on mount
   const [currentIndex, setCurrentIndex] = useState(() => {

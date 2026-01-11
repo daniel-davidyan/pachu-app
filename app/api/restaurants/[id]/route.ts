@@ -185,28 +185,32 @@ export async function GET(
       };
     });
 
-    // Filter reviews based on priority
+    // Show ALL Pachu reviews, sorted with friends first, then other users
     let reviews = allReviews;
     let showingNonFriendReviews = false;
 
-    if (user && allReviews.length > 0 && followingIds.length > 0) {
-      const friendReviews = allReviews.filter(review => followingIds.includes(review.user.id));
+    if (allReviews.length > 0) {
+      // Sort: user's own reviews first, then friends, then others (maintain date order within groups)
+      reviews = [...allReviews].sort((a, b) => {
+        const aIsOwn = user && a.user.id === user.id;
+        const bIsOwn = user && b.user.id === user.id;
+        const aIsFriend = followingIds.includes(a.user.id);
+        const bIsFriend = followingIds.includes(b.user.id);
+        
+        // Own reviews first
+        if (aIsOwn && !bIsOwn) return -1;
+        if (!aIsOwn && bIsOwn) return 1;
+        // Then friends
+        if (aIsFriend && !bIsFriend) return -1;
+        if (!aIsFriend && bIsFriend) return 1;
+        // Maintain original date order within same priority group
+        return 0;
+      });
       
-      if (friendReviews.length > 0) {
-        reviews = friendReviews;
-      } else {
-        const userOwnReviews = allReviews.filter(review => review.user.id === user.id);
-        if (userOwnReviews.length > 0) {
-          reviews = userOwnReviews;
-        } else {
-          showingNonFriendReviews = true;
-        }
-      }
-    } else if (user) {
-      const userOwnReviews = allReviews.filter(review => review.user.id === user.id);
-      if (userOwnReviews.length > 0) {
-        reviews = userOwnReviews;
-      }
+      // Check if showing non-friend reviews (for info banner)
+      const hasFriendReviews = reviews.some(r => followingIds.includes(r.user.id));
+      const hasOwnReviews = user ? reviews.some(r => r.user.id === user.id) : false;
+      showingNonFriendReviews = !hasFriendReviews && !hasOwnReviews && reviews.length > 0;
     }
 
     // Get friends who reviewed
@@ -402,25 +406,29 @@ async function handleGooglePlaceId(
       }
     }
 
-    // Determine which reviews to show
+    // Show ALL Pachu reviews (sorted: own first, then friends, then others), fall back to Google only if no Pachu reviews
     let reviewsToShow: any[] = [];
     let showingGoogleReviews = false;
 
-    if (user && followingIds.length > 0) {
-      const friendReviews = ourReviews.filter(review => followingIds.includes(review.user.id));
-      if (friendReviews.length > 0) {
-        reviewsToShow = friendReviews;
-      }
-    }
-
-    if (reviewsToShow.length === 0 && user && ourReviews.length > 0) {
-      const userOwnReviews = ourReviews.filter(review => review.user.id === user.id);
-      if (userOwnReviews.length > 0) {
-        reviewsToShow = userOwnReviews;
-      }
-    }
-
-    if (reviewsToShow.length === 0 && googleData.reviews && googleData.reviews.length > 0) {
+    if (ourReviews.length > 0) {
+      // Sort: user's own reviews first, then friends, then others
+      reviewsToShow = [...ourReviews].sort((a, b) => {
+        const aIsOwn = user && a.user.id === user.id;
+        const bIsOwn = user && b.user.id === user.id;
+        const aIsFriend = followingIds.includes(a.user.id);
+        const bIsFriend = followingIds.includes(b.user.id);
+        
+        // Own reviews first
+        if (aIsOwn && !bIsOwn) return -1;
+        if (!aIsOwn && bIsOwn) return 1;
+        // Then friends
+        if (aIsFriend && !bIsFriend) return -1;
+        if (!aIsFriend && bIsFriend) return 1;
+        // Maintain original date order within same priority group
+        return 0;
+      });
+    } else if (googleData.reviews && googleData.reviews.length > 0) {
+      // Fall back to Google reviews only if no Pachu reviews exist
       showingGoogleReviews = true;
       const restaurantPhotos = googleData.photos 
         ? googleData.photos.slice(0, 3).map((photo: any) => 

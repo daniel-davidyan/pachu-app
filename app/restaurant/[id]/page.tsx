@@ -524,72 +524,77 @@ export default function RestaurantPage() {
               </div>
             )}
 
-            {/* Opening Hours */}
-            {restaurant.openingHours && restaurant.openingHours.weekday_text && restaurant.openingHours.weekday_text.length > 0 && (
-              <div className="mb-5">
-                <button
-                  onClick={() => setShowAllHours(!showAllHours)}
-                  className="w-full"
-                >
-                  <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all">
-                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
-                      restaurant.openingHours.open_now 
-                        ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30' 
-                        : 'bg-gray-400 shadow-lg shadow-gray-400/20'
-                    }`}>
-                      <Clock className="w-5 h-5 text-white" strokeWidth={2} />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-bold text-gray-900">Hours</span>
-                        {restaurant.openingHours.open_now !== undefined && (
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            restaurant.openingHours.open_now 
-                              ? 'bg-emerald-100 text-emerald-700' 
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {restaurant.openingHours.open_now ? 'Open Now' : 'Closed'}
-                          </span>
-                        )}
+            {/* Opening Hours - use local state OR restaurant data */}
+            {(() => {
+              const hours = openingHours || restaurant.openingHours;
+              if (!hours || !hours.weekday_text || hours.weekday_text.length === 0) return null;
+              
+              return (
+                <div className="mb-5">
+                  <button
+                    onClick={() => setShowAllHours(!showAllHours)}
+                    className="w-full"
+                  >
+                    <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+                        hours.open_now 
+                          ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30' 
+                          : 'bg-gray-400 shadow-lg shadow-gray-400/20'
+                      }`}>
+                        <Clock className="w-5 h-5 text-white" strokeWidth={2} />
                       </div>
-                      <div className="space-y-1">
-                        {/* Today's hours */}
-                        <div className="text-xs text-gray-600 font-medium">
-                          {restaurant.openingHours.weekday_text[(new Date().getDay() + 6) % 7]}
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-gray-900">Hours</span>
+                          {hours.open_now !== undefined && (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              hours.open_now 
+                                ? 'bg-emerald-100 text-emerald-700' 
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {hours.open_now ? 'Open Now' : 'Closed'}
+                            </span>
+                          )}
                         </div>
-                        
-                        {/* All hours - expandable */}
-                        {showAllHours && (
-                          <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5">
-                            {restaurant.openingHours.weekday_text.map((day: string, index: number) => {
-                              const isToday = index === (new Date().getDay() + 6) % 7;
-                              return (
-                                <div 
-                                  key={index} 
-                                  className={`text-xs flex justify-between ${
-                                    isToday 
-                                      ? 'font-bold text-gray-900' 
-                                      : 'text-gray-600'
-                                  }`}
-                                >
-                                  <span>{day.split(': ')[0]}</span>
-                                  <span>{day.split(': ')[1]}</span>
-                                </div>
-                              );
-                            })}
+                        <div className="space-y-1">
+                          {/* Today's hours */}
+                          <div className="text-xs text-gray-600 font-medium">
+                            {hours.weekday_text[(new Date().getDay() + 6) % 7]}
                           </div>
-                        )}
+                          
+                          {/* All hours - expandable */}
+                          {showAllHours && (
+                            <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5">
+                              {hours.weekday_text.map((day: string, index: number) => {
+                                const isToday = index === (new Date().getDay() + 6) % 7;
+                                return (
+                                  <div 
+                                    key={index} 
+                                    className={`text-xs flex justify-between ${
+                                      isToday 
+                                        ? 'font-bold text-gray-900' 
+                                        : 'text-gray-600'
+                                    }`}
+                                  >
+                                    <span>{day.split(': ')[0]}</span>
+                                    <span>{day.split(': ')[1]}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      {showAllHours ? (
+                        <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0 mt-2" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0 mt-2" />
+                      )}
                     </div>
-                    {showAllHours ? (
-                      <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0 mt-2" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0 mt-2" />
-                    )}
-                  </div>
-                </button>
-              </div>
-            )}
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Action Buttons - Modern Grid Layout */}
             <div className={`grid gap-2.5 ${isIsrael ? 'grid-cols-4' : 'grid-cols-3'}`}>

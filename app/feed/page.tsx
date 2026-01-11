@@ -371,7 +371,6 @@ export default function FeedPage() {
       {/* Main Feed Content - Full screen, video behind everything */}
       <div className="w-full h-full">
         <TikTokFeed
-          key={activeTab}
           reviews={reviews}
           onLoadMore={handleLoadMore}
           hasMore={hasMore}
