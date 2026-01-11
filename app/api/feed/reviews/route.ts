@@ -261,7 +261,7 @@ export async function GET(request: NextRequest) {
           .from('reviews')
           .select(`
             id, rating, content, created_at, user_id, restaurant_id,
-            restaurants (id, name, address, city, google_place_id, image_url)
+            restaurants (id, name, address, city, google_place_id, image_url, latitude, longitude)
           `)
           .in('id', missingVideoReviewIds)
           .eq('is_published', true);
