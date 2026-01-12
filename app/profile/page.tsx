@@ -725,6 +725,15 @@ export default function ProfilePage() {
                         })()
                       )}
                       
+                      {/* Restaurant name overlay - on thumbnails */}
+                      {thumbnailUrl && (
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent pt-6 pb-2 px-2">
+                          <p className="text-white text-xs font-medium text-center line-clamp-1 drop-shadow-md">
+                            {review.restaurants?.name}
+                          </p>
+                        </div>
+                      )}
+                      
                       {/* Video Indicator */}
                       {hasVideo && (
                         <div className="absolute top-2 right-2">
