@@ -696,7 +696,7 @@ export default function ProfilePage() {
                     <Link
                       key={review.id}
                       href={`/profile/feed?tab=${activeTab}&startId=${review.id}`}
-                      className="relative aspect-square bg-gray-200 overflow-hidden group"
+                      className="relative aspect-[4/5] bg-gray-200 overflow-hidden group"
                     >
                       {thumbnailUrl ? (
                         <img
