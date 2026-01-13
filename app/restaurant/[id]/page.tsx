@@ -5,14 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { MainLayout } from '@/components/layout/main-layout';
 import { 
-  ArrowLeft, Bookmark, MapPin, Phone, Globe, DollarSign, 
-  Users, PenLine, Navigation, Share2, Loader2, Calendar, ThumbsUp, Star, Edit2, Trash2, MoreVertical, Utensils, Clock, ChevronDown, ChevronUp
+  ArrowLeft, Bookmark, MapPin, Phone, Globe,
+  Users, PenLine, Navigation, Share2, Loader2, Calendar, Star, Utensils, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { CompactRating } from '@/components/ui/modern-rating';
-import { PostCard, PostCardData } from '@/components/post/post-card';
-import { formatDistanceToNow, format } from 'date-fns';
+import { InstagramPostCard, InstagramPostData } from '@/components/feed/instagram-post-card';
 import Link from 'next/link';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
@@ -291,8 +289,8 @@ export default function RestaurantPage() {
     }
   };
 
-  const handleEditReview = (post: PostCardData) => {
-    const review = reviews.find((r: Review) => r.id === post.id);
+  const handleEditReview = (reviewId: string) => {
+    const review = reviews.find((r: Review) => r.id === reviewId);
     if (review) {
       setEditingReview(review);
       setShowWriteReview(true);
@@ -702,24 +700,44 @@ export default function RestaurantPage() {
               <p className="text-sm text-gray-400 mt-1">Be the first to share your experience!</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {reviews.map((review: Review) => (
-                <div
-                  key={review.id}
-                  ref={setPostRef(review.id)}
-                  data-post-id={review.id}
-                >
-                  <PostCard
-                    post={review}
-                    showRestaurantInfo={false}
-                    onEdit={handleEditReview}
-                    onDelete={handleDeleteReview}
-                    onSheetStateChange={setSheetOpen}
-                    onUpdate={fetchRestaurant}
-                    isVisible={visiblePostId === review.id}
-                  />
-                </div>
-              ))}
+            <div>
+              {reviews.map((review: Review) => {
+                const postData: InstagramPostData = {
+                  id: review.id,
+                  rating: review.rating,
+                  title: review.title,
+                  content: review.content,
+                  createdAt: review.createdAt,
+                  likesCount: review.likesCount || 0,
+                  commentsCount: review.commentsCount || 0,
+                  isLiked: review.isLiked || false,
+                  user: {
+                    id: review.user?.id || '',
+                    username: review.user?.username || '',
+                    fullName: review.user?.fullName || '',
+                    avatarUrl: review.user?.avatarUrl,
+                  },
+                  photos: review.photos || [],
+                  videos: review.videos?.map(v => ({ url: v.url, thumbnailUrl: v.thumbnailUrl })) || [],
+                  // Don't show restaurant info since we're already on the restaurant page
+                  restaurant: undefined,
+                };
+
+                return (
+                  <div
+                    key={review.id}
+                    ref={setPostRef(review.id)}
+                    data-post-id={review.id}
+                  >
+                    <InstagramPostCard
+                      post={postData}
+                      onSheetStateChange={setSheetOpen}
+                      onUpdate={fetchRestaurant}
+                      isVisible={visiblePostId === review.id}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
