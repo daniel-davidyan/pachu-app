@@ -649,14 +649,14 @@ export default function RestaurantPage() {
         </div>
 
         {/* Experiences Section */}
-        <div className="px-4 py-2 mt-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">
+        <div className="mt-4">
+          <h2 className="text-lg font-bold text-gray-900 mb-3 px-4">
             Experiences ({reviews.length})
           </h2>
 
           {/* Info banner when showing Google/non-friend reviews */}
           {(showingGoogleReviews || showingNonFriendReviews) && reviews.length > 0 && (
-            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+            <div className="mb-4 mx-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <Users className="w-5 h-5 text-blue-600" />
@@ -692,7 +692,7 @@ export default function RestaurantPage() {
           )}
 
           {reviews.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-2xl">
+            <div className="text-center py-12 mx-4 bg-white rounded-2xl">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Star className="w-8 h-8 text-gray-400" />
               </div>
@@ -734,6 +734,7 @@ export default function RestaurantPage() {
                       onSheetStateChange={setSheetOpen}
                       onUpdate={fetchRestaurant}
                       isVisible={visiblePostId === review.id}
+                      showUserHeader={true}
                     />
                   </div>
                 );

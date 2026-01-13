@@ -47,6 +47,8 @@ interface InstagramPostCardProps {
   onUpdate?: () => void;
   isVisible?: boolean;
   isHighlighted?: boolean;
+  /** When true, shows the user info in the header instead of restaurant info (useful on restaurant page) */
+  showUserHeader?: boolean;
 }
 
 export function InstagramPostCard({ 
@@ -54,7 +56,8 @@ export function InstagramPostCard({
   onSheetStateChange, 
   onUpdate, 
   isVisible = false,
-  isHighlighted = false
+  isHighlighted = false,
+  showUserHeader = false
 }: InstagramPostCardProps) {
   const { user } = useUser();
   const { showToast } = useToast();
@@ -298,45 +301,90 @@ export function InstagramPostCard({
 
   return (
     <div className={`bg-white ${isHighlighted ? 'animate-highlight-post' : ''}`}>
-      {/* Restaurant Header - Instagram Style */}
+      {/* Header - Instagram Style (shows user or restaurant based on prop) */}
       <div className="flex items-center px-3 py-2.5">
-        {/* Restaurant Photo Circle */}
-        <Link
-          href={post.restaurant ? `/restaurant/${post.restaurant.googlePlaceId || post.restaurant.id}` : '#'}
-          className="flex-shrink-0"
-        >
-          <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 p-[2px]">
-            <div className="w-full h-full rounded-full overflow-hidden bg-white p-[1px]">
-              {post.restaurant?.imageUrl ? (
-                <img 
-                  src={post.restaurant.imageUrl} 
-                  alt={post.restaurant.name} 
-                  className="w-full h-full object-cover rounded-full"
-                />
-              ) : (
-                <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center">
-                  <span className="text-sm">🍽️</span>
+        {showUserHeader ? (
+          <>
+            {/* User Photo Circle */}
+            <Link
+              href={`/profile/${post.user.id}`}
+              className="flex-shrink-0"
+            >
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 p-[2px]">
+                <div className="w-full h-full rounded-full overflow-hidden bg-white p-[1px]">
+                  {post.user.avatarUrl ? (
+                    <img 
+                      src={post.user.avatarUrl} 
+                      alt={post.user.fullName} 
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                      <span className="text-sm font-bold text-white">
+                        {(post.user.fullName || post.user.username).charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-        </Link>
+              </div>
+            </Link>
 
-        {/* Restaurant Info */}
-        <Link
-          href={post.restaurant ? `/restaurant/${post.restaurant.googlePlaceId || post.restaurant.id}` : '#'}
-          className="flex-1 min-w-0 ml-3"
-        >
-          <p className="font-semibold text-[13px] text-gray-900 truncate leading-tight">
-            {post.restaurant?.name || 'Restaurant'}
-          </p>
-          <div className="flex items-center gap-1 text-[11px] text-gray-500">
-            <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-            <span className="truncate">{formatAddress(post.restaurant?.address || '')}</span>
-            <span className="flex-shrink-0">•</span>
-            <span className="flex-shrink-0">{formatDistanceToNow(new Date(post.createdAt), { addSuffix: false })}</span>
-          </div>
-        </Link>
+            {/* User Info */}
+            <Link
+              href={`/profile/${post.user.id}`}
+              className="flex-1 min-w-0 ml-3"
+            >
+              <p className="font-semibold text-[13px] text-gray-900 truncate leading-tight">
+                {post.user.fullName || post.user.username}
+              </p>
+              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                <span className="truncate">@{post.user.username}</span>
+                <span className="flex-shrink-0">•</span>
+                <span className="flex-shrink-0">{formatDistanceToNow(new Date(post.createdAt), { addSuffix: false })}</span>
+              </div>
+            </Link>
+          </>
+        ) : (
+          <>
+            {/* Restaurant Photo Circle */}
+            <Link
+              href={post.restaurant ? `/restaurant/${post.restaurant.googlePlaceId || post.restaurant.id}` : '#'}
+              className="flex-shrink-0"
+            >
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 p-[2px]">
+                <div className="w-full h-full rounded-full overflow-hidden bg-white p-[1px]">
+                  {post.restaurant?.imageUrl ? (
+                    <img 
+                      src={post.restaurant.imageUrl} 
+                      alt={post.restaurant.name} 
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center">
+                      <span className="text-sm">🍽️</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Link>
+
+            {/* Restaurant Info */}
+            <Link
+              href={post.restaurant ? `/restaurant/${post.restaurant.googlePlaceId || post.restaurant.id}` : '#'}
+              className="flex-1 min-w-0 ml-3"
+            >
+              <p className="font-semibold text-[13px] text-gray-900 truncate leading-tight">
+                {post.restaurant?.name || 'Restaurant'}
+              </p>
+              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                <span className="truncate">{formatAddress(post.restaurant?.address || '')}</span>
+                <span className="flex-shrink-0">•</span>
+                <span className="flex-shrink-0">{formatDistanceToNow(new Date(post.createdAt), { addSuffix: false })}</span>
+              </div>
+            </Link>
+          </>
+        )}
 
         {/* Rating */}
         <div className="flex-shrink-0 ml-2">
