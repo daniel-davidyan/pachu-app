@@ -107,7 +107,7 @@ export function BottomNav({ show = true, variant = 'default' }: BottomNavProps) 
               ? isFeedPage ? "text-white" : "text-[#C5459C]"
               : isFeedPage ? "text-white/50" : "text-gray-400"
           )}>
-            Agent
+            Pachu
           </span>
         </Link>
 
