@@ -67,13 +67,13 @@ export function BottomNav({ show = true, variant = 'default' }: BottomNavProps) 
         >
           <Plus
             className={cn(
-              "w-6 h-6 transition-all duration-200",
+              "w-8 h-8 transition-all duration-200",
               isActiveSearch 
                 ? isFeedPage ? "text-white" : "text-[#C5459C]"
                 : isFeedPage ? "text-white/50" : "text-gray-400",
               "group-active:scale-90"
             )}
-            strokeWidth={isActiveSearch ? 2.5 : 1.5}
+            strokeWidth={isActiveSearch ? 3.5 : 3}
           />
           <span className={cn(
             "text-[10px] font-medium mt-0.5 transition-colors",
