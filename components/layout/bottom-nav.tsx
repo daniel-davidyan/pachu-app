@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Search, MapPin, User, Sparkles } from 'lucide-react';
+import { Home, Plus, MapPin, User, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -65,7 +65,7 @@ export function BottomNav({ show = true, variant = 'default' }: BottomNavProps) 
           href="/search"
           className="flex flex-col items-center justify-center flex-1 py-2 group"
         >
-          <Search
+          <Plus
             className={cn(
               "w-6 h-6 transition-all duration-200",
               isActiveSearch 
