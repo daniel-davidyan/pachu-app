@@ -157,30 +157,30 @@ export default function FeedPage() {
   const hasFetchedOnMount = useRef(!!initialData.current.hasData); // Skip fetch if we have data
   
   // Update from prefetched data when it arrives
+  // Accept prefetch data even if we've started our own fetch, as long as we don't have data yet
   useEffect(() => {
-    if (prefetchedFeed && !hasFetchedOnMount.current) {
-      const hasForYouData = prefetchedFeed.forYou.length > 0;
-      const hasFollowingData = prefetchedFeed.following.length > 0;
-      
-      if (hasForYouData) {
-        setForYouReviews(prefetchedFeed.forYou);
-        setForYouHasLoadedOnce(true);
-      }
-      if (hasFollowingData) {
-        setFollowingReviews(prefetchedFeed.following);
-        setFollowingHasLoadedOnce(true);
-      }
-      
-      // Only mark as loaded if we actually got data from prefetch
-      // Otherwise, let the direct fetch happen
-      if (hasForYouData || hasFollowingData) {
-        setLoading(false);
-        hasFetchedOnMount.current = true;
-      }
-      // If prefetch returned empty, don't set hasFetchedOnMount
-      // This allows the direct fetch to run when userLocation is ready
+    if (!prefetchedFeed) return;
+    
+    const hasForYouData = prefetchedFeed.forYou.length > 0;
+    const hasFollowingData = prefetchedFeed.following.length > 0;
+    
+    // Update forYou if prefetch has data and we don't
+    if (hasForYouData && forYouReviews.length === 0) {
+      setForYouReviews(prefetchedFeed.forYou);
+      setForYouHasLoadedOnce(true);
     }
-  }, [prefetchedFeed]);
+    // Update following if prefetch has data and we don't
+    if (hasFollowingData && followingReviews.length === 0) {
+      setFollowingReviews(prefetchedFeed.following);
+      setFollowingHasLoadedOnce(true);
+    }
+    
+    // Stop loading if we got data from prefetch
+    if ((hasForYouData || hasFollowingData) && loading) {
+      setLoading(false);
+      hasFetchedOnMount.current = true;
+    }
+  }, [prefetchedFeed, forYouReviews.length, followingReviews.length, loading]);
   
   // Update location from prefetch when it arrives
   useEffect(() => {

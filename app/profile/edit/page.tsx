@@ -181,7 +181,10 @@ export default function EditProfilePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header - Instagram Style */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+      <div 
+        className="sticky top-0 z-10 bg-white border-b border-gray-200"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
         <div className="flex items-center justify-between px-4 h-14">
           <button
             onClick={() => router.back()}
