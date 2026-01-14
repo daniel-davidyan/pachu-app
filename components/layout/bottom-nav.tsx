@@ -1,7 +1,7 @@
 'use client';
 
 import { Home, Plus, MapPin, User } from 'lucide-react';
-import { IconRobot } from '@tabler/icons-react';
+import { MagicWand } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -91,7 +91,7 @@ export function BottomNav({ show = true, variant = 'default' }: BottomNavProps) 
           href="/agent"
           className="flex flex-col items-center justify-center flex-1 py-2 group"
         >
-          <IconRobot
+          <MagicWand
             className={cn(
               "w-6 h-6 transition-all duration-200",
               isActiveAgent 
@@ -99,7 +99,7 @@ export function BottomNav({ show = true, variant = 'default' }: BottomNavProps) 
                 : isFeedPage ? "text-white/50" : "text-gray-400",
               "group-active:scale-90"
             )}
-            strokeWidth={isActiveAgent ? 2.5 : 1.5}
+            weight={isActiveAgent ? "fill" : "regular"}
           />
           <span className={cn(
             "text-[10px] font-medium mt-0.5 transition-colors",
