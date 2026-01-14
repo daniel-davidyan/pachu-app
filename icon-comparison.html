@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Icons - Pachu</title>
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        
+        h1 {
+            color: white;
+            margin-bottom: 40px;
+            font-size: 28px;
+        }
+        
+        .icons-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            max-width: 500px;
+        }
+        
+        .icon-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        
+        .icon-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(197, 69, 156, 0.3);
+            border-color: #C5459C;
+        }
+        
+        .icon-card i {
+            color: #C5459C;
+            font-size: 52px;
+        }
+        
+        .icon-number {
+            background: #C5459C;
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        
+        .icon-name {
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        .note {
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 40px;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>אייקוני רובוט ל-Pachu</h1>
+    
+    <div class="icons-container">
+        <div class="icon-card">
+            <span class="icon-number">1</span>
+            <i class="ph ph-robot"></i>
+            <span class="icon-name">Robot</span>
+        </div>
+        
+        <div class="icon-card">
+            <span class="icon-number">2</span>
+            <i class="ph ph-android-logo"></i>
+            <span class="icon-name">Android</span>
+        </div>
+        
+        <div class="icon-card">
+            <span class="icon-number">3</span>
+            <i class="ph ph-bug-droid"></i>
+            <span class="icon-name">Bug Droid</span>
+        </div>
+        
+        <div class="icon-card">
+            <span class="icon-number">4</span>
+            <i class="ph ph-head-circuit"></i>
+            <span class="icon-name">Head Circuit</span>
+        </div>
+        
+        <div class="icon-card">
+            <span class="icon-number">5</span>
+            <i class="ph ph-cpu"></i>
+            <span class="icon-name">CPU</span>
+        </div>
+        
+        <div class="icon-card">
+            <span class="icon-number">6</span>
+            <i class="ph ph-circuitry"></i>
+            <span class="icon-name">Circuitry</span>
+        </div>
+    </div>
+    
+    <p class="note">אייקונים מספריית Phosphor Icons</p>
+</body>
+</html>
