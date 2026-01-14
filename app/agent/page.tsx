@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Sparkles, Loader2, Plus, Clock, X, Trash2, BarChart3 } from 'lucide-react';
+import { Send, Loader2, Plus, Clock, X, Trash2, BarChart3 } from 'lucide-react';
+import { MagicWand } from '@phosphor-icons/react';
 import { BottomNav } from '@/components/layout/bottom-nav';
 
 interface Restaurant {
@@ -611,7 +612,7 @@ export default function AgentPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 text-primary" />
+                <MagicWand className="w-5 h-5 text-primary" weight="fill" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -725,7 +726,7 @@ export default function AgentPage() {
               >
                 <div className="flex flex-col items-center">
                   <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                    <Sparkles className="w-10 h-10 text-primary" />
+                    <MagicWand className="w-10 h-10 text-primary" weight="fill" />
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-2 text-lg">What are you craving?</h3>
                   <p className="text-sm text-gray-500 max-w-xs text-center">Tell me your mood, budget, or cuisine preferences and I&apos;ll find the perfect spot for you</p>
