@@ -47,7 +47,7 @@ function LoginForm() {
         throw error;
       }
       
-      router.push('/feed');
+      router.push('/agent');
       router.refresh();
     } catch (error: any) {
       setError(error.message || 'An error occurred');

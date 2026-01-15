@@ -51,7 +51,7 @@ export default function SignUpPage() {
         // No email confirmation needed (auto-confirm is enabled)
         setSuccess(true);
         setTimeout(() => {
-          router.push('/feed');
+          router.push('/agent');
           router.refresh();
         }, 1500);
       }
