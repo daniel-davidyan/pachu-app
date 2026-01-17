@@ -5,15 +5,12 @@ import { useUser } from '@/hooks/use-user';
 import { usePrefetch } from '@/hooks/use-prefetch';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus } from 'lucide-react';
-import { CompactRating } from '@/components/ui/modern-rating';
+import { Camera, Heart, Loader2, Grid3X3, EyeOff, Bookmark, Play, FolderPlus } from 'lucide-react';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { PostCard, PostCardData } from '@/components/post/post-card';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { useToast } from '@/components/ui/toast';
-import { formatAddress } from '@/lib/address-utils';
 import { CollectionModal } from '@/components/collections/collection-modal';
 import useSWR from 'swr';
 
@@ -105,21 +102,6 @@ const MiniRatingRing = ({ rating, emoji }: { rating: number; emoji: string }) =>
     </div>
   );
 };
-
-interface Profile {
-  id: string;
-  username: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  created_at: string;
-}
-
-interface Stats {
-  experiences: number;
-  followers: number;
-  following: number;
-}
 
 interface Review {
   id: string;
@@ -240,6 +222,7 @@ export default function ProfilePage() {
   const [collections, setCollections] = useState<SavedCollection[]>([]);
   const [allSavedCount, setAllSavedCount] = useState(0);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
 
   // Fetch collections when saved tab is active
   useEffect(() => {
@@ -266,7 +249,7 @@ export default function ProfilePage() {
   const fetchWishlist = async () => {
     if (!user?.id) return;
     
-    setLoadingTab(true);
+    setCollectionsLoading(true);
     try {
       const response = await fetch('/api/wishlist');
       const data = await response.json();
@@ -281,14 +264,14 @@ export default function ProfilePage() {
       console.error('Error fetching wishlist:', error);
       setWishlist([]);
     } finally {
-      setLoadingTab(false);
+      setCollectionsLoading(false);
     }
   };
 
   const fetchCollections = async () => {
     if (!user?.id) return;
     
-    setLoadingTab(true);
+    setCollectionsLoading(true);
     try {
       // Fetch collections and all saved count in parallel
       const [collectionsRes, wishlistRes] = await Promise.all([
@@ -310,7 +293,7 @@ export default function ProfilePage() {
       console.error('Error fetching collections:', error);
       setCollections([]);
     } finally {
-      setLoadingTab(false);
+      setCollectionsLoading(false);
     }
   };
 
@@ -348,8 +331,18 @@ export default function ProfilePage() {
       });
 
       if (response.ok) {
-        setReviews(prev => prev.filter(review => review.id !== reviewToDelete));
-        fetchStats(); // Refresh stats
+        // Optimistically update SWR cache by filtering out the deleted review
+        mutateProfile((current: any) => {
+          if (!current) return current;
+          return {
+            ...current,
+            reviews: current.reviews?.filter((r: any) => r.id !== reviewToDelete) || [],
+            stats: {
+              ...current.stats,
+              experiences: Math.max(0, (current.stats?.experiences || 0) - 1),
+            },
+          };
+        }, { revalidate: true });
         showToast('Experience deleted successfully', 'success');
       } else {
         showToast('Failed to delete experience', 'error');
@@ -362,17 +355,12 @@ export default function ProfilePage() {
     }
   };
 
-  const handleEditReview = (post: PostCardData) => {
-    const review = reviews.find(r => r.id === post.id);
+  const handleEditReview = (post: { id: string }) => {
+    const review = reviews.find((r: any) => r.id === post.id);
     if (review) {
       setEditingReview(review);
       setShowEditModal(true);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -415,7 +403,14 @@ export default function ProfilePage() {
 
       if (updateError) throw updateError;
 
-      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+      // Update SWR cache with new avatar URL
+      mutateProfile((current: any) => {
+        if (!current) return current;
+        return {
+          ...current,
+          profile: { ...current.profile, avatar_url: publicUrl },
+        };
+      }, { revalidate: true });
       showToast('Profile photo updated successfully', 'success');
     } catch (error) {
       console.error('Error uploading avatar:', error);
@@ -616,7 +611,7 @@ export default function ProfilePage() {
 
         {/* Tab Content - Instagram-Style Grid */}
         <div>
-          {loadingTab ? (
+          {(activeTab === 'saved' ? collectionsLoading : loadingTab) ? (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-2" />
               <p className="text-sm text-gray-500">Loading...</p>
@@ -625,7 +620,7 @@ export default function ProfilePage() {
             // Reviews Grid - Instagram Style
             reviews.length > 0 ? (
               <div className="grid grid-cols-3 gap-[1px] bg-gray-100">
-                {reviews.map((review) => {
+                {reviews.map((review: Review) => {
                   // Only show user-uploaded content (photos or video thumbnails), not Google restaurant images
                   const hasVideo = (review.review_videos?.length || 0) > 0;
                   const videoThumbnail = review.review_videos?.[0]?.thumbnail_url;
