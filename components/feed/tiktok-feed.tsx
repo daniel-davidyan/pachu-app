@@ -626,7 +626,6 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
           setComments([]);
         }}
         title="Comments"
-        skipBodyLock={true}
         footer={user ? (
           <div ref={inputContainerRef} className="pt-3">
             <div className="flex items-center gap-3">

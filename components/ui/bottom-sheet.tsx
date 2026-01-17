@@ -17,14 +17,14 @@ interface BottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  footer?: React.ReactNode; // Fixed footer that stays above keyboard
+  footer?: React.ReactNode;
   title?: string;
   zIndex?: number;
   height?: string;
   skipBodyLock?: boolean;
 }
 
-export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex = 9998, height = '70vh', skipBodyLock = false }: BottomSheetProps) {
+export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex = 9998, height = '70vh' }: BottomSheetProps) {
   const mounted = useIsMounted();
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -36,54 +36,53 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const scrollPositionRef = useRef<number>(0);
   const initialHeightRef = useRef<number>(0);
 
-  // Body lock effect
+  // Always lock body scroll when sheet is open
   useEffect(() => {
-    if (skipBodyLock) return;
-    
     if (isOpen) {
       scrollPositionRef.current = window.scrollY;
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
       document.body.style.top = `-${scrollPositionRef.current}px`;
+      document.body.style.left = '0';
     } else {
       const scrollY = scrollPositionRef.current;
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
+      document.body.style.left = '';
       window.scrollTo(0, scrollY);
     }
     
     return () => {
-      if (skipBodyLock) return;
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
+      document.body.style.left = '';
     };
-  }, [isOpen, skipBodyLock]);
+  }, [isOpen]);
 
-  // Keyboard detection via visualViewport
+  // Track keyboard via visual viewport
   useEffect(() => {
     if (!isOpen) {
-      // Use microtask to avoid setState during render
-      queueMicrotask(() => setKeyboardHeight(0));
+      setKeyboardHeight(0);
       return;
     }
 
     const vv = window.visualViewport;
     if (!vv) return;
 
-    // Store initial height when sheet opens
+    // Store initial height
     initialHeightRef.current = vv.height;
 
     const handleResize = () => {
       const currentHeight = vv.height;
       const diff = initialHeightRef.current - currentHeight;
       
-      // Keyboard is open if viewport shrunk significantly
-      if (diff > 100) {
+      // Keyboard is open if viewport shrunk significantly (> 150px)
+      if (diff > 150) {
         setKeyboardHeight(diff);
       } else {
         setKeyboardHeight(0);
@@ -186,6 +185,12 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
+  
+  // Calculate sheet height - reduce by keyboard height when keyboard is open
+  const baseMaxHeight = '85vh';
+  const adjustedMaxHeight = keyboardHeight > 0 
+    ? `calc(85vh - ${keyboardHeight}px)` 
+    : baseMaxHeight;
 
   const content = (
     <>
@@ -196,20 +201,17 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
         style={{ opacity: isOpen ? 1 : 0, zIndex }}
       />
 
-      {/* Bottom Sheet - moves up when keyboard opens */}
+      {/* Bottom Sheet */}
       <div
         ref={sheetRef}
-        className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col"
+        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col"
         style={{
-          bottom: keyboardHeight,
           height: height,
-          maxHeight: keyboardHeight > 0 
-            ? `calc(100vh - ${keyboardHeight}px - 20px)` 
-            : '85vh',
+          maxHeight: adjustedMaxHeight,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 1,
-          transition: keyboardHeight > 0 ? 'bottom 0.2s ease-out, max-height 0.2s ease-out' : 'none',
+          transition: keyboardHeight > 0 ? 'max-height 0.25s ease-out' : 'none',
         }}
       >
         {/* Drag Handle */}
@@ -247,7 +249,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
           {children}
         </div>
 
-        {/* Fixed Footer - for input fields, stays above keyboard */}
+        {/* Fixed Footer */}
         {footer && (
           <div className="flex-shrink-0 px-4 pb-4 bg-white border-t border-gray-100">
             {footer}
