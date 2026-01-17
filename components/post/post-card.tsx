@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical, Bookmark } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, MapPin, Calendar, Edit2, Trash2, Send, X, MoreVertical, Bookmark, Loader2 } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -204,6 +204,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [mentionSearch, setMentionSearch] = useState('');
   const [availableFriends, setAvailableFriends] = useState<Array<{ id: string; username: string; fullName: string; avatarUrl?: string }>>([]);
   const [mentionedUsers, setMentionedUsers] = useState<Array<{ id: string; username: string }>>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState('');
   const [commentMenuOpen, setCommentMenuOpen] = useState<string | null>(null);
@@ -307,14 +308,20 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
 
   // Fetch friends list when component mounts or comments are shown
   const fetchFriends = async (search = '') => {
+    setLoadingFriends(true);
     try {
-      const response = await fetch('/api/friends/search?q=' + search);
+      const response = await fetch('/api/friends/search?q=' + encodeURIComponent(search));
       const data = await response.json();
       if (data.friends) {
         setAvailableFriends(data.friends);
+      } else {
+        setAvailableFriends([]);
       }
     } catch (error) {
       console.error('Error fetching friends:', error);
+      setAvailableFriends([]);
+    } finally {
+      setLoadingFriends(false);
     }
   };
 
@@ -1362,77 +1369,80 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                   </div>
                 )}
                 
-                <div className="relative">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      placeholder="Add a comment..."
-                      value={newComment}
-                      onChange={(e) => handleMentionInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleCommentSubmit();
-                        }
-                      }}
-                      className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
-                    />
-                    <button
-                      onClick={handleCommentSubmit}
-                      disabled={!newComment.trim()}
-                      className="text-blue-500 font-semibold text-sm disabled:opacity-40 transition-opacity"
-                    >
-                      Post
-                    </button>
-                  </div>
-                  
-                  {/* Mention Dropdown */}
-                  {showMentionDropdown && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto z-50">
-                      {availableFriends.length > 0 ? (
-                        <>
-                          <div className="px-4 py-2 border-b border-gray-100">
-                            <p className="text-xs font-medium text-gray-500">People you follow</p>
-                          </div>
-                          {availableFriends.map((friend) => (
-                            <button
-                              key={friend.id}
-                              onClick={() => handleSelectMention(friend)}
-                              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                            >
-                              {friend.avatarUrl ? (
-                                <img
-                                  src={friend.avatarUrl}
-                                  alt={friend.fullName}
-                                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                                />
-                              ) : (
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                                  <span className="text-sm font-bold text-white">
-                                    {friend.fullName.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
-                                <p className="text-xs text-gray-500">@{friend.username}</p>
+                {/* Mention Dropdown - Positioned above input */}
+                {showMentionDropdown && (
+                  <div className="mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto">
+                    {loadingFriends ? (
+                      <div className="px-4 py-6 text-center">
+                        <Loader2 className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Loading...</p>
+                      </div>
+                    ) : availableFriends.length > 0 ? (
+                      <>
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <p className="text-xs font-medium text-gray-500">People you follow</p>
+                        </div>
+                        {availableFriends.map((friend) => (
+                          <button
+                            key={friend.id}
+                            onClick={() => handleSelectMention(friend)}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                          >
+                            {friend.avatarUrl ? (
+                              <img
+                                src={friend.avatarUrl}
+                                alt={friend.fullName}
+                                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm font-bold text-white">
+                                  {friend.fullName.charAt(0).toUpperCase()}
+                                </span>
                               </div>
-                            </button>
-                          ))}
-                        </>
-                      ) : mentionSearch ? (
-                        <div className="px-4 py-6 text-center">
-                          <p className="text-sm text-gray-500">No matches found for &quot;{mentionSearch}&quot;</p>
-                          <p className="text-xs text-gray-400 mt-1">You can only tag people you follow</p>
-                        </div>
-                      ) : (
-                        <div className="px-4 py-6 text-center">
-                          <p className="text-sm text-gray-500">Start typing to search</p>
-                          <p className="text-xs text-gray-400 mt-1">You can tag people you follow</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
+                              <p className="text-xs text-gray-500">@{friend.username}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </>
+                    ) : mentionSearch ? (
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-sm text-gray-500">No matches found for &quot;{mentionSearch}&quot;</p>
+                        <p className="text-xs text-gray-400 mt-1">You can only tag people you follow</p>
+                      </div>
+                    ) : (
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-sm text-gray-500">You don&apos;t follow anyone yet</p>
+                        <p className="text-xs text-gray-400 mt-1">Follow people to tag them in comments</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Add a comment..."
+                    value={newComment}
+                    onChange={(e) => handleMentionInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleCommentSubmit();
+                      }
+                    }}
+                    className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
+                  />
+                  <button
+                    onClick={handleCommentSubmit}
+                    disabled={!newComment.trim()}
+                    className="text-blue-500 font-semibold text-sm disabled:opacity-40 transition-opacity"
+                  >
+                    Post
+                  </button>
                 </div>
               </div>
             )}
