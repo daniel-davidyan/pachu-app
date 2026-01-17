@@ -1368,59 +1368,6 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                     ))}
                   </div>
                 )}
-                
-                {/* Mention Dropdown - Positioned above input */}
-                {showMentionDropdown && (
-                  <div className="mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto">
-                    {loadingFriends ? (
-                      <div className="px-4 py-6 text-center">
-                        <Loader2 className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">Loading...</p>
-                      </div>
-                    ) : availableFriends.length > 0 ? (
-                      <>
-                        <div className="px-4 py-2 border-b border-gray-100">
-                          <p className="text-xs font-medium text-gray-500">People you follow</p>
-                        </div>
-                        {availableFriends.map((friend) => (
-                          <button
-                            key={friend.id}
-                            onClick={() => handleSelectMention(friend)}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                          >
-                            {friend.avatarUrl ? (
-                              <img
-                                src={friend.avatarUrl}
-                                alt={friend.fullName}
-                                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                                <span className="text-sm font-bold text-white">
-                                  {friend.fullName.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
-                              <p className="text-xs text-gray-500">@{friend.username}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </>
-                    ) : mentionSearch ? (
-                      <div className="px-4 py-6 text-center">
-                        <p className="text-sm text-gray-500">No matches found for &quot;{mentionSearch}&quot;</p>
-                        <p className="text-xs text-gray-400 mt-1">You can only tag people you follow</p>
-                      </div>
-                    ) : (
-                      <div className="px-4 py-6 text-center">
-                        <p className="text-sm text-gray-500">You don&apos;t follow anyone yet</p>
-                        <p className="text-xs text-gray-400 mt-1">Follow people to tag them in comments</p>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div className="flex items-center gap-3">
                   <input
@@ -1444,6 +1391,62 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                     Post
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Mention Dropdown - Fixed position above comment input */}
+            {showMentionDropdown && user && (
+              <div 
+                className="fixed left-4 right-4 bg-white border border-gray-200 rounded-2xl shadow-2xl max-h-56 overflow-y-auto"
+                style={{ bottom: 'calc(60px + env(safe-area-inset-bottom))', zIndex: 99999 }}
+              >
+                {loadingFriends ? (
+                  <div className="px-4 py-6 text-center">
+                    <Loader2 className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Loading...</p>
+                  </div>
+                ) : availableFriends.length > 0 ? (
+                  <>
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <p className="text-xs font-medium text-gray-500">People you follow</p>
+                    </div>
+                    {availableFriends.map((friend) => (
+                      <button
+                        key={friend.id}
+                        onClick={() => handleSelectMention(friend)}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                      >
+                        {friend.avatarUrl ? (
+                          <img
+                            src={friend.avatarUrl}
+                            alt={friend.fullName}
+                            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-bold text-white">
+                              {friend.fullName.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
+                          <p className="text-xs text-gray-500">@{friend.username}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                ) : mentionSearch ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm text-gray-500">No matches found for &quot;{mentionSearch}&quot;</p>
+                    <p className="text-xs text-gray-400 mt-1">You can only tag people you follow</p>
+                  </div>
+                ) : (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm text-gray-500">You don&apos;t follow anyone yet</p>
+                    <p className="text-xs text-gray-400 mt-1">Follow people to tag them in comments</p>
+                  </div>
+                )}
               </div>
             )}
           </>
