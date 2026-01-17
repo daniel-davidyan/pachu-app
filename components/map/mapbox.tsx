@@ -645,6 +645,9 @@ export function Mapbox({
 
     // Initial load
     currentMap.on('load', () => {
+      // Hide default POI labels (restaurants, shops, etc.) - only show our custom markers
+      currentMap.setLayoutProperty('poi-label', 'visibility', 'none');
+      
       // Small delay to ensure map is fully loaded
       setTimeout(() => {
         // Don't auto-trigger geolocate - let user click location button instead
