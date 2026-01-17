@@ -88,27 +88,71 @@ export default function ReviewPage() {
         setRecentReviews(data.recentReviews || []);
         setIsFollowing(data.isFollowing || false);
       }
-    } catch (error) {
-      console.error('Error fetching review:', error);
+    } catch {
+      // Error fetching review
     } finally {
       setLoading(false);
     }
   };
 
   const handleLike = async () => {
-    if (!review) return;
+    if (!review || !user) return;
     
-    // TODO: Implement like API call
+    // Optimistic update
+    const wasLiked = review.isLiked;
     setReview({
       ...review,
-      isLiked: !review.isLiked,
-      likesCount: review.isLiked ? review.likesCount - 1 : review.likesCount + 1,
+      isLiked: !wasLiked,
+      likesCount: wasLiked ? review.likesCount - 1 : review.likesCount + 1,
     });
+
+    try {
+      const response = await fetch('/api/reviews/like', {
+        method: wasLiked ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewId: review.id }),
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setReview({
+          ...review,
+          isLiked: wasLiked,
+          likesCount: review.likesCount,
+        });
+      }
+    } catch (error) {
+      // Revert on error
+      setReview({
+        ...review,
+        isLiked: wasLiked,
+        likesCount: review.likesCount,
+      });
+    }
   };
 
   const handleFollow = async () => {
-    // TODO: Implement follow/unfollow API call
-    setIsFollowing(!isFollowing);
+    if (!review || !user || review.user.id === user.id) return;
+
+    // Optimistic update
+    const wasFollowing = isFollowing;
+    setIsFollowing(!wasFollowing);
+
+    try {
+      const response = await fetch('/api/users/follow', {
+        method: wasFollowing ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: review.user.id }),
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setIsFollowing(wasFollowing);
+      }
+    } catch (error) {
+      // Revert on error
+      setIsFollowing(wasFollowing);
+    }
   };
 
   const handleShare = async () => {
@@ -119,8 +163,8 @@ export default function ReviewPage() {
           text: review.content,
           url: window.location.href,
         });
-      } catch (error) {
-        console.log('Error sharing:', error);
+      } catch {
+        // Sharing cancelled or not supported
       }
     }
   };

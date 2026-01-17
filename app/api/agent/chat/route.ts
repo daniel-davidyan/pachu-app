@@ -30,15 +30,6 @@ interface UserProfile {
   dietary?: string[];
 }
 
-interface ExtractedInfo {
-  occasion: string | null;
-  location: string | null;
-  cuisine: string | null;
-  vibe: string | null;
-  budget: string | null;
-  readyToRecommend: boolean;
-}
-
 // ============================================
 // THE MAIN SYSTEM PROMPT - The Brain of Pachu
 // ============================================
@@ -90,32 +81,21 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
-    console.log('🔐 CHAT API - User auth:', { 
-      isLoggedIn: !!user, 
-      userId: user?.id || 'NOT_LOGGED_IN',
-    });
-    
     const body = await request.json();
     const {
       message,
       conversationId,
-      previousContext,
       messages: conversationHistory,
-      userLocation,
     } = body;
 
     if (!message) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 });
     }
 
-    // ========================================
     // STEP 1: Get User Profile for personalization
-    // ========================================
     const userProfile = await getUserProfile(supabase, user?.id);
     
-    // ========================================
     // STEP 2: Build conversation for the model
-    // ========================================
     const systemPromptWithProfile = buildSystemPrompt(userProfile);
     
     const openaiMessages: any[] = [
@@ -125,7 +105,6 @@ export async function POST(request: NextRequest) {
     // Add conversation history
     if (conversationHistory && conversationHistory.length > 0) {
       conversationHistory.forEach((msg: any) => {
-        // Clean previous messages from the READY tag
         const cleanContent = msg.content.replace(/\[READY_TO_RECOMMEND\]/g, '').trim();
         openaiMessages.push({
           role: msg.role,
@@ -137,11 +116,7 @@ export async function POST(request: NextRequest) {
     // Add current message
     openaiMessages.push({ role: 'user', content: message });
 
-    // ========================================
     // STEP 3: Get Agent Response
-    // ========================================
-    console.log('🤖 Calling OpenAI for natural conversation...');
-    
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: openaiMessages,
@@ -150,19 +125,14 @@ export async function POST(request: NextRequest) {
     });
 
     const agentResponse = completion.choices[0].message.content || '';
-    console.log('📝 Agent raw response:', agentResponse);
 
-    // ========================================
     // STEP 4: Check if ready to recommend
-    // ========================================
     const isReadyToRecommend = agentResponse.includes('[READY_TO_RECOMMEND]');
     
     // Clean the response from the tag
     const cleanResponse = agentResponse.replace(/\[READY_TO_RECOMMEND\]/g, '').trim();
 
     if (isReadyToRecommend) {
-      console.log('🎯 Ready to recommend! Sending conversation to pipeline...');
-      
       // Call recommendation API with full conversation
       const requestUrl = new URL(request.url);
       const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
@@ -174,13 +144,8 @@ export async function POST(request: NextRequest) {
         { baseUrl, cookies }
       );
 
-      // Use the natural summary message from the recommendation API
-      // The message contains [[Restaurant Name]] markers that the frontend will render as components
-      let fullMessage = '';
-      
       if (recommendResponse.recommendations && recommendResponse.recommendations.length > 0) {
-        // Use the naturally generated message from the recommendation API
-        fullMessage = recommendResponse.message || cleanResponse;
+        const fullMessage = recommendResponse.message || cleanResponse;
         
         return NextResponse.json({
           message: fullMessage,
@@ -190,20 +155,17 @@ export async function POST(request: NextRequest) {
           conversationId: conversationId || `conv_${Date.now()}`,
         });
       } else {
-        // No recommendations found - return a friendly error message
         const noResultsMessage = 'אוי, לא מצאתי בדיוק מה שחיפשת 😔 אולי ננסה משהו קצת אחר? ספר לי עוד מה בא לך!';
         
         return NextResponse.json({
           message: noResultsMessage,
-          readyToRecommend: false, // Let user continue the conversation
+          readyToRecommend: false,
           conversationId: conversationId || `conv_${Date.now()}`,
         });
       }
     }
 
-    // ========================================
     // STEP 5: Return conversational response
-    // ========================================
     return NextResponse.json({
       message: cleanResponse,
       readyToRecommend: false,
@@ -226,7 +188,6 @@ export async function POST(request: NextRequest) {
 function buildSystemPrompt(profile: UserProfile): string {
   let prompt = SYSTEM_PROMPT;
   
-  // Add personalization if we have user info
   if (profile.firstName || profile.likes?.length || profile.dislikes?.length) {
     prompt += '\n\n## מידע על המשתמש הנוכחי:\n';
     
@@ -269,7 +230,6 @@ async function getUserProfile(supabase: any, userId?: string): Promise<UserProfi
   const fullName = profile?.full_name || profile?.username || '';
   const firstName = fullName.split(' ')[0];
 
-  // Build dietary preferences
   const dietary: string[] = [];
   if (tasteProfile?.is_kosher) dietary.push('כשר');
   if (tasteProfile?.is_vegetarian) dietary.push('צמחוני');
@@ -293,7 +253,6 @@ async function callRecommendationAPI(
   requestInfo: { baseUrl: string; cookies: string }
 ): Promise<{ recommendations: any[]; message?: string; debugData?: any }> {
   
-  // Build full messages array including current message
   const messages = [
     ...conversationHistory,
     { role: 'user', content: currentMessage }
@@ -301,7 +260,6 @@ async function callRecommendationAPI(
 
   try {
     const controller = new AbortController();
-    // Increased timeout to 60 seconds - vector search + LLM calls can take time
     const timeoutId = setTimeout(() => controller.abort(), 60000);
     
     const recommendResponse = await fetch(`${requestInfo.baseUrl}/api/agent/recommend`, {
@@ -311,7 +269,7 @@ async function callRecommendationAPI(
         'Cookie': requestInfo.cookies,
       },
       body: JSON.stringify({
-        messages,  // Send full conversation
+        messages,
         includeDebugData: true,
       }),
       signal: controller.signal,

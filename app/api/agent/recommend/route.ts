@@ -76,54 +76,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('\n========================================');
-    console.log('🚀 SIMPLIFIED PIPELINE V3.1');
-    console.log('========================================\n');
-    console.log('📝 User messages:', userMessagesOnly.substring(0, 200));
-
-    // ================================================
     // STEP 0: EXTRACT SEARCH INTENT
-    // ================================================
-    console.log('\n🎯 STEP 0: Extract Search Intent');
     const searchIntent = await extractSearchIntent(userMessagesOnly);
-    console.log('   Search intent:', searchIntent);
 
-    // ================================================
     // STEP 1: VECTOR SEARCH (All → Top 30)
-    // Using pgvector for efficient database-side similarity search
-    // ================================================
-    console.log('\n📊 STEP 1: Vector Search');
-    
-    // Generate embedding for the SEARCH INTENT
-    console.log('   🧠 Generating search embedding...');
     const searchEmbedding = await generateEmbedding(searchIntent);
-    console.log(`   🧠 Search embedding length: ${searchEmbedding.length}`);
 
-    // Try to use the optimized database function first
     let top30: Restaurant[] = [];
     let totalInDb = 0;
     
     try {
-      // Use pgvector's database-side similarity search (MUCH faster, no JSON parsing issues)
-      console.log('   📡 Calling database vector search function...');
+      // Use pgvector's database-side similarity search
       const { data: vectorResults, error: rpcError } = await supabase.rpc('search_restaurants_simple', {
-        query_embedding: JSON.stringify(searchEmbedding), // pgvector expects string format
+        query_embedding: JSON.stringify(searchEmbedding),
         max_results: 30,
       });
 
       if (rpcError) {
-        console.error('   ⚠️ RPC error:', rpcError.message);
         throw new Error(rpcError.message);
       }
 
       if (vectorResults && vectorResults.length > 0) {
-        console.log(`   ✅ Database returned ${vectorResults.length} results`);
         top30 = vectorResults.map((r: any) => ({
           ...r,
           vectorScore: r.similarity || 0,
         }));
         
-        // Get total count for debug
         const { count } = await supabase
           .from('restaurant_cache')
           .select('id', { count: 'exact', head: true })
@@ -132,13 +110,8 @@ export async function POST(request: NextRequest) {
       } else {
         throw new Error('No results from database function');
       }
-    } catch (dbError) {
+    } catch {
       // Fallback: Fetch ALL restaurants and filter by search intent keywords
-      console.log('   ⚠️ Database function failed, using keyword fallback...');
-      console.log(`   ⚠️ Error: ${dbError}`);
-      
-      // Fetch ALL restaurants (no embedding needed)
-      // Using ACTUAL column names from the enrich script (which populated the DB)
       const { data: allRestaurants, error: fetchError } = await supabase
         .from('restaurant_cache')
         .select('id, google_place_id, name, address, city, latitude, longitude, google_rating, google_reviews_count, price_level, categories, summary, opening_hours, photos')
@@ -150,7 +123,6 @@ export async function POST(request: NextRequest) {
       }
 
       totalInDb = allRestaurants?.length || 0;
-      console.log(`   📦 Fallback: fetched ${totalInDb} restaurants total`);
 
       if (!allRestaurants || allRestaurants.length === 0) {
         return NextResponse.json({
@@ -161,7 +133,6 @@ export async function POST(request: NextRequest) {
 
       // Extract keywords from search intent for filtering
       const keywords = searchIntent.toLowerCase().split(/\s+/).filter(k => k.length > 2);
-      console.log(`   🔍 Filtering by keywords: ${keywords.join(', ')}`);
 
       // Score restaurants by keyword matches in categories and summary
       const scoredRestaurants = allRestaurants.map(r => {
@@ -170,25 +141,21 @@ export async function POST(request: NextRequest) {
         const nameText = (r.name || '').toLowerCase();
         const searchText = `${categoriesText} ${summaryText} ${nameText}`;
         
-        // Count keyword matches
         let score = 0;
         for (const keyword of keywords) {
           if (searchText.includes(keyword)) {
             score += 1;
           }
-          // Extra points for category match
           if (categoriesText.includes(keyword)) {
             score += 2;
           }
         }
         
-        // Boost by rating
         score += (r.google_rating || 0) / 5;
         
         return { ...r, keywordScore: score };
       });
 
-      // Sort by keyword score, then by rating
       scoredRestaurants.sort((a, b) => {
         if (b.keywordScore !== a.keywordScore) {
           return b.keywordScore - a.keywordScore;
@@ -197,9 +164,7 @@ export async function POST(request: NextRequest) {
       });
 
       const topMatches = scoredRestaurants.slice(0, 30);
-      console.log(`   📊 Top matches: ${topMatches.slice(0, 5).map(r => `${r.name} (score: ${r.keywordScore.toFixed(1)})`).join(', ')}`);
 
-      // Map to Restaurant interface (column names match directly)
       top30 = topMatches.map(r => ({
         id: r.id,
         google_place_id: r.google_place_id,
@@ -215,28 +180,12 @@ export async function POST(request: NextRequest) {
         summary: r.summary || '',
         opening_hours: r.opening_hours,
         photos: r.photos,
-        vectorScore: r.keywordScore / (keywords.length * 3 + 1), // Normalize score
+        vectorScore: r.keywordScore / (keywords.length * 3 + 1),
       }));
     }
 
-    console.log(`   ✅ Top 30 selected. Best score: ${top30[0]?.vectorScore?.toFixed(4)}`);
-    console.log('   Top 5:', top30.slice(0, 5).map(r => `${r.name} (${r.vectorScore?.toFixed(3)})`).join(', '));
-
-    // ================================================
     // STEP 2: LLM SELECTION (30 → 3)
-    // ================================================
-    console.log('\n🤖 STEP 2: LLM Selection');
-
     const recommendations = await selectWithLLM(top30, conversationText, user?.id);
-
-    console.log(`   ✅ LLM selected ${recommendations.length} restaurants`);
-    recommendations.forEach((rec, i) => {
-      console.log(`   ${i + 1}. ${rec.restaurant.name}: "${rec.reason}"`);
-    });
-
-    console.log('\n========================================');
-    console.log('✅ PIPELINE COMPLETE');
-    console.log('========================================\n');
 
     // Generate natural summary message using LLM
     const summaryMessage = await generateNaturalSummary(recommendations, conversationText);
@@ -245,10 +194,9 @@ export async function POST(request: NextRequest) {
       recommendations,
       message: summaryMessage,
       debugData: includeDebugData ? {
-        // Step 1: Database & Hard Filters (currently no hard filters, so same as total)
         step1: {
           totalInDb: totalInDb,
-          afterFilter: totalInDb, // No hard filters in V3
+          afterFilter: totalInDb,
           sampleRestaurants: top30.slice(0, 10).map(r => ({
             id: r.id,
             name: r.name,
@@ -256,7 +204,6 @@ export async function POST(request: NextRequest) {
             city: r.city,
           })),
         },
-        // Step 2: Vector Search
         step2: {
           queryText: searchIntent,
           totalScored: totalInDb,
@@ -268,7 +215,6 @@ export async function POST(request: NextRequest) {
             summary: r.summary?.substring(0, 100),
           })),
         },
-        // Step 3: Re-ranking (pass-through in V3 - same as vector search)
         step3: {
           totalReranked: top30.length,
           topByRerank: top30.map(r => ({
@@ -276,11 +222,10 @@ export async function POST(request: NextRequest) {
             name: r.name,
             categories: r.categories,
             vectorScore: r.vectorScore,
-            finalScore: r.vectorScore, // Same in V3
-            socialScore: 0, // Not used in V3
+            finalScore: r.vectorScore,
+            socialScore: 0,
           })),
         },
-        // Step 4: LLM Selection
         step4: {
           candidatesSentToLLM: top30.map(r => ({
             id: r.id,
@@ -308,10 +253,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ============================================
 // STEP 0: Extract Search Intent
-// ============================================
-
 async function extractSearchIntent(userMessages: string): Promise<string> {
   const prompt = `Extract the restaurant search intent from this user message. 
 Return a short search query in English that captures what type of food/restaurant they want.
@@ -348,10 +290,7 @@ Return ONLY the search query, nothing else:`;
   }
 }
 
-// ============================================
 // STEP 1 HELPERS: Vector Search
-// ============================================
-
 async function generateEmbedding(text: string): Promise<number[]> {
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-small',
@@ -360,64 +299,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return response.data[0].embedding;
 }
 
-/**
- * Parse embedding from various formats:
- * - Array of numbers (direct)
- * - JSON string: "[0.1, 0.2, ...]"
- * - pgvector string: "[0.1,0.2,...]" or "(0.1,0.2,...)"
- */
-function parseEmbedding(embedding: any): number[] | null {
-  if (!embedding) return null;
-  
-  // Already an array
-  if (Array.isArray(embedding)) {
-    return embedding;
-  }
-  
-  // String format (JSON or pgvector)
-  if (typeof embedding === 'string') {
-    try {
-      // Try JSON parse first
-      const parsed = JSON.parse(embedding);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      // Try pgvector format: remove brackets and split by comma
-      const cleaned = embedding.replace(/[\[\]()]/g, '');
-      const values = cleaned.split(',').map(v => parseFloat(v.trim()));
-      if (values.length > 0 && !isNaN(values[0])) {
-        return values;
-      }
-    }
-  }
-  
-  // Object with data property (some drivers return this)
-  if (typeof embedding === 'object' && embedding.data) {
-    return parseEmbedding(embedding.data);
-  }
-  
-  return null;
-}
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (!a || !b || a.length !== b.length) return 0;
-  
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-// ============================================
 // STEP 2: LLM Selection
-// ============================================
-
 async function selectWithLLM(
   candidates: Restaurant[],
   conversationText: string,
@@ -425,14 +307,10 @@ async function selectWithLLM(
   userId?: string
 ): Promise<Recommendation[]> {
   
-  console.log('🎯 selectWithLLM called with', candidates.length, 'candidates');
-  
   if (candidates.length === 0) {
-    console.error('❌ No candidates provided to LLM selection!');
     return [];
   }
 
-  // Build restaurant list for prompt
   const restaurantList = candidates.map((r, i) => {
     return `${i + 1}. ${r.name}
    קטגוריות: ${(r.categories || []).join(', ') || 'מסעדה'}
@@ -477,7 +355,6 @@ ${restaurantList}
 - "הסושי הכי טרי בעיר"`;
 
   try {
-    console.log('📤 Calling GPT-4o for selection...');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
@@ -486,21 +363,14 @@ ${restaurantList}
     });
 
     const responseText = response.choices[0].message.content || '[]';
-    console.log('📥 LLM raw response:', responseText.substring(0, 200));
-    
     const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
-    console.log('🧹 Cleaned response:', cleaned.substring(0, 200));
-    
     const selections = JSON.parse(cleaned);
-    console.log('✅ Parsed selections:', selections);
 
     const results = selections.slice(0, 3).map((sel: { index: number; reason: string }) => {
       const restaurant = candidates[sel.index - 1];
       if (!restaurant) {
-        console.error(`❌ Invalid index ${sel.index} in LLM response (candidates length: ${candidates.length})`);
         return null;
       }
-      console.log(`   ✓ Selected: ${restaurant.name}`);
       return {
         restaurant,
         reason: sel.reason,
@@ -508,12 +378,10 @@ ${restaurantList}
       };
     }).filter(Boolean) as Recommendation[];
     
-    console.log(`📊 Final results: ${results.length} recommendations`);
     return results;
 
   } catch (e) {
-    console.error('❌ LLM selection error:', e);
-    console.log('⚠️ Using fallback: returning top 3 candidates');
+    console.error('LLM selection error:', e);
     
     // Fallback: return top 3 with generic reasons
     return candidates.slice(0, 3).map(r => ({
@@ -524,10 +392,7 @@ ${restaurantList}
   }
 }
 
-// ============================================
 // Natural Summary Generation
-// ============================================
-
 async function generateNaturalSummary(
   recommendations: Recommendation[],
   conversationText: string

@@ -7,7 +7,6 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     
-    // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user) {
@@ -26,11 +25,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Always use Google Place ID to find or create restaurant
     let restaurantId: string | null = null;
 
     if (restaurant.googlePlaceId) {
-      // Check if restaurant exists by Google Place ID
       const { data: existingRestaurant } = await supabase
         .from('restaurants')
         .select('id')
@@ -40,7 +37,6 @@ export async function POST(request: NextRequest) {
       if (existingRestaurant) {
         restaurantId = existingRestaurant.id;
       } else {
-        // Create new restaurant with Google Place ID and location
         const restaurantData: any = {
           google_place_id: restaurant.googlePlaceId,
           name: restaurant.name,
@@ -49,7 +45,6 @@ export async function POST(request: NextRequest) {
           created_by: user.id,
         };
 
-        // Include latitude and longitude if provided
         if (restaurant.latitude && restaurant.longitude) {
           restaurantData.latitude = restaurant.latitude;
           restaurantData.longitude = restaurant.longitude;
@@ -71,7 +66,6 @@ export async function POST(request: NextRequest) {
 
         restaurantId = newRestaurant.id;
         
-        // Also try to update PostGIS location if available (for spatial queries)
         if (restaurant.latitude && restaurant.longitude) {
           try {
             await supabase.rpc('update_restaurant_location', {
@@ -79,19 +73,15 @@ export async function POST(request: NextRequest) {
               p_longitude: restaurant.longitude,
               p_latitude: restaurant.latitude,
             });
-          } catch (e) {
-            // PostGIS location update is optional, continue without it
-            // The latitude/longitude columns are already saved above
-            console.log('PostGIS location update skipped');
+          } catch {
+            // PostGIS location update is optional
           }
         }
 
-        // Enrich restaurant in background (don't block the response)
         enrichAndCacheRestaurant(restaurant.googlePlaceId, supabase)
-          .catch(err => console.error('[Reviews API] Background enrichment failed:', err));
+          .catch(err => console.error('Background enrichment failed:', err));
       }
     } else if (restaurant.id) {
-      // Fallback: use provided restaurant ID (for legacy support)
       restaurantId = restaurant.id;
     }
 
@@ -104,7 +94,6 @@ export async function POST(request: NextRequest) {
 
     // If reviewId is provided, update existing review (edit mode)
     if (reviewId) {
-      // Verify the review belongs to the user
       const { data: existingReview } = await supabase
         .from('reviews')
         .select('id, user_id')
@@ -119,7 +108,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Update existing review
       const { error: updateError } = await supabase
         .from('reviews')
         .update({
@@ -139,32 +127,12 @@ export async function POST(request: NextRequest) {
       }
 
       // Update photos
-      console.log('[API reviews] Updating photos for review:', reviewId);
-      console.log('[API reviews] Received photoUrls:', photoUrls?.length, 'photos');
-      
       if (photoUrls?.length > 0) {
-        // First, check how many photos exist before delete
-        const { data: existingPhotos, error: countError } = await supabase
-          .from('review_photos')
-          .select('id, photo_url')
-          .eq('review_id', reviewId);
-        
-        console.log('[API reviews] Existing photos before delete:', existingPhotos?.length || 0);
-        
-        // Delete old photos
-        const { error: deleteError, count: deleteCount } = await supabase
+        await supabase
           .from('review_photos')
           .delete()
-          .eq('review_id', reviewId)
-          .select();
+          .eq('review_id', reviewId);
 
-        if (deleteError) {
-          console.error('[API reviews] Delete error:', deleteError);
-        } else {
-          console.log('[API reviews] Deleted photos count:', deleteCount);
-        }
-
-        // Add new photos - handle both old format (string[]) and new format ({url, sortOrder}[])
         const photoInserts = photoUrls.map((photo: string | { url: string; sortOrder: number }, index: number) => {
           const url = typeof photo === 'string' ? photo : photo.url;
           const sortOrder = typeof photo === 'string' ? index : photo.sortOrder;
@@ -175,41 +143,22 @@ export async function POST(request: NextRequest) {
           };
         });
 
-        console.log('[API reviews] Inserting photos:', photoInserts.length);
-        const { error: insertError } = await supabase.from('review_photos').insert(photoInserts);
-        
-        if (insertError) {
-          console.error('[API reviews] Insert error:', insertError);
-        }
-        
-        // Verify final count
-        const { data: finalPhotos } = await supabase
-          .from('review_photos')
-          .select('id')
-          .eq('review_id', reviewId);
-        console.log('[API reviews] Final photos count after update:', finalPhotos?.length || 0);
+        await supabase.from('review_photos').insert(photoInserts);
       } else {
-        // If no photos provided, delete all existing photos
-        const { error: deleteError } = await supabase
+        await supabase
           .from('review_photos')
           .delete()
           .eq('review_id', reviewId);
-        
-        if (deleteError) {
-          console.error('[API reviews] Delete all error:', deleteError);
-        }
       }
 
-      // Handle videos (if review_videos table exists)
+      // Handle videos
       if (videoUrls?.length > 0) {
         try {
-          // Delete old videos
           await supabase
             .from('review_videos')
             .delete()
             .eq('review_id', reviewId);
 
-          // Add new videos - handle both old format and new format with sortOrder
           const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string; sortOrder?: number }, index: number) => ({
             review_id: reviewId,
             video_url: video.url,
@@ -218,18 +167,16 @@ export async function POST(request: NextRequest) {
           }));
 
           await supabase.from('review_videos').insert(videoInserts);
-        } catch (videoError) {
-          // Video table may not exist yet, continue without error
-          console.log('[API reviews] Video update skipped:', videoError);
+        } catch {
+          // Video table may not exist yet
         }
       } else {
-        // Delete all existing videos if none provided
         try {
           await supabase
             .from('review_videos')
             .delete()
             .eq('review_id', reviewId);
-        } catch (e) {
+        } catch {
           // Table may not exist
         }
       }
@@ -241,7 +188,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Otherwise, create a new review (allows multiple reviews per restaurant)
+    // Create a new review
     const { data: newReview, error: createError } = await supabase
       .from('reviews')
       .insert({
@@ -256,12 +203,6 @@ export async function POST(request: NextRequest) {
 
     if (createError) {
       console.error('Error creating review:', createError);
-      console.error('Error details:', {
-        message: createError.message,
-        details: createError.details,
-        hint: createError.hint,
-        code: createError.code
-      });
       return NextResponse.json(
         { 
           error: 'Failed to create review',
@@ -272,7 +213,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Add photos - handle both old format (string[]) and new format ({url, sortOrder}[])
+    // Add photos
     if (photoUrls?.length > 0) {
       const photoInserts = photoUrls.map((photo: string | { url: string; sortOrder: number }, index: number) => {
         const url = typeof photo === 'string' ? photo : photo.url;
@@ -293,15 +234,12 @@ export async function POST(request: NextRequest) {
     
     if (videoUrls?.length > 0) {
       try {
-        // Handle both old format and new format with sortOrder
         const videoInserts = videoUrls.map((video: { url: string; thumbnailUrl?: string; sortOrder?: number }, index: number) => ({
           review_id: newReview.id,
           video_url: video.url,
           thumbnail_url: video.thumbnailUrl,
           sort_order: video.sortOrder !== undefined ? video.sortOrder : index,
         }));
-
-        console.log('[API reviews] Inserting videos:', JSON.stringify(videoInserts));
         
         const { data: insertedVideos, error: videoError } = await supabase
           .from('review_videos')
@@ -309,31 +247,20 @@ export async function POST(request: NextRequest) {
           .select();
         
         if (videoError) {
-          console.error('[API reviews] Video insert error:', videoError);
-          console.error('[API reviews] Video insert error details:', {
-            message: videoError.message,
-            details: videoError.details,
-            hint: videoError.hint,
-            code: videoError.code
-          });
+          console.error('Video insert error:', videoError);
           videoInsertError = videoError.message;
-          // If the table doesn't exist, log a helpful message
-          if (videoError.code === '42P01' || videoError.message?.includes('relation') || videoError.message?.includes('does not exist')) {
-            console.error('[API reviews] The review_videos table may not exist! Run migration 117-update-review-videos-bucket.sql');
-          }
         } else {
           videosInserted = insertedVideos?.length || 0;
-          console.log('[API reviews] Videos inserted successfully:', videosInserted);
         }
       } catch (videoError: any) {
-        console.error('[API reviews] Video insert exception:', videoError);
+        console.error('Video insert exception:', videoError);
         videoInsertError = videoError?.message || 'Unknown error';
       }
     }
 
-    // Add taste signal for the review (strongest signal - user actually visited)
+    // Add taste signal for the review
     try {
-      const isPositive = rating >= 4; // 4-5 stars = positive, 1-3 = negative
+      const isPositive = rating >= 4;
       const signalContent = isPositive
         ? `Visited and liked ${restaurant.name}${restaurant.cuisineTypes?.length ? `, ${restaurant.cuisineTypes.join(', ')}` : ''}`
         : `Visited but didn't like ${restaurant.name}${restaurant.cuisineTypes?.length ? `, ${restaurant.cuisineTypes.join(', ')}` : ''}`;
@@ -350,11 +277,10 @@ export async function POST(request: NextRequest) {
         sourceId: newReview.id,
       });
     } catch (signalError) {
-      // Don't fail the review if signal fails
-      console.error('Error adding taste signal for review:', signalError);
+      console.error('Error adding taste signal:', signalError);
     }
 
-    // Trigger reviews embedding update (async, don't wait)
+    // Trigger reviews embedding update (async)
     updateUserReviewsEmbedding(user.id).catch(err => 
       console.error('Error updating reviews embedding:', err)
     );
@@ -382,12 +308,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const restaurantId = searchParams.get('restaurantId');
     const userId = searchParams.get('userId');
-    const publishedFilter = searchParams.get('published'); // 'true', 'false', or null for all
+    const publishedFilter = searchParams.get('published');
 
-    // Get current user to check for likes
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Query reviews with restaurant and photo data
     let query = supabase
       .from('reviews')
       .select(`
@@ -426,30 +350,22 @@ export async function GET(request: NextRequest) {
       query = query.eq('user_id', userId);
     }
 
-    // Filter by published status if specified
     if (publishedFilter === 'true') {
       query = query.eq('is_published', true);
     } else if (publishedFilter === 'false') {
       query = query.eq('is_published', false);
     }
-    // If publishedFilter is null, return all reviews (for user's own profile)
 
     const { data: reviews, error } = await query.limit(50);
 
     if (error) {
-      console.error('Error fetching reviews - Details:', error);
-      console.error('Query params:', { restaurantId, userId });
+      console.error('Error fetching reviews:', error);
       return NextResponse.json(
-        { 
-          error: 'Failed to fetch reviews',
-          details: error.message,
-          hint: error.hint 
-        },
+        { error: 'Failed to fetch reviews', details: error.message },
         { status: 500 }
       );
     }
 
-    // Get user profiles for all reviews
     const userIds = [...new Set(reviews?.map(r => r.user_id) || [])];
     const { data: profilesData } = await supabase
       .from('profiles')
@@ -461,16 +377,13 @@ export async function GET(request: NextRequest) {
       profilesMap.set(profile.id, profile);
     });
 
-    // Get likes and comments counts for all reviews
     const reviewIds = reviews?.map(r => r.id) || [];
     
-    // Get likes counts
     const { data: likesData } = await supabase
       .from('review_likes')
       .select('review_id')
       .in('review_id', reviewIds);
 
-    // Get user's likes if logged in
     let userLikes: string[] = [];
     if (user) {
       const { data: userLikesData } = await supabase
@@ -481,13 +394,11 @@ export async function GET(request: NextRequest) {
       userLikes = userLikesData?.map(l => l.review_id) || [];
     }
 
-    // Get comments counts
     const { data: commentsData } = await supabase
       .from('review_comments')
       .select('review_id')
       .in('review_id', reviewIds);
 
-    // Count likes and comments per review
     const likesCounts: { [key: string]: number } = {};
     likesData?.forEach(like => {
       likesCounts[like.review_id] = (likesCounts[like.review_id] || 0) + 1;
@@ -498,11 +409,9 @@ export async function GET(request: NextRequest) {
       commentsCounts[comment.review_id] = (commentsCounts[comment.review_id] || 0) + 1;
     });
 
-    // Format reviews with counts, user profiles, and combined media array
     const formattedReviews = reviews?.map(review => {
       const profile = profilesMap.get(review.user_id);
       
-      // Build combined media array with correct sort order
       const photos = (review.review_photos as any[]) || [];
       const videos = (review.review_videos as any[]) || [];
       
@@ -520,7 +429,6 @@ export async function GET(request: NextRequest) {
         })),
       ];
       
-      // Sort by sortOrder to get correct combined order
       mediaItems.sort((a, b) => a.sortOrder - b.sortOrder);
       
       return {
@@ -529,7 +437,6 @@ export async function GET(request: NextRequest) {
         commentsCount: commentsCounts[review.id] || 0,
         isLiked: userLikes.includes(review.id),
         isPublished: review.is_published,
-        // Combined media array with correct order (use this instead of separate review_photos/review_videos)
         media: mediaItems,
         user: profile ? {
           id: profile.id,
@@ -540,15 +447,11 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Return empty array if no reviews
     return NextResponse.json({ reviews: formattedReviews || [] });
   } catch (error) {
     console.error('Error in reviews API:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -559,7 +462,6 @@ export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient();
     
-    // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user) {
@@ -579,7 +481,6 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Check if review belongs to user
     const { data: review } = await supabase
       .from('reviews')
       .select('user_id')
@@ -593,13 +494,11 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete review photos first
     await supabase
       .from('review_photos')
       .delete()
       .eq('review_id', reviewId);
 
-    // Delete review
     const { error: deleteError } = await supabase
       .from('reviews')
       .delete()
@@ -622,4 +521,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-

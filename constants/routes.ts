@@ -12,11 +12,12 @@ export const ROUTES = {
   // Main App Routes
   FEED: '/feed',
   MAP: '/map',
-  CHAT: '/chat',
+  AGENT: '/agent',
   WISHLIST: '/wishlist',
   SEARCH: '/search',
   NOTIFICATIONS: '/notifications',
   SETTINGS: '/settings',
+  ONBOARDING: '/onboarding',
   
   // Profile Routes
   PROFILE: '/profile',
@@ -35,6 +36,7 @@ export const API_ROUTES = {
   // Feed
   FEED_FOLLOWING: '/api/feed/following',
   FEED_NEARBY: '/api/feed/nearby',
+  FEED_REVIEWS: '/api/feed/reviews',
   
   // Restaurants
   RESTAURANTS_SEARCH: '/api/restaurants/search',
@@ -50,21 +52,31 @@ export const API_ROUTES = {
   
   // Profile
   PROFILE_BY_ID: (id: string) => `/api/profile/${id}`,
+  PROFILE_ME: '/api/profile/me',
   
   // Users
   USERS_SEARCH: '/api/users/search',
+  USERS_FOLLOW: '/api/users/follow',
   
-  // Chat
-  CHAT: '/api/chat',
-  MAP_CHAT: '/api/map-chat',
+  // Agent (Pachu AI)
+  AGENT_CHAT: '/api/agent/chat',
+  AGENT_RECOMMEND: '/api/agent/recommend',
+  
+  // Wishlist
+  WISHLIST: '/api/wishlist',
+  
+  // Collections
+  COLLECTIONS: '/api/collections',
+  
+  // Notifications
+  NOTIFICATIONS: '/api/notifications',
 } as const;
 
-// Navigation Items
+// Navigation Items (matches BottomNav)
 export const NAV_ITEMS = [
-  { href: ROUTES.FEED, label: 'Feed', icon: 'Home' },
-  { href: ROUTES.MAP, label: 'Map', icon: 'Map' },
-  { href: ROUTES.CHAT, label: 'Chat', icon: 'MessageCircle' },
-  { href: ROUTES.WISHLIST, label: 'Wishlist', icon: 'Heart' },
+  { href: ROUTES.FEED, label: 'Home', icon: 'Home' },
+  { href: ROUTES.SEARCH, label: 'Search', icon: 'Plus' },
+  { href: ROUTES.AGENT, label: 'Pachu', icon: 'MagicWand' },
+  { href: ROUTES.MAP, label: 'Map', icon: 'MapPin' },
   { href: ROUTES.PROFILE, label: 'Profile', icon: 'User' },
 ] as const;
-
