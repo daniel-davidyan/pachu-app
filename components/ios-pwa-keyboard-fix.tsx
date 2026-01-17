@@ -6,8 +6,7 @@ import { useEffect } from 'react';
  * iOS PWA Keyboard Fix
  * 
  * Ensures keyboard opens properly in iOS PWA and Safari.
- * The body lock in BottomSheet prevents page scrolling,
- * this component just ensures focus works correctly.
+ * Prevents iOS from scrolling the viewport when keyboard opens.
  */
 export function IOSPWAKeyboardFix() {
   useEffect(() => {
@@ -32,10 +31,20 @@ export function IOSPWAKeyboardFix() {
       }
     };
 
+    // Prevent iOS viewport scroll when keyboard opens
+    const handleFocusIn = () => {
+      // Force scroll back to top to prevent iOS from shifting the viewport
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 50);
+    };
+
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    document.addEventListener('focusin', handleFocusIn, { passive: true });
 
     return () => {
       document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('focusin', handleFocusIn);
     };
   }, []);
 

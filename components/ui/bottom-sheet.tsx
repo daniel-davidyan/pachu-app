@@ -64,7 +64,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     };
   }, [isOpen]);
 
-  // Track keyboard via visual viewport
+  // Track keyboard via visual viewport - position sheet above keyboard
   useEffect(() => {
     if (!isOpen) {
       queueMicrotask(() => setKeyboardHeight(0));
@@ -74,25 +74,61 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     const vv = window.visualViewport;
     if (!vv) return;
 
-    // Store initial height
-    initialHeightRef.current = vv.height;
+    // Store initial height on first open
+    if (initialHeightRef.current === 0) {
+      initialHeightRef.current = vv.height;
+    }
 
     const handleResize = () => {
       const currentHeight = vv.height;
       const diff = initialHeightRef.current - currentHeight;
       
-      // Keyboard is open if viewport shrunk significantly (> 150px)
-      if (diff > 150) {
+      // Keyboard is open if viewport shrunk significantly (> 100px)
+      if (diff > 100) {
         setKeyboardHeight(diff);
       } else {
         setKeyboardHeight(0);
       }
     };
 
+    // Also handle scroll - iOS sometimes uses offsetTop instead of resizing
+    const handleScroll = () => {
+      if (vv.offsetTop > 0) {
+        // iOS is scrolling the viewport - we need to compensate
+        setKeyboardHeight(vv.offsetTop);
+      }
+    };
+
     vv.addEventListener('resize', handleResize);
+    vv.addEventListener('scroll', handleScroll);
+    
+    // Initial check
+    handleResize();
     
     return () => {
       vv.removeEventListener('resize', handleResize);
+      vv.removeEventListener('scroll', handleScroll);
+    };
+  }, [isOpen]);
+
+  // Prevent iOS scroll-into-view when input is focused
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const preventScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        // Prevent the default scroll behavior
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    };
+
+    document.addEventListener('focusin', preventScroll);
+    
+    return () => {
+      document.removeEventListener('focusin', preventScroll);
     };
   }, [isOpen]);
 
@@ -186,7 +222,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
   
-  // Calculate sheet height - reduce by keyboard height when keyboard is open
+  // When keyboard is open, reduce the sheet height and position it above the keyboard
   const baseMaxHeight = '85vh';
   const adjustedMaxHeight = keyboardHeight > 0 
     ? `calc(85vh - ${keyboardHeight}px)` 
@@ -201,17 +237,18 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
         style={{ opacity: isOpen ? 1 : 0, zIndex }}
       />
 
-      {/* Bottom Sheet */}
+      {/* Bottom Sheet - positioned above keyboard when it's open */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col"
+        className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col"
         style={{
+          bottom: keyboardHeight, // Move sheet up when keyboard opens
           height: height,
           maxHeight: adjustedMaxHeight,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 1,
-          transition: keyboardHeight > 0 ? 'max-height 0.25s ease-out' : 'none',
+          transition: keyboardHeight > 0 ? 'bottom 0.1s ease-out, max-height 0.1s ease-out' : 'none',
         }}
       >
         {/* Drag Handle */}
