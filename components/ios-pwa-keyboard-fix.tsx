@@ -16,8 +16,9 @@ export function IOSPWAKeyboardFix() {
   useEffect(() => {
     // Only run on iOS
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                         (window.navigator as any).standalone === true;
+                         (window.navigator as { standalone?: boolean }).standalone === true;
 
     if (!isIOS) return;
 
@@ -73,7 +74,7 @@ export function IOSPWAKeyboardFix() {
       pendingFocus = null;
     };
 
-    const handleFocusOut = (e: FocusEvent) => {
+    const handleFocusOut = () => {
       if (isStandalone && pendingFocus) {
         const target = pendingFocus;
         setTimeout(() => {

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { TikTokReviewCard } from './tiktok-review-card';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
-import { Loader2, Heart, MessageCircle, MoreVertical, Edit2, Trash2, X } from 'lucide-react';
+import { Loader2, Heart, MessageCircle, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
@@ -468,7 +468,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
       await fetch(`/api/reviews/${activeReviewId}/comments/${commentId}/like`, {
         method: newLikedState ? 'POST' : 'DELETE',
       });
-    } catch (error) {
+    } catch {
       // Revert on error
       setComments(prev => prev.map(c => 
         c.id === commentId 

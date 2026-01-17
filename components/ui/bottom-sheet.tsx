@@ -75,7 +75,6 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   // Track iOS keyboard height using visualViewport API
   useEffect(() => {
     if (!isOpen) {
-      setKeyboardOffset(0);
       return;
     }
 
@@ -100,6 +99,8 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
     
     return () => {
       visualViewport.removeEventListener('resize', handleResize);
+      // Reset keyboard offset when effect cleans up (sheet closes)
+      setKeyboardOffset(0);
     };
   }, [isOpen]);
 
