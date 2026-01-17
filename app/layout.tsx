@@ -19,7 +19,7 @@ export const viewport: Viewport = {
   userScalable: false, // Disable pinch-to-zoom for native app feel
   viewportFit: 'cover',
   themeColor: '#C5459C',
-  interactiveWidget: 'resizes-content', // Makes keyboard behavior better on iOS
+  interactiveWidget: 'resizes-visual', // Visual viewport resizes, content stays stable
 };
 
 export const metadata: Metadata = {

@@ -70,6 +70,29 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
     };
   }, [isOpen, skipBodyLock]);
 
+  // Prevent iOS from scrolling the page when focusing inputs inside the sheet
+  useEffect(() => {
+    if (!isOpen || !sheetRef.current) return;
+
+    const sheet = sheetRef.current;
+    
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        // Prevent iOS auto-scroll by keeping scroll at 0
+        requestAnimationFrame(() => {
+          window.scrollTo(0, 0);
+        });
+      }
+    };
+
+    sheet.addEventListener('focusin', handleFocusIn);
+    
+    return () => {
+      sheet.removeEventListener('focusin', handleFocusIn);
+    };
+  }, [isOpen]);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     // Don't intercept touch events on input elements - this blocks keyboard on iOS PWA
     const target = e.target as HTMLElement;
@@ -183,7 +206,7 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
         className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col transition-transform duration-300 ease-out"
         style={{
           height: height === 'auto' ? 'auto' : height,
-          maxHeight: height === 'auto' ? '70vh' : height,
+          maxHeight: height === 'auto' ? '70dvh' : height.replace('vh', 'dvh'),
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 1,
