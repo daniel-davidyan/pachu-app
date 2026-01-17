@@ -1,14 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
-import { createPortal } from 'react-dom';
-
-// Client-side mount detection
-const emptySubscribe = () => () => {};
-const getClientSnapshot = () => true;
-const getServerSnapshot = () => false;
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, Bookmark, MapPin, Loader2, X } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, MapPin, Loader2 } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
@@ -82,10 +76,8 @@ export function InstagramPostCard({
   const [availableFriends, setAvailableFriends] = useState<Array<{ id: string; username: string; fullName: string; avatarUrl?: string }>>([]);
   const [mentionedUsers, setMentionedUsers] = useState<Array<{ id: string; username: string }>>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ bottom: 0, left: 0, width: 0 });
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const commentsListRef = useRef<HTMLDivElement>(null);
-  const isMounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
   
   // Save/Collection state
   const [isSaved, setIsSaved] = useState(false);
@@ -209,18 +201,6 @@ export function InstagramPostCard({
       setLoadingComments(false);
     }
   };
-
-  // Calculate dropdown position when it shows
-  useEffect(() => {
-    if (showMentionDropdown && inputContainerRef.current) {
-      const rect = inputContainerRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        bottom: window.innerHeight - rect.top + 8,
-        left: rect.left,
-        width: rect.width,
-      });
-    }
-  }, [showMentionDropdown]);
 
   // Fetch friends for mention
   const fetchFriends = async (searchQuery: string = '') => {
@@ -672,8 +652,11 @@ export function InstagramPostCard({
       {/* Comments Bottom Sheet */}
       <BottomSheet
         isOpen={showComments}
-        onClose={() => setShowComments(false)}
-        title="Comments"
+        onClose={() => {
+          setShowComments(false);
+          setShowMentionDropdown(false);
+        }}
+        title={showMentionDropdown ? "Tag People" : "Comments"}
         footer={user ? (
           <div ref={inputContainerRef} className="pt-3">
             <div className="flex items-center gap-3">
@@ -706,122 +689,97 @@ export function InstagramPostCard({
           </div>
         ) : undefined}
       >
-        {loadingComments ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          </div>
-        ) : (
-          <>
-            {comments.length > 0 ? (
-              <div ref={commentsListRef} className="space-y-4 pb-4">
-                {comments.map((comment: any) => (
-                  <div key={comment.id} className="flex gap-3">
-                    <Link href={`/profile/${comment.user.id}`} className="flex-shrink-0">
-                      {comment.user.avatarUrl ? (
-                        <img
-                          src={comment.user.avatarUrl}
-                          alt={comment.user.fullName}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                          <span className="text-xs font-bold text-white">
-                            {(comment.user.fullName || comment.user.username).charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </Link>
-                    
+        {/* Inline Mention Picker - replaces comments when @ is typed */}
+        {showMentionDropdown ? (
+          <div className="pb-4">
+            {loadingFriends ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              </div>
+            ) : availableFriends.length > 0 ? (
+              <div className="space-y-1">
+                {availableFriends.map((friend) => (
+                  <button
+                    key={friend.id}
+                    onClick={() => handleSelectMention(friend)}
+                    className="w-full px-2 py-3 text-left hover:bg-gray-50 rounded-xl flex items-center gap-3 transition-colors"
+                  >
+                    {friend.avatarUrl ? (
+                      <img
+                        src={friend.avatarUrl}
+                        alt={friend.fullName}
+                        className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <span className="text-base font-bold text-white">
+                          {friend.fullName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-gray-900">
-                        <Link href={`/profile/${comment.user.id}`} className="font-semibold mr-1">
-                          {comment.user.username}
-                        </Link>
-                        {renderCommentContent(comment.content, comment.mentions || [])}
-                      </p>
-                      <p className="text-[11px] text-gray-500 mt-1">
-                        {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                      </p>
+                      <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
+                      <p className="text-xs text-gray-500">@{friend.username}</p>
                     </div>
-                  </div>
+                  </button>
                 ))}
+              </div>
+            ) : mentionSearch ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 font-medium">No matches for &quot;{mentionSearch}&quot;</p>
+                <p className="text-sm text-gray-400 mt-1">You can only tag people you follow</p>
               </div>
             ) : (
               <div className="text-center py-12">
-                <MessageCircle className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">No comments yet</p>
-                <p className="text-sm text-gray-400 mt-1">Be the first to comment!</p>
+                <p className="text-gray-500 font-medium">You don&apos;t follow anyone yet</p>
+                <p className="text-sm text-gray-400 mt-1">Follow users to tag them</p>
               </div>
             )}
-
-            {/* Mention Dropdown Portal */}
-            {showMentionDropdown && isMounted && createPortal(
-              <div 
-                className="fixed bg-white border border-gray-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto"
-                style={{
-                  bottom: dropdownPosition.bottom,
-                  left: dropdownPosition.left,
-                  width: dropdownPosition.width,
-                  zIndex: 99999,
-                }}
-              >
-                {loadingFriends ? (
-                  <div className="px-4 py-6 text-center">
-                    <Loader2 className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Loading...</p>
-                  </div>
-                ) : availableFriends.length > 0 ? (
-                  <>
-                    <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                      <p className="text-xs font-medium text-gray-500">People you follow</p>
-                      <button 
-                        onClick={() => setShowMentionDropdown(false)}
-                        className="p-1 hover:bg-gray-100 rounded-full"
-                      >
-                        <X className="w-4 h-4 text-gray-400" />
-                      </button>
+          </div>
+        ) : loadingComments ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        ) : comments.length > 0 ? (
+          <div ref={commentsListRef} className="space-y-4 pb-4">
+            {comments.map((comment: any) => (
+              <div key={comment.id} className="flex gap-3">
+                <Link href={`/profile/${comment.user.id}`} className="flex-shrink-0">
+                  {comment.user.avatarUrl ? (
+                    <img
+                      src={comment.user.avatarUrl}
+                      alt={comment.user.fullName}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                      <span className="text-xs font-bold text-white">
+                        {(comment.user.fullName || comment.user.username).charAt(0).toUpperCase()}
+                      </span>
                     </div>
-                    {availableFriends.map((friend) => (
-                      <button
-                        key={friend.id}
-                        onClick={() => handleSelectMention(friend)}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                      >
-                        {friend.avatarUrl ? (
-                          <img
-                            src={friend.avatarUrl}
-                            alt={friend.fullName}
-                            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                            <span className="text-sm font-bold text-white">
-                              {friend.fullName.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
-                          <p className="text-xs text-gray-500">@{friend.username}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </>
-                ) : mentionSearch ? (
-                  <div className="px-4 py-6 text-center">
-                    <p className="text-sm text-gray-500">No matches for &quot;{mentionSearch}&quot;</p>
-                    <p className="text-xs text-gray-400 mt-1">You can only tag people you follow</p>
-                  </div>
-                ) : (
-                  <div className="px-4 py-6 text-center">
-                    <p className="text-sm text-gray-500">You don&apos;t follow anyone yet</p>
-                    <p className="text-xs text-gray-400 mt-1">Follow users to tag them</p>
-                  </div>
-                )}
-              </div>,
-              document.body
-            )}
-          </>
+                  )}
+                </Link>
+                
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] text-gray-900">
+                    <Link href={`/profile/${comment.user.id}`} className="font-semibold mr-1">
+                      {comment.user.username}
+                    </Link>
+                    {renderCommentContent(comment.content, comment.mentions || [])}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <MessageCircle className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">No comments yet</p>
+            <p className="text-sm text-gray-400 mt-1">Be the first to comment!</p>
+          </div>
         )}
       </BottomSheet>
 
