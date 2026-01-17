@@ -40,7 +40,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   useEffect(() => {
     if (isOpen) {
       scrollPositionRef.current = window.scrollY;
-      setInitialWindowHeight(window.innerHeight);
+      queueMicrotask(() => setInitialWindowHeight(window.innerHeight));
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
