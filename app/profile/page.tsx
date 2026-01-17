@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useUser } from '@/hooks/use-user';
 import { usePrefetch } from '@/hooks/use-prefetch';
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Calendar, Camera, X, Heart, MapPin, Loader2, Trash2, MoreVertical, Grid3X3, EyeOff, Bookmark, Play, Share2, Plus, FolderPlus } from 'lucide-react';
 import { CompactRating } from '@/components/ui/modern-rating';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
@@ -15,6 +15,7 @@ import { WriteReviewModal } from '@/components/review/write-review-modal';
 import { useToast } from '@/components/ui/toast';
 import { formatAddress } from '@/lib/address-utils';
 import { CollectionModal } from '@/components/collections/collection-modal';
+import useSWR from 'swr';
 
 // Subtle pastel gradient palettes for varied backgrounds
 const subtleGradients = [
@@ -169,19 +170,20 @@ interface SavedCollection {
 
 type ProfileTab = 'published' | 'unpublished' | 'saved';
 
+// SWR fetcher function
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch');
+  return res.json();
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useUser();
-  const { profileData, profileLoading, refreshProfile } = usePrefetch();
+  const { profileData } = usePrefetch();
   const { showToast } = useToast();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [stats, setStats] = useState<Stats>({ experiences: 0, followers: 0, following: 0 });
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
-  const [collections, setCollections] = useState<SavedCollection[]>([]);
-  const [allSavedCount, setAllSavedCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadingTab, setLoadingTab] = useState(false);
+  
+  // UI state
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('published');
@@ -193,134 +195,73 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-
-  // Use prefetched data on initial load for instant display
-  useEffect(() => {
-    if (profileData && !profile) {
-      // Use prefetched data immediately - but only if profile exists
-      if (profileData.profile) {
-        setProfile(profileData.profile);
-        if (profileData.stats) {
-          setStats(profileData.stats);
-        }
-        if (profileData.reviews && activeTab === 'published') {
-          setReviews(profileData.reviews);
-        }
-        setLoading(false);
-        setLoadingTab(false);
-      }
-      // If profileData exists but profile is null, we need to fetch fresh
+  // SWR for profile data with stale-while-revalidate
+  // Shows cached data instantly, fetches fresh data in background
+  const { data: swrData, error: swrError, isLoading: swrLoading, mutate: mutateProfile } = useSWR(
+    user?.id ? `/api/profile/me?tab=${activeTab}` : null,
+    fetcher,
+    {
+      // Use prefetched data as initial fallback for instant render
+      fallbackData: profileData && activeTab === 'published' ? {
+        profile: profileData.profile,
+        stats: profileData.stats,
+        reviews: profileData.reviews,
+      } : undefined,
+      // Background revalidation settings
+      revalidateOnFocus: false, // We'll handle this manually with visibility API
+      revalidateIfStale: true,
+      dedupingInterval: 5000, // Dedupe requests within 5 seconds
     }
-  }, [profileData, profile, activeTab]);
+  );
 
-  // Optimized: Single API call for profile, stats, and reviews
-  const fetchProfileDataFromAPI = async (tab: string = activeTab) => {
-    if (!user?.id) return;
+  // Extract data from SWR response
+  const profile = swrData?.profile || null;
+  const stats = swrData?.stats || { experiences: 0, followers: 0, following: 0 };
+  const reviews = swrData?.reviews || [];
+  
+  // Loading state: only show loader if no data at all (not during background revalidation)
+  const loading = swrLoading && !swrData && !profileData?.profile;
+  const loadingTab = swrLoading && !!profile; // Show tab loading when switching tabs
+
+  // Background refresh when user returns to app (visibility change)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user?.id) {
+        // Trigger background revalidation without showing loader
+        mutateProfile();
+      }
+    };
     
-    try {
-      const response = await fetch(`/api/profile/me?tab=${tab}`);
-      const data = await response.json();
-      
-      if (data.error) {
-        console.error('API error:', data.error, data.details);
-        // Still try to set loading to false but profile stays null
-        setLoading(false);
-        return;
-      }
-      
-      // Set all data at once
-      if (data.profile) {
-        setProfile(data.profile);
-      }
-      if (data.stats) {
-        setStats(data.stats);
-      }
-      if (data.reviews) {
-        setReviews(data.reviews);
-      }
-      setLoading(false);
-      setLoadingTab(false);
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-      setLoading(false);
-      setLoadingTab(false);
-    }
-  };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user?.id, mutateProfile]);
 
-  // Initial load - use prefetched data or fetch if not available
+  // Collections state (separate from main profile SWR)
+  const [collections, setCollections] = useState<SavedCollection[]>([]);
+  const [allSavedCount, setAllSavedCount] = useState(0);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+
+  // Fetch collections when saved tab is active
   useEffect(() => {
-    // Fetch if: user exists AND (no prefetch data OR prefetch had no profile) AND we don't have profile yet
-    const needsFetch = user && !profile && (!profileData || !profileData.profile);
-    if (needsFetch) {
-      setLoading(true);
-      fetchProfileDataFromAPI('published');
+    if (user && profile && activeTab === 'saved') {
+      fetchCollections();
     }
-  }, [user, profileData, profile]);
+  }, [activeTab, user, profile]);
 
-  // Tab change - only fetch reviews for that tab
-  useEffect(() => {
-    if (user && profile) {
-      if (activeTab === 'published' || activeTab === 'unpublished') {
-        setLoadingTab(true);
-        fetchReviewsOnly();
-      } else {
-        fetchCollections();
-      }
-    }
-  }, [activeTab]);
+  // Refresh function for manual refresh (after mutations)
+  const refreshData = useCallback(() => {
+    mutateProfile();
+  }, [mutateProfile]);
 
-  // Light-weight reviews fetch for tab switching
-  const fetchReviewsOnly = async () => {
-    if (!user?.id) return;
-    
-    try {
-      const response = await fetch(`/api/profile/me?tab=${activeTab}`);
-      const data = await response.json();
-      
-      if (data.reviews) {
-        setReviews(data.reviews);
-      }
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-      setReviews([]);
-    } finally {
-      setLoadingTab(false);
-    }
-  };
+  // Legacy fetchStats - now uses SWR mutate
+  const fetchStats = useCallback(() => {
+    mutateProfile();
+  }, [mutateProfile]);
 
-  // Keep these for backwards compatibility and refresh functionality
-  const fetchProfile = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  };
-
-  const fetchStats = async () => {
-    // Refresh stats after actions like delete/follow
-    try {
-      const response = await fetch(`/api/profile/me?tab=${activeTab}`);
-      const data = await response.json();
-      if (data.stats) {
-        setStats(data.stats);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
-
-  const fetchReviews = async () => {
-    setLoadingTab(true);
-    await fetchReviewsOnly();
-  };
+  // Legacy fetchReviews - now uses SWR mutate
+  const fetchReviews = useCallback(() => {
+    mutateProfile();
+  }, [mutateProfile]);
 
   const fetchWishlist = async () => {
     if (!user?.id) return;

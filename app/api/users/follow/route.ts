@@ -1,5 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { profileCache, ServerCache } from '@/lib/cache';
+
+/**
+ * Invalidate profile caches for both users involved in follow/unfollow
+ * This ensures fresh data is fetched on next request
+ */
+function invalidateProfileCaches(currentUserId: string, targetUserId: string) {
+  // Invalidate both users' profile caches
+  profileCache.delete(ServerCache.makeKey('profile', { id: targetUserId }));
+  profileCache.delete(ServerCache.makeKey('profile', { id: currentUserId }));
+}
 
 /**
  * POST /api/users/follow
@@ -124,6 +135,9 @@ export async function POST(request: NextRequest) {
       }
       
       console.log('[FOLLOW] Successfully followed user');
+      
+      // Invalidate profile caches so fresh data is fetched
+      invalidateProfileCaches(user.id, userId);
 
       // Optional: Create notification for the followed user
       const { error: notifError } = await supabase.from('notifications').insert({
@@ -173,6 +187,9 @@ export async function POST(request: NextRequest) {
         console.error('Unfollow error:', unfollowError);
         throw unfollowError;
       }
+      
+      // Invalidate profile caches so fresh data is fetched
+      invalidateProfileCaches(user.id, userId);
 
       return NextResponse.json({ 
         success: true,

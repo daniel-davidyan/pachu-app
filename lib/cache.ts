@@ -104,7 +104,7 @@ export const profileCache = new ServerCache();
 export const CACHE_TTL = {
   FEED: 2 * 60 * 1000,        // 2 minutes for feed data
   RESTAURANT: 5 * 60 * 1000,  // 5 minutes for restaurant details
-  PROFILE: 3 * 60 * 1000,     // 3 minutes for profiles
+  PROFILE: 30 * 1000,         // 30 seconds for profiles (follower counts change frequently)
   MATCH_SCORE: 10 * 60 * 1000, // 10 minutes for match scores
 } as const;
 

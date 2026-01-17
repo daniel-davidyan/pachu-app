@@ -175,7 +175,10 @@ export function MediaCarousel({ media, isVisible, isPreloading = false, classNam
                   src={item.url}
                   alt=""
                   className="w-full h-full object-cover"
-                  loading={index <= currentIndex + 1 ? 'eager' : 'lazy'}
+                  // Eager load current, next 2, and all if preloading for instant display
+                  loading={isPreloading || index <= currentIndex + 2 ? 'eager' : 'lazy'}
+                  // Add decoding hint for better performance
+                  decoding={isPreloading || index <= currentIndex + 1 ? 'sync' : 'async'}
                 />
               </div>
             )}

@@ -415,7 +415,8 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
   }
 
   // Only render reviews within a window around current index for performance
-  const renderWindow = 3; // Render current + 3 before/after
+  // Increased from 3 to 5 for smoother scrolling and better preloading
+  const renderWindow = 5; // Render current + 5 before/after
   const startIndex = Math.max(0, currentIndex - renderWindow);
   const endIndex = Math.min(reviews.length - 1, currentIndex + renderWindow);
 
@@ -468,7 +469,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
                 <TikTokReviewCard
                   review={review}
                   isVisible={index === currentIndex}
-                  isPreloading={Math.abs(index - currentIndex) === 1}
+                  isPreloading={Math.abs(index - currentIndex) <= 3} // Preload 3 cards ahead/behind
                   onSwipeRight={() => handleSwipeRight(review)}
                   onSwipeLeft={() => handleSwipeLeft(review)}
                   onOpenComments={() => handleOpenComments(review.id)}

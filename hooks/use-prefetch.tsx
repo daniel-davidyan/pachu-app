@@ -72,6 +72,10 @@ interface PrefetchContextType {
   refreshProfile: () => Promise<void>;
   refreshFeed: () => Promise<void>;
   
+  // Invalidation (clears cache immediately, triggers refetch)
+  invalidateProfile: () => void;
+  invalidateFeed: () => void;
+  
   // Status
   isInitialized: boolean;
 }
@@ -348,6 +352,32 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
     await fetchFeedData(location);
   }, [getUserLocation, fetchFeedData]);
 
+  // Invalidation functions - clear cache immediately and trigger background refetch
+  // These are useful after mutations (e.g., follow/unfollow) to ensure fresh data
+  const invalidateProfile = useCallback(() => {
+    // Clear cached data immediately
+    setProfileData(null);
+    // Reset fetching ref to allow immediate refetch
+    profileFetchingRef.current = false;
+    // Trigger background refetch
+    fetchProfileData();
+  }, [fetchProfileData]);
+
+  const invalidateFeed = useCallback(() => {
+    // Clear cached data immediately  
+    setFeedData(null);
+    // Reset fetching ref to allow immediate refetch
+    feedFetchingRef.current = false;
+    // Clear sessionStorage cache too
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pachu_feed_data');
+    }
+    // Trigger background refetch if we have location
+    if (userLocation) {
+      fetchFeedData(userLocation);
+    }
+  }, [fetchFeedData, userLocation]);
+
   return (
     <PrefetchContext.Provider
       value={{
@@ -363,6 +393,8 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
         refreshNearbyPlaces,
         refreshProfile,
         refreshFeed,
+        invalidateProfile,
+        invalidateFeed,
         isInitialized,
       }}
     >
