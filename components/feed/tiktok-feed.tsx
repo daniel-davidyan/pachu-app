@@ -1,14 +1,20 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { TikTokReviewCard } from './tiktok-review-card';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
-import { Loader2, Heart, MessageCircle, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { Loader2, Heart, MessageCircle, MoreVertical, Edit2, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/components/ui/toast';
 import Link from 'next/link';
+
+// Client-side mount detection (same pattern as BottomSheet)
+const emptySubscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 // Session storage key for feed position
 const FEED_POSITION_KEY = 'pachu_feed_position';
@@ -149,6 +155,16 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
+  
+  // Mention state
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState('');
+  const [availableFriends, setAvailableFriends] = useState<Array<{ id: string; username: string; fullName: string; avatarUrl?: string }>>([]);
+  const [mentionedUsers, setMentionedUsers] = useState<Array<{ id: string; username: string }>>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ bottom: 0, left: 0, width: 0 });
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+  const isMounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
@@ -307,6 +323,77 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
     }
   }, [showToast, onCommentsVisibilityChange]);
 
+  // Calculate dropdown position when it shows
+  useEffect(() => {
+    if (showMentionDropdown && inputContainerRef.current) {
+      const rect = inputContainerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        bottom: window.innerHeight - rect.top + 8,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, [showMentionDropdown]);
+
+  // Fetch friends for mention
+  const fetchFriends = useCallback(async (searchQuery: string = '') => {
+    if (!user) return;
+    
+    setLoadingFriends(true);
+    try {
+      const response = await fetch(`/api/friends/search?q=${encodeURIComponent(searchQuery)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableFriends(data.friends || []);
+      }
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+    } finally {
+      setLoadingFriends(false);
+    }
+  }, [user]);
+
+  // Handle mention input
+  const handleMentionInput = useCallback((value: string) => {
+    setNewComment(value);
+    
+    // Detect @ symbol
+    const cursorPosition = value.length;
+    const textBeforeCursor = value.substring(0, cursorPosition);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1 && (atIndex === 0 || textBeforeCursor[atIndex - 1] === ' ')) {
+      const searchText = textBeforeCursor.substring(atIndex + 1);
+      // Only show dropdown if no space after @
+      if (!searchText.includes(' ')) {
+        setShowMentionDropdown(true);
+        setMentionSearch(searchText);
+        fetchFriends(searchText);
+        return;
+      }
+    }
+    
+    setShowMentionDropdown(false);
+    setMentionSearch('');
+  }, [fetchFriends]);
+
+  // Handle mention selection
+  const handleSelectMention = useCallback((friend: { id: string; username: string; fullName: string }) => {
+    const atIndex = newComment.lastIndexOf('@');
+    if (atIndex !== -1) {
+      const beforeAt = newComment.substring(0, atIndex);
+      const newValue = `${beforeAt}@${friend.username} `;
+      setNewComment(newValue);
+      
+      // Add to mentioned users if not already there
+      if (!mentionedUsers.find(m => m.id === friend.id)) {
+        setMentionedUsers(prev => [...prev, { id: friend.id, username: friend.username }]);
+      }
+    }
+    setShowMentionDropdown(false);
+    setMentionSearch('');
+  }, [newComment, mentionedUsers]);
+
   // Post comment
   const handlePostComment = useCallback(async () => {
     if (!user || !activeReviewId || !newComment.trim()) return;
@@ -317,7 +404,10 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
       const response = await fetch(`/api/reviews/${activeReviewId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newComment.trim() }),
+        body: JSON.stringify({ 
+          content: newComment.trim(),
+          mentionedUserIds: mentionedUsers.map(u => u.id),
+        }),
       });
 
       if (response.ok) {
@@ -334,8 +424,10 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
           },
           likesCount: 0,
           isLiked: false,
+          mentions: data.comment.mentions || [],
         }]);
         setNewComment('');
+        setMentionedUsers([]);
       } else {
         showToast('Failed to post comment', 'error');
       }
@@ -345,7 +437,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
     } finally {
       setPostingComment(false);
     }
-  }, [user, activeReviewId, newComment, showToast]);
+  }, [user, activeReviewId, newComment, mentionedUsers, showToast]);
 
   // Like comment
   const handleLikeComment = useCallback(async (commentId: string) => {
@@ -376,6 +468,34 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
       ));
     }
   }, [user, activeReviewId, comments]);
+
+  // Render comment content with clickable mentions
+  const renderCommentContent = (content: string, mentions: Array<{ id: string; username: string; fullName: string }> = []) => {
+    if (!content) return null;
+    
+    const mentionMap = new Map(mentions.map(m => [m.username.toLowerCase(), m]));
+    const parts = content.split(/(@[a-zA-Z0-9._]+)/g);
+
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const username = part.slice(1);
+        const mentionedUser = mentionMap.get(username.toLowerCase());
+        if (mentionedUser) {
+          return (
+            <Link
+              key={index}
+              href={user && mentionedUser.id === user.id ? '/profile' : `/profile/${mentionedUser.id}`}
+              className="text-blue-500 font-semibold hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              @{mentionedUser.username}
+            </Link>
+          );
+        }
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
 
   // BULLETPROOF empty state logic - only show after delayed confirmation
   // This guarantees loader shows first, then empty state only after 500ms of confirmed empty
@@ -542,7 +662,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
                           </span>
                         </Link>
                         <span className="text-sm text-gray-900 ml-2">
-                          {comment.content}
+                          {renderCommentContent(comment.content, comment.mentions || [])}
                         </span>
                       </div>
                       <button
@@ -573,7 +693,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
 
           {/* Comment Input */}
           {user && (
-            <div className="sticky bottom-0 bg-white pt-3 pb-safe border-t border-gray-200">
+            <div ref={inputContainerRef} className="sticky bottom-0 bg-white pt-3 pb-safe border-t border-gray-200">
               <div className="flex items-center gap-3">
                 <input
                   type="text"
@@ -583,15 +703,19 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
                   autoCorrect="on"
                   placeholder="Add a comment..."
                   value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
+                  onChange={(e) => handleMentionInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && !showMentionDropdown) {
                       e.preventDefault();
                       handlePostComment();
                     }
+                    if (showMentionDropdown && e.key === 'Escape') {
+                      e.preventDefault();
+                      setShowMentionDropdown(false);
+                    }
                   }}
                   className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
-                  style={{ fontSize: '16px' }} // Prevents iOS zoom on focus
+                  style={{ fontSize: '16px' }}
                 />
                 <button
                   onClick={handlePostComment}
@@ -602,6 +726,74 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Mention Dropdown Portal */}
+          {showMentionDropdown && isMounted && createPortal(
+            <div 
+              className="fixed bg-white border border-gray-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto"
+              style={{
+                bottom: dropdownPosition.bottom,
+                left: dropdownPosition.left,
+                width: dropdownPosition.width,
+                zIndex: 99999,
+              }}
+            >
+              {loadingFriends ? (
+                <div className="px-4 py-6 text-center">
+                  <Loader2 className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Loading...</p>
+                </div>
+              ) : availableFriends.length > 0 ? (
+                <>
+                  <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
+                    <p className="text-xs font-medium text-gray-500">People you follow</p>
+                    <button 
+                      onClick={() => setShowMentionDropdown(false)}
+                      className="p-1 hover:bg-gray-100 rounded-full"
+                    >
+                      <X className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+                  {availableFriends.map((friend) => (
+                    <button
+                      key={friend.id}
+                      onClick={() => handleSelectMention(friend)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                    >
+                      {friend.avatarUrl ? (
+                        <img
+                          src={friend.avatarUrl}
+                          alt={friend.fullName}
+                          className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-bold text-white">
+                            {friend.fullName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
+                        <p className="text-xs text-gray-500">@{friend.username}</p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              ) : mentionSearch ? (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-gray-500">No matches for &quot;{mentionSearch}&quot;</p>
+                  <p className="text-xs text-gray-400 mt-1">You can only tag people you follow</p>
+                </div>
+              ) : (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-gray-500">You don&apos;t follow anyone yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Follow users to tag them</p>
+                </div>
+              )}
+            </div>,
+            document.body
           )}
         </div>
       </BottomSheet>
