@@ -674,6 +674,37 @@ export function InstagramPostCard({
         isOpen={showComments}
         onClose={() => setShowComments(false)}
         title="Comments"
+        footer={user ? (
+          <div ref={inputContainerRef} className="pt-3">
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Add a comment..."
+                value={newComment}
+                onChange={(e) => handleMentionInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !showMentionDropdown) {
+                    e.preventDefault();
+                    handleCommentSubmit();
+                  }
+                  if (showMentionDropdown && e.key === 'Escape') {
+                    e.preventDefault();
+                    setShowMentionDropdown(false);
+                  }
+                }}
+                className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
+                style={{ fontSize: '16px' }}
+              />
+              <button
+                onClick={handleCommentSubmit}
+                disabled={!newComment.trim()}
+                className="text-blue-500 font-semibold text-sm disabled:opacity-40 transition-opacity"
+              >
+                Post
+              </button>
+            </div>
+          </div>
+        ) : undefined}
       >
         {loadingComments ? (
           <div className="flex items-center justify-center py-12">
@@ -682,7 +713,7 @@ export function InstagramPostCard({
         ) : (
           <>
             {comments.length > 0 ? (
-              <div ref={commentsListRef} className="space-y-4 mb-4">
+              <div ref={commentsListRef} className="space-y-4 pb-4">
                 {comments.map((comment: any) => (
                   <div key={comment.id} className="flex gap-3">
                     <Link href={`/profile/${comment.user.id}`} className="flex-shrink-0">
@@ -720,39 +751,6 @@ export function InstagramPostCard({
                 <MessageCircle className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 font-medium">No comments yet</p>
                 <p className="text-sm text-gray-400 mt-1">Be the first to comment!</p>
-              </div>
-            )}
-
-            {/* Comment Input */}
-            {user && (
-              <div ref={inputContainerRef} className="sticky bottom-0 bg-white pt-3 pb-safe border-t border-gray-200 -mx-4 px-4">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="Add a comment..."
-                    value={newComment}
-                    onChange={(e) => handleMentionInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey && !showMentionDropdown) {
-                        e.preventDefault();
-                        handleCommentSubmit();
-                      }
-                      if (showMentionDropdown && e.key === 'Escape') {
-                        e.preventDefault();
-                        setShowMentionDropdown(false);
-                      }
-                    }}
-                    className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
-                    style={{ fontSize: '16px' }}
-                  />
-                  <button
-                    onClick={handleCommentSubmit}
-                    disabled={!newComment.trim()}
-                    className="text-blue-500 font-semibold text-sm disabled:opacity-40 transition-opacity"
-                  >
-                    Post
-                  </button>
-                </div>
               </div>
             )}
 
