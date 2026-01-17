@@ -30,17 +30,17 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [initialWindowHeight, setInitialWindowHeight] = useState<number>(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
-  const initialWindowHeightRef = useRef<number>(0);
 
   // Lock body scroll and store position
   useEffect(() => {
     if (isOpen) {
       scrollPositionRef.current = window.scrollY;
-      initialWindowHeightRef.current = window.innerHeight;
+      setInitialWindowHeight(window.innerHeight);
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
@@ -199,8 +199,8 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     : '85dvh';
 
   // Calculate the keyboard gap (space between visual viewport and actual screen bottom)
-  const keyboardGap = viewportHeight !== null && initialWindowHeightRef.current > 0
-    ? initialWindowHeightRef.current - viewportHeight
+  const keyboardGap = viewportHeight !== null && initialWindowHeight > 0
+    ? initialWindowHeight - viewportHeight
     : 0;
 
   const content = (
