@@ -94,7 +94,6 @@ export function IOSPWAKeyboardFix() {
 
     // Visual viewport handler - prevent scroll when keyboard opens
     const vv = window.visualViewport;
-    let scrollPreventInterval: NodeJS.Timeout | null = null;
 
     const handleViewportResize = () => {
       // When visual viewport changes (keyboard opens/closes), prevent scroll
@@ -121,9 +120,6 @@ export function IOSPWAKeyboardFix() {
       document.removeEventListener('focusin', handleFocusIn);
       if (vv) {
         vv.removeEventListener('resize', handleViewportResize);
-      }
-      if (scrollPreventInterval) {
-        clearInterval(scrollPreventInterval);
       }
     };
   }, []);

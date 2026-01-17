@@ -28,8 +28,10 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-  const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
-  const [initialWindowHeight, setInitialWindowHeight] = useState<number>(typeof window !== 'undefined' ? window.innerHeight : 800);
+  const [viewportState, setViewportState] = useState<{ visual: number | null; initial: number }>({
+    visual: null,
+    initial: typeof window !== 'undefined' ? window.innerHeight : 800,
+  });
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -69,14 +71,24 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   // Track visual viewport for keyboard detection
   useEffect(() => {
     if (!isOpen) {
-      setVisualViewportHeight(null);
+      // Reset viewport state when closed
+      queueMicrotask(() => {
+        setViewportState(prev => ({ ...prev, visual: null }));
+      });
       return;
     }
 
-    // Store initial height
-    setInitialWindowHeight(window.innerHeight);
-
     const vv = window.visualViewport;
+    const initialHeight = window.innerHeight;
+    
+    // Set initial state
+    queueMicrotask(() => {
+      setViewportState({
+        visual: vv ? vv.height : initialHeight,
+        initial: initialHeight,
+      });
+    });
+
     if (!vv) return;
 
     const preventScroll = () => {
@@ -92,7 +104,7 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
 
     const handleResize = () => {
       // Visual viewport height changes when keyboard opens/closes
-      setVisualViewportHeight(vv.height);
+      setViewportState(prev => ({ ...prev, visual: vv.height }));
       
       // Prevent iOS from scrolling
       preventScroll();
@@ -104,8 +116,6 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
       preventScroll();
     };
 
-    // Initial state
-    setVisualViewportHeight(vv.height);
     preventScroll();
 
     // Listen to viewport changes
@@ -123,7 +133,6 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
       vv.removeEventListener('scroll', handleVisualViewportScroll);
       window.removeEventListener('scroll', preventScroll);
       clearInterval(intervalId);
-      setVisualViewportHeight(null);
     };
   }, [isOpen]);
 
@@ -226,12 +235,12 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
   
   // Calculate if keyboard is open based on visual viewport change
-  const keyboardOpen = visualViewportHeight !== null && visualViewportHeight < initialWindowHeight - 100;
+  const keyboardOpen = viewportState.visual !== null && viewportState.visual < viewportState.initial - 100;
   
   // When keyboard is open, limit sheet height to visual viewport
   // When closed, use the requested height
   const effectiveMaxHeight = keyboardOpen 
-    ? `${visualViewportHeight! - 20}px`  // Leave some space at top
+    ? `${viewportState.visual! - 20}px`  // Leave some space at top
     : (height === 'auto' ? '70dvh' : height.replace('vh', 'dvh'));
 
   const content = (
