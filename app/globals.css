@@ -71,6 +71,34 @@ body {
     input, textarea {
       font-size: 16px; /* Prevents iOS zoom on focus */
     }
+    
+    /* Prevent body from scrolling when keyboard opens */
+    html, body {
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* Main content wrapper should handle scrolling */
+    #__next, main, .main-content {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      height: 100%;
+    }
+  }
+  
+  /* iOS keyboard viewport fix */
+  @supports (-webkit-touch-callout: none) {
+    /* iOS Safari and PWA specific */
+    body {
+      /* Prevent viewport shift when keyboard opens */
+      min-height: -webkit-fill-available;
+    }
+    
+    html {
+      height: -webkit-fill-available;
+    }
   }
 
   /* Prevent double-tap zoom on all interactive elements */

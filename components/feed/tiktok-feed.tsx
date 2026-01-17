@@ -164,6 +164,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ bottom: 0, left: 0, width: 0 });
   const inputContainerRef = useRef<HTMLDivElement>(null);
+  const commentsListRef = useRef<HTMLDivElement>(null);
   const isMounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -428,6 +429,14 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
         }]);
         setNewComment('');
         setMentionedUsers([]);
+        
+        // Scroll to bottom to show the new comment
+        setTimeout(() => {
+          commentsListRef.current?.scrollTo({
+            top: commentsListRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 100);
       } else {
         showToast('Failed to post comment', 'error');
       }
@@ -621,7 +630,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
       >
         <div className="flex flex-col h-full">
           {/* Comments List */}
-          <div className="flex-1 overflow-y-auto space-y-4 pb-4">
+          <div ref={commentsListRef} className="flex-1 overflow-y-auto space-y-4 pb-4">
             {loadingComments ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />

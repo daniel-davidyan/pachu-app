@@ -84,6 +84,7 @@ export function InstagramPostCard({
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ bottom: 0, left: 0, width: 0 });
   const inputContainerRef = useRef<HTMLDivElement>(null);
+  const commentsListRef = useRef<HTMLDivElement>(null);
   const isMounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
   
   // Save/Collection state
@@ -330,6 +331,14 @@ export function InstagramPostCard({
           setComments([...comments, data.comment]);
           setMentionedUsers([]);
           if (onUpdate) onUpdate();
+          
+          // Scroll to bottom to show the new comment
+          setTimeout(() => {
+            commentsListRef.current?.scrollTo({
+              top: commentsListRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
+          }, 100);
         }
       }
     } catch (error) {
@@ -673,7 +682,7 @@ export function InstagramPostCard({
         ) : (
           <>
             {comments.length > 0 ? (
-              <div className="space-y-4 mb-4">
+              <div ref={commentsListRef} className="space-y-4 mb-4">
                 {comments.map((comment: any) => (
                   <div key={comment.id} className="flex gap-3">
                     <Link href={`/profile/${comment.user.id}`} className="flex-shrink-0">
