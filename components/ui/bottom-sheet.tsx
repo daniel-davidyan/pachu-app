@@ -77,7 +77,8 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   // Track visual viewport for keyboard - this gives us the actual visible area
   useEffect(() => {
     if (!isOpen) {
-      setViewportHeight(null);
+      // Use queueMicrotask to avoid synchronous setState in effect
+      queueMicrotask(() => setViewportHeight(null));
       return;
     }
 
@@ -89,8 +90,8 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
       setViewportHeight(vv.height);
     };
 
-    // Set initial value
-    updateViewport();
+    // Set initial value after a microtask to avoid sync setState
+    queueMicrotask(updateViewport);
 
     vv.addEventListener('resize', updateViewport);
     vv.addEventListener('scroll', updateViewport);
