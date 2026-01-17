@@ -28,12 +28,10 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
-  const initialViewportHeight = useRef<number>(typeof window !== 'undefined' ? window.innerHeight : 0);
 
   useEffect(() => {
     // Skip body lock for fixed-position contexts like TikTok feed
@@ -71,38 +69,6 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
       document.body.style.top = '';
     };
   }, [isOpen, skipBodyLock]);
-
-  // Track iOS keyboard height using visualViewport API
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    // Store initial viewport height
-    initialViewportHeight.current = window.innerHeight;
-
-    const visualViewport = window.visualViewport;
-    if (!visualViewport) return;
-
-    const handleResize = () => {
-      // When keyboard opens, visualViewport.height decreases
-      const heightDiff = initialViewportHeight.current - visualViewport.height;
-      // Only apply offset if difference is significant (keyboard is likely open)
-      if (heightDiff > 100) {
-        setKeyboardOffset(heightDiff);
-      } else {
-        setKeyboardOffset(0);
-      }
-    };
-
-    visualViewport.addEventListener('resize', handleResize);
-    
-    return () => {
-      visualViewport.removeEventListener('resize', handleResize);
-      // Reset keyboard offset when effect cleans up (sheet closes)
-      setKeyboardOffset(0);
-    };
-  }, [isOpen]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // Don't intercept touch events on input elements - this blocks keyboard on iOS PWA
@@ -214,13 +180,10 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
       {/* Bottom Sheet */}
       <div
         ref={sheetRef}
-        className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col transition-all duration-300 ease-out"
+        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col transition-transform duration-300 ease-out"
         style={{
-          bottom: keyboardOffset > 0 ? keyboardOffset : 0,
           height: height === 'auto' ? 'auto' : height,
-          maxHeight: keyboardOffset > 0 
-            ? `calc(${height === 'auto' ? '70vh' : height} - ${keyboardOffset}px)` 
-            : (height === 'auto' ? '70vh' : height),
+          maxHeight: height === 'auto' ? '70vh' : height,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 1,
