@@ -114,10 +114,10 @@ export default function SearchPage() {
   const loadSuggestedUsers = useCallback(async () => {
     setLoadingSuggested(true);
     try {
-      // Use search API with empty query to get some users
+      // Use search API with empty query to get all users
       const response = await fetch(`/api/users/search?query=`);
       const data = await response.json();
-      setSuggestedUsers((data.users || []).slice(0, 5));
+      setSuggestedUsers(data.users || []);
     } catch (error) {
       console.error('Error loading suggested users:', error);
       setSuggestedUsers([]);
@@ -509,16 +509,16 @@ export default function SearchPage() {
                 </>
               ) : (
                 <>
-                  {/* Suggested Users Section */}
+                  {/* All Users Section */}
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900 mb-2.5 flex items-center gap-1.5">
                       <span className="text-base">👥</span>
-                      Suggested Users
+                      All Users
                     </h2>
                     {loadingSuggested ? (
                       <div className="text-center py-8">
                         <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">Loading suggested users...</p>
+                        <p className="text-sm text-gray-500">Loading users...</p>
                       </div>
                     ) : suggestedUsers.length > 0 ? (
                       <div className="space-y-2.5">
@@ -596,7 +596,7 @@ export default function SearchPage() {
                     ) : (
                       <div className="text-center py-8 text-gray-500">
                         <User className="w-8 h-8 mx-auto mb-3 text-gray-300" />
-                        <p className="text-sm">No suggested users found</p>
+                        <p className="text-sm">No users found</p>
                         <p className="text-xs mt-1">Try searching for users</p>
                       </div>
                     )}
