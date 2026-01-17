@@ -67,7 +67,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   // Track keyboard via visual viewport
   useEffect(() => {
     if (!isOpen) {
-      setKeyboardHeight(0);
+      queueMicrotask(() => setKeyboardHeight(0));
       return;
     }
 
