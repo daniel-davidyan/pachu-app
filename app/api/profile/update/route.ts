@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { validateUsername } from '@/lib/username-validation';
 
 /**
  * PATCH /api/profile/update
@@ -21,14 +22,27 @@ export async function PATCH(request: NextRequest) {
 
     const { full_name, username, bio } = await request.json();
 
-    // If username is being updated, check if it's already taken
-    if (username) {
+    // If username is being updated, validate it
+    if (username !== undefined) {
+      // Server-side validation
+      const validation = validateUsername(username);
+      if (!validation.isValid) {
+        return NextResponse.json(
+          { error: validation.error || 'Invalid username' },
+          { status: 400 }
+        );
+      }
+
+      // Use the sanitized (lowercase) version
+      const sanitizedUsername = validation.sanitized || username.toLowerCase();
+
+      // Check if username is already taken (case-insensitive)
       const { data: existingUser } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', username)
+        .ilike('username', sanitizedUsername)
         .neq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (existingUser) {
         return NextResponse.json(
@@ -39,10 +53,22 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update profile
-    const updates: any = {};
+    const updates: Record<string, string | null> = {};
     if (full_name !== undefined) updates.full_name = full_name;
-    if (username !== undefined) updates.username = username;
+    if (username !== undefined) {
+      // Always store username in lowercase
+      const validation = validateUsername(username);
+      updates.username = validation.sanitized || username.toLowerCase();
+    }
     if (bio !== undefined) updates.bio = bio;
+
+    // Validate bio length
+    if (bio && bio.length > 150) {
+      return NextResponse.json(
+        { error: 'Bio must be 150 characters or less' },
+        { status: 400 }
+      );
+    }
 
     const { data, error } = await supabase
       .from('profiles')

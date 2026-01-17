@@ -124,7 +124,7 @@ export interface Wishlist {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'like' | 'follow' | 'comment' | 'review';
+  type: 'like' | 'follow' | 'comment' | 'review' | 'mention';
   title: string;
   message?: string;
   link?: string;

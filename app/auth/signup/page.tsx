@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { validateUsername, sanitizeUsername } from '@/lib/username-validation';
+import { Check, X, Loader2 } from 'lucide-react';
 
 import Link from 'next/link';
 
@@ -17,13 +19,106 @@ export default function SignUpPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // Username validation state
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+
+  // Debounced username check
+  const checkUsernameAvailability = useCallback(async (usernameToCheck: string) => {
+    if (!usernameToCheck || usernameToCheck.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    // First validate locally
+    const validation = validateUsername(usernameToCheck);
+    if (!validation.isValid) {
+      setUsernameError(validation.error || 'Invalid username');
+      setUsernameAvailable(false);
+      return;
+    }
+
+    setCheckingUsername(true);
+    try {
+      const response = await fetch(`/api/users/check-username?username=${encodeURIComponent(usernameToCheck)}`);
+      const data = await response.json();
+      
+      if (data.valid && data.available) {
+        setUsernameError(null);
+        setUsernameAvailable(true);
+      } else {
+        setUsernameError(data.error || 'Username not available');
+        setUsernameAvailable(false);
+      }
+    } catch (err) {
+      console.error('Error checking username:', err);
+      // Don't show error for network issues, just clear the state
+      setUsernameAvailable(null);
+    } finally {
+      setCheckingUsername(false);
+    }
+  }, []);
+
+  // Debounce username check
+  useEffect(() => {
+    const trimmed = username.trim();
+    
+    if (!trimmed) {
+      setUsernameError(null);
+      setUsernameAvailable(null);
+      return;
+    }
+
+    // Quick local validation first
+    const validation = validateUsername(trimmed);
+    if (!validation.isValid) {
+      setUsernameError(validation.error || 'Invalid username');
+      setUsernameAvailable(false);
+      return;
+    }
+
+    // Clear previous error and set checking
+    setUsernameError(null);
+    setUsernameAvailable(null);
+    
+    const timeoutId = setTimeout(() => {
+      checkUsernameAvailability(trimmed);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [username, checkUsernameAvailability]);
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Auto-sanitize as user types (lowercase, no spaces)
+    const sanitized = value.toLowerCase().replace(/\s/g, '_');
+    setUsername(sanitized);
+  };
+
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final validation before submit
+    const validation = validateUsername(username);
+    if (!validation.isValid) {
+      setError(validation.error || 'Invalid username');
+      return;
+    }
+
+    if (usernameAvailable === false) {
+      setError('Please choose a different username');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setSuccess(false);
 
     try {
+      // Use the sanitized username
+      const sanitizedUsername = validation.sanitized || sanitizeUsername(username);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -31,7 +126,7 @@ export default function SignUpPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
-            username: username,
+            username: sanitizedUsername,
           },
         },
       });
@@ -79,6 +174,8 @@ export default function SignUpPage() {
     }
   };
 
+  const isFormValid = fullName && username && email && password && usernameAvailable !== false;
+
   return (
     <div className="min-h-screen flex items-center justify-center px-5 py-8 bg-[#f9e7ff]">
       <div className="w-full max-w-[380px]">
@@ -125,18 +222,46 @@ export default function SignUpPage() {
             disabled={loading}
           />
 
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#C5459C] transition-all text-sm placeholder:text-gray-400"
-            placeholder="Username"
-            required
-            disabled={loading}
-            pattern="[a-zA-Z0-9_]{3,30}"
-            title="3-30 characters, letters, numbers, and underscores only"
-          />
+          {/* Username field with validation feedback */}
+          <div className="relative">
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={handleUsernameChange}
+              className={`w-full px-4 py-3 pr-10 bg-white border rounded-lg focus:outline-none transition-all text-sm placeholder:text-gray-400 ${
+                usernameError 
+                  ? 'border-red-400 focus:border-red-500' 
+                  : usernameAvailable 
+                    ? 'border-green-400 focus:border-green-500' 
+                    : 'border-gray-200 focus:border-[#C5459C]'
+              }`}
+              placeholder="Username"
+              required
+              disabled={loading}
+              autoComplete="off"
+              autoCapitalize="off"
+            />
+            {/* Status indicator */}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              {checkingUsername && (
+                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+              )}
+              {!checkingUsername && usernameAvailable === true && (
+                <Check className="w-5 h-5 text-green-500" />
+              )}
+              {!checkingUsername && usernameAvailable === false && (
+                <X className="w-5 h-5 text-red-500" />
+              )}
+            </div>
+          </div>
+          
+          {/* Username validation hint */}
+          {username && (
+            <div className={`text-xs px-1 -mt-1 ${usernameError ? 'text-red-500' : usernameAvailable ? 'text-green-600' : 'text-gray-500'}`}>
+              {usernameError || (usernameAvailable ? 'Username is available!' : 'Letters, numbers, underscores, and periods only')}
+            </div>
+          )}
 
           <input
             id="email"
@@ -163,7 +288,7 @@ export default function SignUpPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isFormValid}
             className="w-full py-3 rounded-lg font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm active:scale-[0.98]"
             style={{ backgroundColor: '#C5459C' }}
           >
@@ -233,4 +358,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-

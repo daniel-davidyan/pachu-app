@@ -202,7 +202,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
   const [expandedContent, setExpandedContent] = useState(false);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
-  const [availableFriends, setAvailableFriends] = useState<Array<{ id: string; username: string; fullName: string }>>([]);
+  const [availableFriends, setAvailableFriends] = useState<Array<{ id: string; username: string; fullName: string; avatarUrl?: string }>>([]);
   const [mentionedUsers, setMentionedUsers] = useState<Array<{ id: string; username: string }>>([]);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState('');
@@ -602,7 +602,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
     }
   };
 
-  const handleSelectMention = (friend: { id: string; username: string; fullName: string }) => {
+  const handleSelectMention = (friend: { id: string; username: string; fullName: string; avatarUrl?: string }) => {
     // Check if user is already mentioned
     if (mentionedUsers.some(u => u.id === friend.id)) {
       showToast(`@${friend.username} is already mentioned`, 'error');
@@ -616,6 +616,38 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
     setNewComment(afterMention);
     setMentionedUsers([...mentionedUsers, { id: friend.id, username: friend.username }]);
     setShowMentionDropdown(false);
+  };
+
+  // Render comment content with clickable @mentions
+  const renderCommentContent = (content: string, mentions: Array<{ id: string; username: string; fullName: string }>) => {
+    if (!content) return null;
+    
+    // Create a map of usernames to user ids for quick lookup
+    const mentionMap = new Map(mentions.map(m => [m.username.toLowerCase(), m]));
+    
+    // Split content by @mentions
+    const parts = content.split(/(@\w+)/g);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const username = part.slice(1).toLowerCase();
+        const mentionedUser = mentionMap.get(username);
+        
+        if (mentionedUser) {
+          return (
+            <Link
+              key={index}
+              href={user && mentionedUser.id === user.id ? '/profile' : `/profile/${mentionedUser.id}`}
+              className="text-blue-600 font-semibold hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {part}
+            </Link>
+          );
+        }
+      }
+      return <span key={index}>{part}</span>;
+    });
   };
 
   const handleLikeComment = async (commentId: string) => {
@@ -1233,7 +1265,7 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                                 </span>
                               </Link>
                               <span className="text-sm text-gray-900 ml-2">
-                                {comment.content}
+                                {renderCommentContent(comment.content, comment.mentions)}
                               </span>
                             </div>
                             
@@ -1355,25 +1387,50 @@ export function PostCard({ post, showRestaurantInfo = false, onEdit, onDelete, o
                   </div>
                   
                   {/* Mention Dropdown */}
-                  {showMentionDropdown && availableFriends.length > 0 && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto">
-                      {availableFriends.map((friend) => (
-                        <button
-                          key={friend.id}
-                          onClick={() => handleSelectMention(friend)}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-bold text-white">
-                              {friend.fullName.charAt(0).toUpperCase()}
-                            </span>
+                  {showMentionDropdown && (
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto z-50">
+                      {availableFriends.length > 0 ? (
+                        <>
+                          <div className="px-4 py-2 border-b border-gray-100">
+                            <p className="text-xs font-medium text-gray-500">People you follow</p>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
-                            <p className="text-xs text-gray-500">@{friend.username}</p>
-                          </div>
-                        </button>
-                      ))}
+                          {availableFriends.map((friend) => (
+                            <button
+                              key={friend.id}
+                              onClick={() => handleSelectMention(friend)}
+                              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                            >
+                              {friend.avatarUrl ? (
+                                <img
+                                  src={friend.avatarUrl}
+                                  alt={friend.fullName}
+                                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-sm font-bold text-white">
+                                    {friend.fullName.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm text-gray-900">{friend.fullName}</p>
+                                <p className="text-xs text-gray-500">@{friend.username}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      ) : mentionSearch ? (
+                        <div className="px-4 py-6 text-center">
+                          <p className="text-sm text-gray-500">No matches found for &quot;{mentionSearch}&quot;</p>
+                          <p className="text-xs text-gray-400 mt-1">You can only tag people you follow</p>
+                        </div>
+                      ) : (
+                        <div className="px-4 py-6 text-center">
+                          <p className="text-sm text-gray-500">Start typing to search</p>
+                          <p className="text-xs text-gray-400 mt-1">You can tag people you follow</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -29,16 +29,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Search for friends (people the user follows)
+    // Include avatar_url for the mention dropdown
     let profileQuery = supabase
       .from('profiles')
-      .select('id, username, full_name')
+      .select('id, username, full_name, avatar_url')
       .in('id', followingIds)
       .order('username', { ascending: true })
       .limit(20);
 
-    // If there's a search query, filter by username
+    // If there's a search query, filter by username or full_name
     if (query) {
-      profileQuery = profileQuery.ilike('username', `%${query}%`);
+      profileQuery = profileQuery.or(`username.ilike.%${query}%,full_name.ilike.%${query}%`);
     }
 
     const { data: profiles, error: profilesError } = await profileQuery;
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
       id: profile.id,
       username: profile.username,
       fullName: profile.full_name || profile.username,
+      avatarUrl: profile.avatar_url,
     })) || [];
 
     return NextResponse.json({ friends: formattedFriends });
@@ -57,4 +59,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to search friends' }, { status: 500 });
   }
 }
-

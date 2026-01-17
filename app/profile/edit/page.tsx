@@ -2,10 +2,11 @@
 
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, X } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { validateUsername, sanitizeUsername } from '@/lib/username-validation';
 
 interface Profile {
   id: string;
@@ -22,6 +23,7 @@ export default function EditProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
   const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,6 +31,11 @@ export default function EditProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const supabase = createClient();
+
+  // Username validation state
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -44,6 +51,86 @@ export default function EditProfilePage() {
     }
   }, [bio]);
 
+  // Debounced username check
+  const checkUsernameAvailability = useCallback(async (usernameToCheck: string) => {
+    if (!usernameToCheck || usernameToCheck.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    // If username hasn't changed from original, it's valid
+    if (usernameToCheck.toLowerCase() === originalUsername.toLowerCase()) {
+      setUsernameError(null);
+      setUsernameAvailable(true);
+      return;
+    }
+
+    // First validate locally
+    const validation = validateUsername(usernameToCheck);
+    if (!validation.isValid) {
+      setUsernameError(validation.error || 'Invalid username');
+      setUsernameAvailable(false);
+      return;
+    }
+
+    setCheckingUsername(true);
+    try {
+      const response = await fetch(
+        `/api/users/check-username?username=${encodeURIComponent(usernameToCheck)}&currentUserId=${user?.id}`
+      );
+      const data = await response.json();
+      
+      if (data.valid && data.available) {
+        setUsernameError(null);
+        setUsernameAvailable(true);
+      } else {
+        setUsernameError(data.error || 'Username not available');
+        setUsernameAvailable(false);
+      }
+    } catch (err) {
+      console.error('Error checking username:', err);
+      setUsernameAvailable(null);
+    } finally {
+      setCheckingUsername(false);
+    }
+  }, [originalUsername, user?.id]);
+
+  // Debounce username check
+  useEffect(() => {
+    const trimmed = username.trim();
+    
+    if (!trimmed) {
+      setUsernameError(null);
+      setUsernameAvailable(null);
+      return;
+    }
+
+    // If username hasn't changed from original, it's valid
+    if (trimmed.toLowerCase() === originalUsername.toLowerCase()) {
+      setUsernameError(null);
+      setUsernameAvailable(true);
+      return;
+    }
+
+    // Quick local validation first
+    const validation = validateUsername(trimmed);
+    if (!validation.isValid) {
+      setUsernameError(validation.error || 'Invalid username');
+      setUsernameAvailable(false);
+      return;
+    }
+
+    // Clear previous error and set checking
+    setUsernameError(null);
+    setUsernameAvailable(null);
+    
+    const timeoutId = setTimeout(() => {
+      checkUsernameAvailability(trimmed);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [username, originalUsername, checkUsernameAvailability]);
+
   const fetchProfile = async () => {
     try {
       const { data, error } = await supabase
@@ -57,6 +144,7 @@ export default function EditProfilePage() {
       setProfile(data);
       setFullName(data.full_name || '');
       setUsername(data.username || '');
+      setOriginalUsername(data.username || '');
       setBio(data.bio || '');
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -64,6 +152,13 @@ export default function EditProfilePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Auto-sanitize as user types (lowercase, no spaces)
+    const sanitized = value.toLowerCase().replace(/\s/g, '_');
+    setUsername(sanitized);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,14 +220,28 @@ export default function EditProfilePage() {
       return;
     }
 
+    // Validate username
+    const validation = validateUsername(username);
+    if (!validation.isValid) {
+      showToast(validation.error || 'Invalid username', 'error');
+      return;
+    }
+
+    if (usernameAvailable === false) {
+      showToast('Please choose a different username', 'error');
+      return;
+    }
+
     setSaving(true);
     try {
+      const sanitizedUsername = validation.sanitized || sanitizeUsername(username);
+      
       const response = await fetch('/api/profile/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName.trim() || null,
-          username: username.trim(),
+          username: sanitizedUsername,
           bio: bio.trim() || null,
         }),
       });
@@ -178,6 +287,8 @@ export default function EditProfilePage() {
     );
   }
 
+  const isFormValid = username.trim() && usernameAvailable !== false;
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header - Instagram Style */}
@@ -196,7 +307,7 @@ export default function EditProfilePage() {
           <h1 className="text-base font-semibold text-gray-900">Edit profile</h1>
           <button
             onClick={handleSave}
-            disabled={saving || !username.trim()}
+            disabled={saving || !isFormValid}
             className="text-primary font-semibold text-sm disabled:opacity-40"
           >
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Done'}
@@ -262,15 +373,42 @@ export default function EditProfilePage() {
           {/* Username */}
           <div className="py-3 border-b border-gray-200">
             <label className="block text-xs text-gray-500 mb-1">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full text-base text-gray-900 bg-transparent outline-none placeholder:text-gray-400"
-              placeholder="Username"
-              required
-              disabled={saving}
-            />
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                value={username}
+                onChange={handleUsernameChange}
+                className={`w-full text-base bg-transparent outline-none placeholder:text-gray-400 pr-8 ${
+                  usernameError ? 'text-red-600' : 'text-gray-900'
+                }`}
+                placeholder="Username"
+                required
+                disabled={saving}
+                autoComplete="off"
+                autoCapitalize="off"
+              />
+              {/* Status indicator */}
+              <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                {checkingUsername && (
+                  <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+                )}
+                {!checkingUsername && usernameAvailable === true && (
+                  <Check className="w-4 h-4 text-green-500" />
+                )}
+                {!checkingUsername && usernameAvailable === false && (
+                  <X className="w-4 h-4 text-red-500" />
+                )}
+              </div>
+            </div>
+            {/* Validation hint */}
+            {usernameError && (
+              <p className="text-xs text-red-500 mt-1">{usernameError}</p>
+            )}
+            {username && !usernameError && username !== originalUsername && (
+              <p className="text-xs text-gray-400 mt-1">
+                Letters, numbers, underscores, and periods only
+              </p>
+            )}
           </div>
 
           {/* Bio */}
