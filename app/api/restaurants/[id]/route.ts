@@ -19,29 +19,30 @@ export async function GET(
   
   try {
     const { id } = await params;
-    
-    // Check cache first
-    const cacheKey = ServerCache.makeKey('restaurant', { id });
-    const cached = restaurantCache.get<any>(cacheKey);
-    if (cached) {
-      console.log(`[Restaurant] Cache hit - ${Date.now() - startTime}ms`);
-      return NextResponse.json(cached);
-    }
-    
     const supabase = await createClient();
+    
+    // Get user first to determine if we can use cache
+    // (Cache is only for anonymous users since response contains user-specific data)
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const cacheKey = ServerCache.makeKey('restaurant', { id });
+    
+    // Only use cache for anonymous users (response contains user-specific data like isLiked, isWishlisted, friend ordering)
+    if (!user) {
+      const cached = restaurantCache.get<any>(cacheKey);
+      if (cached) {
+        console.log(`[Restaurant] Cache hit (anonymous) - ${Date.now() - startTime}ms`);
+        return NextResponse.json(cached);
+      }
+    }
 
     // Check if ID is a UUID or Google Place ID
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     
-    // PARALLEL: Get user and restaurant data simultaneously
-    const [userResult, restaurantResult] = await Promise.all([
-      supabase.auth.getUser(),
-      isUUID
-        ? supabase.from('restaurants').select('*').eq('id', id).single()
-        : supabase.from('restaurants').select('*').eq('google_place_id', id).single()
-    ]);
-
-    const user = userResult.data?.user;
+    // Fetch restaurant data
+    const restaurantResult = isUUID
+      ? await supabase.from('restaurants').select('*').eq('id', id).single()
+      : await supabase.from('restaurants').select('*').eq('google_place_id', id).single();
     const restaurant = restaurantResult.data;
     const restaurantError = restaurantResult.error;
 
@@ -190,7 +191,7 @@ export async function GET(
     let showingNonFriendReviews = false;
 
     if (allReviews.length > 0) {
-      // Sort: user's own reviews first, then friends, then others (maintain date order within groups)
+      // Sort: user's own reviews first, then friends, then others (sorted by date within each group)
       reviews = [...allReviews].sort((a, b) => {
         const aIsOwn = user && a.user.id === user.id;
         const bIsOwn = user && b.user.id === user.id;
@@ -203,8 +204,8 @@ export async function GET(
         // Then friends
         if (aIsFriend && !bIsFriend) return -1;
         if (!aIsFriend && bIsFriend) return 1;
-        // Maintain original date order within same priority group
-        return 0;
+        // Within same priority group, sort by created_at DESC (newest first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
       
       // Check if showing non-friend reviews (for info banner)
@@ -261,8 +262,10 @@ export async function GET(
       friendsWhoReviewed,
     };
 
-    // Cache the result
-    restaurantCache.set(cacheKey, response, CACHE_TTL.RESTAURANT);
+    // Only cache for anonymous users (response contains user-specific data)
+    if (!user) {
+      restaurantCache.set(cacheKey, response, CACHE_TTL.RESTAURANT);
+    }
     
     console.log(`[Restaurant] Complete - ${Date.now() - startTime}ms`);
     
@@ -411,7 +414,7 @@ async function handleGooglePlaceId(
     let showingGoogleReviews = false;
 
     if (ourReviews.length > 0) {
-      // Sort: user's own reviews first, then friends, then others
+      // Sort: user's own reviews first, then friends, then others (sorted by date within each group)
       reviewsToShow = [...ourReviews].sort((a, b) => {
         const aIsOwn = user && a.user.id === user.id;
         const bIsOwn = user && b.user.id === user.id;
@@ -424,8 +427,8 @@ async function handleGooglePlaceId(
         // Then friends
         if (aIsFriend && !bIsFriend) return -1;
         if (!aIsFriend && bIsFriend) return 1;
-        // Maintain original date order within same priority group
-        return 0;
+        // Within same priority group, sort by created_at DESC (newest first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     } else if (googleData.reviews && googleData.reviews.length > 0) {
       // Fall back to Google reviews only if no Pachu reviews exist
