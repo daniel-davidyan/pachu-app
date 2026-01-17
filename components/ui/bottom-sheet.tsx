@@ -198,6 +198,11 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     ? `${Math.min(viewportHeight * 0.85, viewportHeight - 50)}px`
     : '85dvh';
 
+  // Calculate the keyboard gap (space between visual viewport and actual screen bottom)
+  const keyboardGap = viewportHeight !== null && initialWindowHeightRef.current > 0
+    ? initialWindowHeightRef.current - viewportHeight
+    : 0;
+
   const content = (
     <>
       {/* Backdrop - covers the full visual viewport */}
@@ -215,13 +220,25 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
         }}
       />
 
+      {/* White background to fill gap between sheet and keyboard */}
+      {keyboardGap > 0 && (
+        <div
+          className="fixed left-0 right-0 bg-white"
+          style={{
+            bottom: 0,
+            height: `${keyboardGap}px`,
+            zIndex: zIndex + 1,
+          }}
+        />
+      )}
+
       {/* Bottom Sheet - always at the bottom of the visual viewport */}
       <div
         ref={sheetRef}
         className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col"
         style={{
           // Position at the bottom of the visual viewport
-          bottom: 0,
+          bottom: keyboardGap,
           // Calculate top position based on visual viewport
           top: viewportHeight !== null 
             ? `${Math.max(viewportHeight * 0.15, 50)}px` 
@@ -230,8 +247,8 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
           maxHeight: maxHeightValue,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
-          zIndex: zIndex + 1,
-          transition: 'top 0.15s ease-out, max-height 0.15s ease-out',
+          zIndex: zIndex + 2,
+          transition: 'top 0.15s ease-out, max-height 0.15s ease-out, bottom 0.15s ease-out',
         }}
       >
         {/* Drag Handle */}
