@@ -28,6 +28,8 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
+  const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+  const [initialWindowHeight, setInitialWindowHeight] = useState<number>(typeof window !== 'undefined' ? window.innerHeight : 800);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -41,19 +43,15 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
       // Save the current scroll position
       scrollPositionRef.current = window.scrollY;
       
-      // Lock the body scroll
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
+      // Add class to body
+      document.body.classList.add('sheet-open');
       document.body.style.top = `-${scrollPositionRef.current}px`;
     } else {
       // Restore the scroll position
       const scrollY = scrollPositionRef.current;
       
-      // Reset body styles
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      // Remove class from body
+      document.body.classList.remove('sheet-open');
       document.body.style.top = '';
       
       // Restore scroll position
@@ -63,33 +61,69 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
     return () => {
       // Cleanup on unmount
       if (skipBodyLock) return;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.classList.remove('sheet-open');
       document.body.style.top = '';
     };
   }, [isOpen, skipBodyLock]);
 
-  // Prevent iOS from scrolling the page when focusing inputs inside the sheet
+  // Track visual viewport for keyboard detection
   useEffect(() => {
-    if (!isOpen || !sheetRef.current) return;
+    if (!isOpen) {
+      setVisualViewportHeight(null);
+      return;
+    }
 
-    const sheet = sheetRef.current;
-    
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        // Prevent iOS auto-scroll by keeping scroll at 0
-        requestAnimationFrame(() => {
-          window.scrollTo(0, 0);
-        });
+    // Store initial height
+    setInitialWindowHeight(window.innerHeight);
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const preventScroll = () => {
+      // Aggressively prevent all scrolling when sheet is open
+      window.scrollTo(0, 0);
+      if (document.documentElement.scrollTop !== 0) {
+        document.documentElement.scrollTop = 0;
+      }
+      if (document.body.scrollTop !== 0) {
+        document.body.scrollTop = 0;
       }
     };
 
-    sheet.addEventListener('focusin', handleFocusIn);
+    const handleResize = () => {
+      // Visual viewport height changes when keyboard opens/closes
+      setVisualViewportHeight(vv.height);
+      
+      // Prevent iOS from scrolling
+      preventScroll();
+    };
+
+    const handleVisualViewportScroll = () => {
+      // When visual viewport scrolls, it means iOS is trying to scroll to show the input
+      // We need to counteract this
+      preventScroll();
+    };
+
+    // Initial state
+    setVisualViewportHeight(vv.height);
+    preventScroll();
+
+    // Listen to viewport changes
+    vv.addEventListener('resize', handleResize);
+    vv.addEventListener('scroll', handleVisualViewportScroll);
     
+    // Also listen to window scroll with interval backup
+    window.addEventListener('scroll', preventScroll, { passive: false });
+    
+    // Backup: periodically ensure no scroll happened
+    const intervalId = setInterval(preventScroll, 100);
+
     return () => {
-      sheet.removeEventListener('focusin', handleFocusIn);
+      vv.removeEventListener('resize', handleResize);
+      vv.removeEventListener('scroll', handleVisualViewportScroll);
+      window.removeEventListener('scroll', preventScroll);
+      clearInterval(intervalId);
+      setVisualViewportHeight(null);
     };
   }, [isOpen]);
 
@@ -190,6 +224,15 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
   if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
+  
+  // Calculate if keyboard is open based on visual viewport change
+  const keyboardOpen = visualViewportHeight !== null && visualViewportHeight < initialWindowHeight - 100;
+  
+  // When keyboard is open, limit sheet height to visual viewport
+  // When closed, use the requested height
+  const effectiveMaxHeight = keyboardOpen 
+    ? `${visualViewportHeight! - 20}px`  // Leave some space at top
+    : (height === 'auto' ? '70dvh' : height.replace('vh', 'dvh'));
 
   const content = (
     <>
@@ -200,13 +243,14 @@ export function BottomSheet({ isOpen, onClose, children, title, zIndex = 9998, h
         style={{ opacity: isOpen ? 1 : 0, zIndex }}
       />
 
-      {/* Bottom Sheet */}
+      {/* Bottom Sheet - always at bottom, height adjusts to visual viewport */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl flex flex-col transition-transform duration-300 ease-out"
+        className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col"
         style={{
+          bottom: 0,
           height: height === 'auto' ? 'auto' : height,
-          maxHeight: height === 'auto' ? '70dvh' : height.replace('vh', 'dvh'),
+          maxHeight: effectiveMaxHeight,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 1,
