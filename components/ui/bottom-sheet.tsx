@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useLayoutEffect } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -11,6 +11,14 @@ const getServerSnapshot = () => false;
 
 function useIsMounted() {
   return useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
+}
+
+// Get initial window height safely
+function getInitialWindowHeight() {
+  if (typeof window !== 'undefined') {
+    return window.innerHeight;
+  }
+  return 800; // Fallback for SSR
 }
 
 interface BottomSheetProps {
@@ -25,78 +33,64 @@ interface BottomSheetProps {
   skipBodyLock?: boolean;
 }
 
-export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex = 9998, height = '75vh', expandedHeight = '85vh' }: BottomSheetProps) {
+export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex = 9998, height = '50vh', expandedHeight = '80vh' }: BottomSheetProps) {
   const mounted = useIsMounted();
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-  const [visualViewportHeight, setVisualViewportHeight] = useState(0);
-  const [initialWindowHeight, setInitialWindowHeight] = useState(0);
+  const [keyboardGap, setKeyboardGap] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
+  const initialHeightRef = useRef<number>(0);
 
-  // Initialize heights on mount
+  // Track visual viewport for keyboard detection
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      queueMicrotask(() => {
-        setInitialWindowHeight(window.innerHeight);
-        setVisualViewportHeight(window.visualViewport?.height || window.innerHeight);
-      });
-    }
-  }, []);
-
-  // Track visual viewport for keyboard detection - Instagram-like behavior
-  useLayoutEffect(() => {
     if (!isOpen || typeof window === 'undefined') return;
     
     // Capture initial window height when sheet opens
-    const initialHeight = window.innerHeight;
-    queueMicrotask(() => {
-      setInitialWindowHeight(initialHeight);
-      setVisualViewportHeight(window.visualViewport?.height || initialHeight);
-    });
+    initialHeightRef.current = window.innerHeight;
+    setKeyboardGap(0);
 
     const vv = window.visualViewport;
     if (!vv) return;
 
     const handleResize = () => {
-      // Directly use visual viewport height for smooth resizing
-      setVisualViewportHeight(vv.height);
+      const currentVVHeight = vv.height;
+      const initialHeight = initialHeightRef.current || window.innerHeight;
+      
+      // If visual viewport is significantly smaller than window, keyboard is open
+      const gap = initialHeight - currentVVHeight;
+      
+      if (gap > 150) {
+        setKeyboardGap(gap);
+      } else {
+        setKeyboardGap(0);
+      }
     };
 
-    // Handle both resize and scroll events for iOS PWA compatibility
     vv.addEventListener('resize', handleResize);
-    vv.addEventListener('scroll', handleResize);
     
     return () => {
       vv.removeEventListener('resize', handleResize);
-      vv.removeEventListener('scroll', handleResize);
+      setKeyboardGap(0);
     };
   }, [isOpen]);
 
-  // Lock body scroll
+  // Lock body scroll - simplified approach
   useEffect(() => {
     if (!isOpen) return;
 
     scrollPositionRef.current = window.scrollY;
     
-    const originalOverflow = document.body.style.overflow;
-    const originalPosition = document.body.style.position;
-    const originalTop = document.body.style.top;
-    const originalWidth = document.body.style.width;
-    
+    // Simple overflow hidden - don't mess with position
     document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollPositionRef.current}px`;
-    document.body.style.width = '100%';
+    document.body.style.touchAction = 'none';
     
     return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.position = originalPosition;
-      document.body.style.top = originalTop;
-      document.body.style.width = originalWidth;
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
       window.scrollTo(0, scrollPositionRef.current);
     };
   }, [isOpen]);
@@ -190,15 +184,10 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
-  
-  // Calculate keyboard gap from the difference between initial window height and current visual viewport
-  const keyboardGap = Math.max(0, initialWindowHeight - visualViewportHeight);
   const isKeyboardOpen = keyboardGap > 150;
-  
-  // Instagram-like behavior: sheet shrinks to fit within visual viewport
-  // Calculate maximum available height (visual viewport minus some top margin)
-  const topMargin = 60; // Leave some space at the top
-  const maxAvailableHeight = visualViewportHeight - topMargin;
+  const currentHeight = isKeyboardOpen ? expandedHeight : height;
+  const windowHeight = initialHeightRef.current || getInitialWindowHeight();
+  const visualViewportHeight = windowHeight - keyboardGap;
 
   const content = (
     <>
@@ -209,30 +198,33 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
         style={{ 
           opacity: isOpen ? 1 : 0, 
           zIndex,
-          // On iOS, backdrop should only cover visible area
-          height: visualViewportHeight > 0 ? `${visualViewportHeight}px` : '100%',
         }}
       />
 
-      {/* Bottom Sheet - Instagram-like behavior: stays at bottom, shrinks with keyboard */}
+      {/* White background to fill gap between sheet and keyboard */}
+      {keyboardGap > 0 && (
+        <div
+          className="fixed left-0 right-0 bg-white"
+          style={{
+            bottom: 0,
+            height: `${keyboardGap}px`,
+            zIndex: zIndex + 1,
+          }}
+        />
+      )}
+
+      {/* Bottom Sheet */}
       <div
         ref={sheetRef}
         className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col"
         style={{
-          // Always positioned at the bottom of the visual viewport
-          bottom: isKeyboardOpen ? keyboardGap : 0,
-          // Height shrinks to fit within visual viewport when keyboard is open
-          height: isKeyboardOpen 
-            ? `${Math.min(maxAvailableHeight, visualViewportHeight * 0.85)}px`
-            : height,
-          maxHeight: isKeyboardOpen 
-            ? `${maxAvailableHeight}px` 
-            : '90dvh',
+          bottom: keyboardGap,
+          height: currentHeight,
+          maxHeight: isKeyboardOpen ? `${visualViewportHeight - 40}px` : '85dvh',
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 2,
-          // Smooth transition for Instagram-like feel
-          transition: isDragging ? 'none' : 'height 0.25s ease-out, max-height 0.25s ease-out, bottom 0.25s ease-out',
+          transition: isDragging ? 'none' : 'height 0.2s ease-out, max-height 0.2s ease-out, bottom 0.15s ease-out',
         }}
       >
         {/* Drag Handle */}
@@ -271,15 +263,15 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
           {children}
         </div>
 
-        {/* Fixed Footer - stays at bottom of sheet, above keyboard */}
+        {/* Fixed Footer - positioned at bottom with safe area */}
         {footer && (
           <div 
             className="flex-shrink-0 px-4 bg-white border-t border-gray-100"
             style={{ 
               paddingBottom: isKeyboardOpen 
-                ? '8px'
+                ? '6px'
                 : 'max(16px, env(safe-area-inset-bottom, 16px))',
-              paddingTop: '12px' 
+              paddingTop: '10px' 
             }}
           >
             {footer}
