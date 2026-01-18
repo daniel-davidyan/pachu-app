@@ -297,7 +297,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
               paddingBottom: isKeyboardOpen 
                 ? '6px'
                 : 'env(safe-area-inset-bottom, 8px)',
-              paddingTop: '8px' 
+              paddingTop: '5px' 
             }}
           >
             {footer}
