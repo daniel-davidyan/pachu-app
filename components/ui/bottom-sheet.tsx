@@ -30,18 +30,18 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [keyboardGap, setKeyboardGap] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
-  const initialWindowHeightRef = useRef<number>(0);
+  const initialWindowHeightRef = useRef<number>(typeof window !== 'undefined' ? window.innerHeight : 0);
 
   // Lock body scroll and store position
   useEffect(() => {
     if (isOpen) {
       scrollPositionRef.current = window.scrollY;
+      // Always update initial height when opening
       initialWindowHeightRef.current = window.innerHeight;
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
@@ -62,6 +62,8 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
       document.documentElement.style.overflow = '';
       document.documentElement.style.height = '';
       window.scrollTo(0, scrollY);
+      // Reset keyboard gap when closing
+      setKeyboardGap(0);
     }
     
     return () => {
@@ -76,37 +78,30 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     };
   }, [isOpen]);
 
-  // Track visual viewport for keyboard - this gives us the actual visible area
+  // Track visual viewport for keyboard
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
+    if (!isOpen) return;
 
     const vv = window.visualViewport;
     if (!vv) return;
 
     const updateViewport = () => {
-      // Calculate keyboard gap (space between visual viewport and actual screen bottom)
-      // Only consider it a keyboard if gap > 150px (actual keyboards are ~250-350px)
+      // Calculate keyboard gap
       const gap = initialWindowHeightRef.current > 0 
         ? initialWindowHeightRef.current - vv.height 
         : 0;
       
       // Only set gap if it's a real keyboard (> 150px)
-      const newGap = gap > 150 ? gap : 0;
-      setKeyboardGap(newGap);
-      setViewportHeight(vv.height);
+      setKeyboardGap(gap > 150 ? gap : 0);
     };
 
+    // Listen for viewport changes
     vv.addEventListener('resize', updateViewport);
     vv.addEventListener('scroll', updateViewport);
     
     return () => {
       vv.removeEventListener('resize', updateViewport);
       vv.removeEventListener('scroll', updateViewport);
-      // Reset state on cleanup
-      setKeyboardGap(0);
-      setViewportHeight(null);
     };
   }, [isOpen]);
 
@@ -199,30 +194,20 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
-  const isKeyboardOpen = keyboardGap > 150; // Keyboard is open if gap > 150px (actual keyboards are ~250-350px)
+  const isKeyboardOpen = keyboardGap > 150;
   
   // Use different height based on whether keyboard is open
   const currentHeight = isKeyboardOpen ? expandedHeight : height;
-  
-  // Calculate the max height based on visual viewport (shrinks when keyboard opens)
-  const maxHeightValue = viewportHeight !== null 
-    ? `${Math.min(viewportHeight * 0.9, viewportHeight - 40)}px`
-    : (isKeyboardOpen ? '90dvh' : '85dvh');
 
   const content = (
     <>
-      {/* Backdrop - covers the full visual viewport */}
+      {/* Backdrop */}
       <div
-        className="fixed bg-black/50 transition-opacity duration-300"
+        className="fixed inset-0 bg-black/50 transition-opacity duration-300"
         onClick={onClose}
         style={{ 
           opacity: isOpen ? 1 : 0, 
           zIndex,
-          top: 0,
-          left: 0,
-          right: 0,
-          // Use visual viewport height if available
-          height: viewportHeight !== null ? `${viewportHeight}px` : '100dvh',
         }}
       />
 
@@ -238,23 +223,18 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
         />
       )}
 
-      {/* Bottom Sheet - positioned above the keyboard */}
+      {/* Bottom Sheet */}
       <div
         ref={sheetRef}
         className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col"
         style={{
-          // Position above the keyboard gap
           bottom: keyboardGap,
-          // Calculate top position based on visual viewport and keyboard state
-          top: viewportHeight !== null 
-            ? `${Math.max(viewportHeight * (isKeyboardOpen ? 0.1 : 0.5), 50)}px` 
-            : 'auto',
-          height: viewportHeight !== null ? 'auto' : currentHeight,
-          maxHeight: maxHeightValue,
+          height: currentHeight,
+          maxHeight: isKeyboardOpen ? '90dvh' : '85dvh',
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 2,
-          transition: 'top 0.2s ease-out, height 0.2s ease-out, max-height 0.2s ease-out, bottom 0.15s ease-out',
+          transition: 'height 0.2s ease-out, max-height 0.2s ease-out, bottom 0.15s ease-out',
         }}
       >
         {/* Drag Handle */}
