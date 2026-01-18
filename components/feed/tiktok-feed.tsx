@@ -608,7 +608,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
         }}
         title={showMentionDropdown ? "Tag People" : "Comments"}
         footer={user ? (
-          <div ref={inputContainerRef} className="pt-3">
+          <div ref={inputContainerRef}>
             <div className="flex items-center gap-3">
               <input
                 type="text"

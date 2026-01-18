@@ -308,11 +308,16 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
           {children}
         </div>
 
-        {/* Fixed Footer - closer to keyboard when open */}
+        {/* Fixed Footer - at bottom, with safe area when keyboard closed */}
         {footer && (
           <div 
             className="flex-shrink-0 px-4 bg-white border-t border-gray-100"
-            style={{ paddingBottom: isKeyboardOpen ? '8px' : '16px', paddingTop: '8px' }}
+            style={{ 
+              paddingBottom: isKeyboardOpen 
+                ? '2px'  // Very close to keyboard
+                : 'max(12px, env(safe-area-inset-bottom, 12px))', // Safe area for iPhone home indicator
+              paddingTop: '6px' 
+            }}
           >
             {footer}
           </div>
