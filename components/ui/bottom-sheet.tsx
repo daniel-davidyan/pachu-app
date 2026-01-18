@@ -40,7 +40,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   // Initialize window height on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setWindowHeight(window.innerHeight);
+      queueMicrotask(() => setWindowHeight(window.innerHeight));
     }
   }, []);
 
