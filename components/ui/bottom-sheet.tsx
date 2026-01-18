@@ -294,9 +294,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
           <div 
             className="flex-shrink-0 px-4 bg-white border-t border-gray-100"
             style={{ 
-              paddingBottom: isKeyboardOpen 
-                ? '6px'
-                : 'env(safe-area-inset-bottom, 8px)',
+              paddingBottom: isKeyboardOpen ? '4px' : '4px',
               paddingTop: '5px' 
             }}
           >
