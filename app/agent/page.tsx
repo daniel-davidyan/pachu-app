@@ -230,36 +230,44 @@ export default function AgentPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const initialWindowHeightRef = useRef<number>(typeof window !== 'undefined' ? window.innerHeight : 0);
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const windowHeightRef = useRef<number>(0);
+  const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+
+  // Initialize window height immediately
+  if (typeof window !== 'undefined' && windowHeightRef.current === 0) {
+    windowHeightRef.current = window.innerHeight;
+  }
 
   // Track visual viewport for keyboard handling
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    initialWindowHeightRef.current = window.innerHeight;
+    windowHeightRef.current = window.innerHeight;
     
     const vv = window.visualViewport;
     if (!vv) return;
 
     const updateViewport = () => {
-      setViewportHeight(vv.height);
+      const keyboardHeight = windowHeightRef.current - vv.height;
+      
+      // Only set if keyboard is actually open (> 150px)
+      if (keyboardHeight > 150) {
+        setVisualViewportHeight(vv.height);
+      } else {
+        setVisualViewportHeight(null);
+      }
     };
 
     vv.addEventListener('resize', updateViewport);
-    vv.addEventListener('scroll', updateViewport);
     
     return () => {
       vv.removeEventListener('resize', updateViewport);
-      vv.removeEventListener('scroll', updateViewport);
     };
   }, []);
 
   // Calculate keyboard height
-  const keyboardHeight = viewportHeight !== null && initialWindowHeightRef.current > 0
-    ? Math.max(0, initialWindowHeightRef.current - viewportHeight)
-    : 0;
-  const isKeyboardOpen = keyboardHeight > 150;
+  const isKeyboardOpen = visualViewportHeight !== null;
+  const keyboardHeight = isKeyboardOpen ? (windowHeightRef.current - visualViewportHeight) : 0;
 
   // Get user location
   useEffect(() => {
@@ -574,7 +582,7 @@ export default function AgentPage() {
     <div 
       className="fixed inset-0 flex flex-col overflow-hidden" 
       style={{ 
-        height: viewportHeight !== null ? `${viewportHeight}px` : '100dvh',
+        height: isKeyboardOpen ? `${visualViewportHeight}px` : '100dvh',
         touchAction: 'pan-y',
         overscrollBehavior: 'none',
         background: 'linear-gradient(135deg, #FCE7F3 0%, #FDF2F8 60%, #FFFFFF 100%)',

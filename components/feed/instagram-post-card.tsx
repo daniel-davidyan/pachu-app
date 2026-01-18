@@ -657,15 +657,20 @@ export function InstagramPostCard({
           setShowMentionDropdown(false);
         }}
         title={showMentionDropdown ? "Tag People" : "Comments"}
-        footer={user ? (
+        footer={(
           <div ref={inputContainerRef}>
             <div className="flex items-center gap-3">
               <input
                 type="text"
-                placeholder="Add a comment..."
+                inputMode="text"
+                enterKeyHint="send"
+                autoComplete="off"
+                autoCorrect="on"
+                placeholder={user ? "Add a comment..." : "Log in to comment"}
                 value={newComment}
-                onChange={(e) => handleMentionInput(e.target.value)}
+                onChange={(e) => user && handleMentionInput(e.target.value)}
                 onKeyDown={(e) => {
+                  if (!user) return;
                   if (e.key === 'Enter' && !e.shiftKey && !showMentionDropdown) {
                     e.preventDefault();
                     handleCommentSubmit();
@@ -675,19 +680,20 @@ export function InstagramPostCard({
                     setShowMentionDropdown(false);
                   }
                 }}
-                className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
+                disabled={!user}
+                className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400 disabled:bg-transparent"
                 style={{ fontSize: '16px' }}
               />
               <button
                 onClick={handleCommentSubmit}
-                disabled={!newComment.trim()}
+                disabled={!user || !newComment.trim()}
                 className="text-blue-500 font-semibold text-sm disabled:opacity-40 transition-opacity"
               >
                 Post
               </button>
             </div>
           </div>
-        ) : undefined}
+        )}
       >
         {/* Inline Mention Picker - replaces comments when @ is typed */}
         {showMentionDropdown ? (

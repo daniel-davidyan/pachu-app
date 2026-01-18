@@ -607,7 +607,7 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
           setComments([]);
         }}
         title={showMentionDropdown ? "Tag People" : "Comments"}
-        footer={user ? (
+        footer={(
           <div ref={inputContainerRef}>
             <div className="flex items-center gap-3">
               <input
@@ -616,10 +616,11 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
                 enterKeyHint="send"
                 autoComplete="off"
                 autoCorrect="on"
-                placeholder="Add a comment..."
+                placeholder={user ? "Add a comment..." : "Log in to comment"}
                 value={newComment}
-                onChange={(e) => handleMentionInput(e.target.value)}
+                onChange={(e) => user && handleMentionInput(e.target.value)}
                 onKeyDown={(e) => {
+                  if (!user) return;
                   if (e.key === 'Enter' && !e.shiftKey && !showMentionDropdown) {
                     e.preventDefault();
                     handlePostComment();
@@ -629,19 +630,20 @@ export function TikTokFeed({ reviews, onLoadMore, hasMore, isLoading, isInitialL
                     setShowMentionDropdown(false);
                   }
                 }}
-                className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400"
+                disabled={!user}
+                className="flex-1 text-sm border-0 focus:outline-none focus:ring-0 placeholder-gray-400 disabled:bg-transparent"
                 style={{ fontSize: '16px' }}
               />
               <button
                 onClick={handlePostComment}
-                disabled={!newComment.trim() || postingComment}
+                disabled={!user || !newComment.trim() || postingComment}
                 className="text-primary font-semibold text-sm disabled:opacity-40 transition-opacity"
               >
                 {postingComment ? 'Posting...' : 'Post'}
               </button>
             </div>
           </div>
-        ) : undefined}
+        )}
       >
         {/* Inline Mention Picker - replaces comments when @ is typed */}
         {showMentionDropdown ? (
