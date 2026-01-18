@@ -29,36 +29,29 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-  const [initialWindowHeight, setInitialWindowHeight] = useState<number>(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
+  const initialHeightRef = useRef<number>(0);
 
-  // Lock body scroll and store position
+  // Always lock body scroll when sheet is open
   useEffect(() => {
     if (isOpen) {
       scrollPositionRef.current = window.scrollY;
-      queueMicrotask(() => setInitialWindowHeight(window.innerHeight));
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
-      document.body.style.height = '100%';
       document.body.style.top = `-${scrollPositionRef.current}px`;
       document.body.style.left = '0';
-      document.documentElement.style.overflow = 'hidden';
-      document.documentElement.style.height = '100%';
     } else {
       const scrollY = scrollPositionRef.current;
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
-      document.body.style.height = '';
       document.body.style.top = '';
       document.body.style.left = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.height = '';
       window.scrollTo(0, scrollY);
     }
     
@@ -66,39 +59,76 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
-      document.body.style.height = '';
       document.body.style.top = '';
       document.body.style.left = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.height = '';
     };
   }, [isOpen]);
 
-  // Track visual viewport for keyboard - this gives us the actual visible area
+  // Track keyboard via visual viewport - position sheet above keyboard
   useEffect(() => {
     if (!isOpen) {
-      // Use queueMicrotask to avoid synchronous setState in effect
-      queueMicrotask(() => setViewportHeight(null));
+      queueMicrotask(() => setKeyboardHeight(0));
       return;
     }
 
     const vv = window.visualViewport;
     if (!vv) return;
 
-    const updateViewport = () => {
-      // Use the visual viewport height directly - this shrinks when keyboard opens
-      setViewportHeight(vv.height);
+    // Store initial height on first open
+    if (initialHeightRef.current === 0) {
+      initialHeightRef.current = vv.height;
+    }
+
+    const handleResize = () => {
+      const currentHeight = vv.height;
+      const diff = initialHeightRef.current - currentHeight;
+      
+      // Keyboard is open if viewport shrunk significantly (> 100px)
+      if (diff > 100) {
+        setKeyboardHeight(diff);
+      } else {
+        setKeyboardHeight(0);
+      }
     };
 
-    // Set initial value after a microtask to avoid sync setState
-    queueMicrotask(updateViewport);
+    // Also handle scroll - iOS sometimes uses offsetTop instead of resizing
+    const handleScroll = () => {
+      if (vv.offsetTop > 0) {
+        // iOS is scrolling the viewport - we need to compensate
+        setKeyboardHeight(vv.offsetTop);
+      }
+    };
 
-    vv.addEventListener('resize', updateViewport);
-    vv.addEventListener('scroll', updateViewport);
+    vv.addEventListener('resize', handleResize);
+    vv.addEventListener('scroll', handleScroll);
+    
+    // Initial check
+    handleResize();
     
     return () => {
-      vv.removeEventListener('resize', updateViewport);
-      vv.removeEventListener('scroll', updateViewport);
+      vv.removeEventListener('resize', handleResize);
+      vv.removeEventListener('scroll', handleScroll);
+    };
+  }, [isOpen]);
+
+  // Prevent iOS scroll-into-view when input is focused
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const preventScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        // Prevent the default scroll behavior
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    };
+
+    document.addEventListener('focusin', preventScroll);
+    
+    return () => {
+      document.removeEventListener('focusin', preventScroll);
     };
   }, [isOpen]);
 
@@ -192,63 +222,33 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
   
-  // Calculate the max height based on visual viewport (shrinks when keyboard opens)
-  // If viewportHeight is set, use it directly; otherwise fall back to CSS vh
-  const maxHeightValue = viewportHeight !== null 
-    ? `${Math.min(viewportHeight * 0.85, viewportHeight - 50)}px`
-    : '85dvh';
-
-  // Calculate the keyboard gap (space between visual viewport and actual screen bottom)
-  const keyboardGap = viewportHeight !== null && initialWindowHeight > 0
-    ? initialWindowHeight - viewportHeight
-    : 0;
+  // When keyboard is open, reduce the sheet height and position it above the keyboard
+  const baseMaxHeight = '85vh';
+  const adjustedMaxHeight = keyboardHeight > 0 
+    ? `calc(85vh - ${keyboardHeight}px)` 
+    : baseMaxHeight;
 
   const content = (
     <>
-      {/* Backdrop - covers the full visual viewport */}
+      {/* Backdrop */}
       <div
-        className="fixed bg-black/50 transition-opacity duration-300"
+        className="fixed inset-0 bg-black/50 transition-opacity duration-300"
         onClick={onClose}
-        style={{ 
-          opacity: isOpen ? 1 : 0, 
-          zIndex,
-          top: 0,
-          left: 0,
-          right: 0,
-          // Use visual viewport height if available
-          height: viewportHeight !== null ? `${viewportHeight}px` : '100dvh',
-        }}
+        style={{ opacity: isOpen ? 1 : 0, zIndex }}
       />
 
-      {/* White background to fill gap between sheet and keyboard */}
-      {keyboardGap > 0 && (
-        <div
-          className="fixed left-0 right-0 bg-white"
-          style={{
-            bottom: 0,
-            height: `${keyboardGap}px`,
-            zIndex: zIndex + 1,
-          }}
-        />
-      )}
-
-      {/* Bottom Sheet - always at the bottom of the visual viewport */}
+      {/* Bottom Sheet - positioned above keyboard when it's open */}
       <div
         ref={sheetRef}
         className="fixed left-0 right-0 bg-white rounded-t-3xl flex flex-col"
         style={{
-          // Position at the bottom of the visual viewport
-          bottom: keyboardGap,
-          // Calculate top position based on visual viewport
-          top: viewportHeight !== null 
-            ? `${Math.max(viewportHeight * 0.15, 50)}px` 
-            : 'auto',
-          height: viewportHeight !== null ? 'auto' : height,
-          maxHeight: maxHeightValue,
+          bottom: keyboardHeight, // Move sheet up when keyboard opens
+          height: height,
+          maxHeight: adjustedMaxHeight,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
-          zIndex: zIndex + 2,
-          transition: 'top 0.15s ease-out, max-height 0.15s ease-out, bottom 0.15s ease-out',
+          zIndex: zIndex + 1,
+          transition: keyboardHeight > 0 ? 'bottom 0.1s ease-out, max-height 0.1s ease-out' : 'none',
         }}
       >
         {/* Drag Handle */}
