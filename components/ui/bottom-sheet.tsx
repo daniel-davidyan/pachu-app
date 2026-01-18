@@ -47,8 +47,11 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     // Capture initial window height when sheet opens
     const initialHeight = window.innerHeight;
     initialHeightRef.current = initialHeight;
-    setWindowHeight(initialHeight);
-    setKeyboardGap(0);
+    // Use queueMicrotask to avoid sync setState in effect
+    queueMicrotask(() => {
+      setWindowHeight(initialHeight);
+      setKeyboardGap(0);
+    });
 
     const vv = window.visualViewport;
     if (!vv) return;
@@ -71,7 +74,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     
     return () => {
       vv.removeEventListener('resize', handleResize);
-      setKeyboardGap(0);
+      queueMicrotask(() => setKeyboardGap(0));
     };
   }, [isOpen]);
 
