@@ -230,73 +230,50 @@ export default function AgentPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const initialHeightRef = useRef<number>(0);
-  const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
-  // Track visual viewport for keyboard handling
+  // iOS-optimized keyboard handling using Visual Viewport API
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Capture initial window height when page loads (before any keyboard)
-    const captureInitialHeight = () => {
-      if (initialHeightRef.current === 0) {
-        initialHeightRef.current = window.innerHeight;
-      }
-    };
-    
-    captureInitialHeight();
-    
-    // Use visual viewport API if available (most reliable for mobile keyboards)
     const vv = window.visualViewport;
-    
-    const updateViewport = () => {
-      let currentHeight: number;
+    if (!vv) {
+      // Fallback for browsers without visual viewport - just use window height
+      setViewportHeight(window.innerHeight);
+      return;
+    }
+
+    const handleViewportChange = () => {
+      // Set height to visual viewport height (this is the visible area above keyboard)
+      setViewportHeight(vv.height);
       
-      if (vv) {
-        currentHeight = vv.height;
-      } else {
-        currentHeight = window.innerHeight;
+      // Handle iOS Safari viewport offset - reset any page scroll
+      if (vv.offsetTop > 0) {
+        window.scrollTo(0, 0);
       }
       
-      const fullHeight = initialHeightRef.current || window.innerHeight;
-      const kbHeight = fullHeight - currentHeight;
-      
-      // Only consider keyboard open if height difference is significant (> 100px)
-      if (kbHeight > 100) {
-        setKeyboardHeight(kbHeight);
-        // Scroll to bottom when keyboard opens
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }, 50);
-        });
-      } else {
-        setKeyboardHeight(0);
-      }
+      // Scroll messages to bottom after viewport changes
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      });
     };
 
-    if (vv) {
-      vv.addEventListener('resize', updateViewport);
-      vv.addEventListener('scroll', updateViewport);
-    }
+    // Listen to viewport changes
+    vv.addEventListener('resize', handleViewportChange);
+    vv.addEventListener('scroll', handleViewportChange);
     
-    // Fallback for browsers without visual viewport
-    window.addEventListener('resize', updateViewport);
-    
-    // Initial check
-    updateViewport();
+    // Set initial height
+    handleViewportChange();
     
     return () => {
-      if (vv) {
-        vv.removeEventListener('resize', updateViewport);
-        vv.removeEventListener('scroll', updateViewport);
-      }
-      window.removeEventListener('resize', updateViewport);
+      vv.removeEventListener('resize', handleViewportChange);
+      vv.removeEventListener('scroll', handleViewportChange);
     };
   }, []);
 
-  // Calculate keyboard state
-  const isKeyboardOpen = keyboardHeight > 0;
+  // Detect if keyboard is likely open (viewport smaller than window)
+  const isKeyboardOpen = viewportHeight !== null && viewportHeight < window.innerHeight - 100;
 
   // Get user location
   useEffect(() => {
@@ -379,37 +356,33 @@ export default function AgentPage() {
   }, [messages, currentChatId, latestDebugData]);
 
   // Scroll to bottom helper function
-  const scrollToBottom = (behavior: ScrollBehavior = 'smooth', delay: number = 100) => {
-    setTimeout(() => {
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
-      }
-    }, delay);
+  const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+    });
   };
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0) {
-      scrollToBottom('smooth', 100);
+      scrollToBottom('smooth');
     }
   }, [messages]);
 
-  // Scroll to bottom when keyboard state changes
+  // Scroll to bottom when viewport height changes (keyboard opens/closes)
   useEffect(() => {
-    if (isKeyboardOpen) {
-      // Multiple attempts to ensure scroll happens after resize
-      scrollToBottom('smooth', 50);
-      scrollToBottom('smooth', 200);
-      scrollToBottom('smooth', 400);
+    if (viewportHeight) {
+      // Use 'auto' for instant scroll when keyboard changes
+      scrollToBottom('auto');
     }
-  }, [isKeyboardOpen, keyboardHeight]);
+  }, [viewportHeight]);
 
   // Handle input focus - scroll to bottom
   useEffect(() => {
     if (isInputFocused) {
-      // Delay to allow keyboard animation
-      scrollToBottom('smooth', 150);
-      scrollToBottom('smooth', 350);
+      // Small delay to allow keyboard animation to start
+      setTimeout(() => scrollToBottom('auto'), 100);
+      setTimeout(() => scrollToBottom('auto'), 300);
     }
   }, [isInputFocused]);
 
@@ -621,16 +594,16 @@ export default function AgentPage() {
 
   return (
     <div 
-      className="fixed inset-0 flex flex-col overflow-hidden" 
+      ref={containerRef}
+      className="fixed left-0 right-0 top-0 flex flex-col overflow-hidden" 
       style={{ 
-        height: isKeyboardOpen ? `calc(100dvh - ${keyboardHeight}px)` : '100dvh',
+        height: viewportHeight ? `${viewportHeight}px` : '100dvh',
         touchAction: 'pan-y',
         overscrollBehavior: 'none',
         background: 'linear-gradient(135deg, #FCE7F3 0%, #FDF2F8 60%, #FFFFFF 100%)',
-        transition: 'height 0.1s ease-out',
       }}
     >
-      {/* Global styles for animations */}
+      {/* Global styles for animations and iOS keyboard fixes */}
       <style jsx global>{`
         @keyframes slideIn {
           from {
@@ -659,19 +632,20 @@ export default function AgentPage() {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
+        /* Prevent iOS zoom on input focus */
         input[type="text"],
         input[type="email"],
         input[type="password"],
         textarea {
           font-size: 16px !important;
         }
-        html {
-          scroll-behavior: smooth;
-          overflow-x: hidden;
-        }
-        body {
-          overflow-x: hidden;
-          overscroll-behavior-x: none;
+        /* Prevent body scroll and bounce on iOS */
+        html, body {
+          position: fixed;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          overscroll-behavior: none;
         }
       `}</style>
 
@@ -914,9 +888,8 @@ export default function AgentPage() {
               style={{
                 paddingTop: '0.75rem',
                 paddingBottom: isKeyboardOpen 
-                  ? '12px'
+                  ? '8px'
                   : 'calc(env(safe-area-inset-bottom) + 5rem)',
-                transition: 'padding-bottom 0.1s ease-out'
               }}
             >
               <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-2.5 focus-within:border-primary transition-colors shadow-md">
@@ -926,13 +899,12 @@ export default function AgentPage() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onFocus={() => {
                     setIsInputFocused(true);
-                    // Scroll to bottom with multiple attempts for keyboard animation
-                    scrollToBottom('smooth', 100);
-                    scrollToBottom('smooth', 300);
-                    scrollToBottom('smooth', 500);
+                    // Scroll to bottom when keyboard opens
+                    setTimeout(() => scrollToBottom('auto'), 100);
+                    setTimeout(() => scrollToBottom('auto'), 300);
                   }}
                   onBlur={() => {
-                    setTimeout(() => setIsInputFocused(false), 100);
+                    setTimeout(() => setIsInputFocused(false), 150);
                   }}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
