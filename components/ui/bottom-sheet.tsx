@@ -21,10 +21,11 @@ interface BottomSheetProps {
   title?: string;
   zIndex?: number;
   height?: string;
+  expandedHeight?: string; // Height when keyboard is open
   skipBodyLock?: boolean;
 }
 
-export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex = 9998, height = '70vh' }: BottomSheetProps) {
+export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex = 9998, height = '50vh', expandedHeight = '80vh' }: BottomSheetProps) {
   const mounted = useIsMounted();
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -200,12 +201,15 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
+  const isKeyboardOpen = keyboardGap > 50; // Keyboard is open if gap > 50px
+  
+  // Use different height based on whether keyboard is open
+  const currentHeight = isKeyboardOpen ? expandedHeight : height;
   
   // Calculate the max height based on visual viewport (shrinks when keyboard opens)
-  // If viewportHeight is set, use it directly; otherwise fall back to CSS vh
   const maxHeightValue = viewportHeight !== null 
-    ? `${Math.min(viewportHeight * 0.85, viewportHeight - 50)}px`
-    : '85dvh';
+    ? `${Math.min(viewportHeight * 0.9, viewportHeight - 40)}px`
+    : (isKeyboardOpen ? '90dvh' : '85dvh');
 
   const content = (
     <>
@@ -243,16 +247,16 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
         style={{
           // Position above the keyboard gap
           bottom: keyboardGap,
-          // Calculate top position based on visual viewport
+          // Calculate top position based on visual viewport and keyboard state
           top: viewportHeight !== null 
-            ? `${Math.max(viewportHeight * 0.15, 50)}px` 
+            ? `${Math.max(viewportHeight * (isKeyboardOpen ? 0.1 : 0.5), 50)}px` 
             : 'auto',
-          height: viewportHeight !== null ? 'auto' : height,
+          height: viewportHeight !== null ? 'auto' : currentHeight,
           maxHeight: maxHeightValue,
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 2,
-          transition: 'top 0.15s ease-out, max-height 0.15s ease-out, bottom 0.15s ease-out',
+          transition: 'top 0.2s ease-out, height 0.2s ease-out, max-height 0.2s ease-out, bottom 0.15s ease-out',
         }}
       >
         {/* Drag Handle */}
@@ -290,9 +294,12 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
           {children}
         </div>
 
-        {/* Fixed Footer */}
+        {/* Fixed Footer - closer to keyboard when open */}
         {footer && (
-          <div className="flex-shrink-0 px-4 pb-4 bg-white border-t border-gray-100">
+          <div 
+            className="flex-shrink-0 px-4 bg-white border-t border-gray-100"
+            style={{ paddingBottom: isKeyboardOpen ? '8px' : '16px', paddingTop: '8px' }}
+          >
             {footer}
           </div>
         )}

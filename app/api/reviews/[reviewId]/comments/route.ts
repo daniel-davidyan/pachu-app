@@ -11,63 +11,80 @@ export async function GET(
     const supabase = await createClient();
     const { reviewId } = await params;
 
-    // Get current user to check for likes
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Get comments with user info and mentions
-    const { data: comments, error } = await supabase
-      .from('review_comments')
-      .select(`
-        id,
-        content,
-        created_at,
-        updated_at,
-        user:profiles!review_comments_user_id_fkey (
+    // Run user auth and comments query in parallel for faster loading
+    const [userResult, commentsResult] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from('review_comments')
+        .select(`
           id,
-          username,
-          full_name,
-          avatar_url
-        ),
-        mentions:comment_mentions (
-          mentioned_user:profiles!comment_mentions_mentioned_user_id_fkey (
+          content,
+          created_at,
+          updated_at,
+          user:profiles!review_comments_user_id_fkey (
             id,
             username,
-            full_name
+            full_name,
+            avatar_url
+          ),
+          mentions:comment_mentions (
+            mentioned_user:profiles!comment_mentions_mentioned_user_id_fkey (
+              id,
+              username,
+              full_name
+            )
           )
-        )
-      `)
-      .eq('review_id', reviewId)
-      .order('created_at', { ascending: true });
+        `)
+        .eq('review_id', reviewId)
+        .order('created_at', { ascending: true })
+    ]);
+
+    const user = userResult.data?.user;
+    const { data: comments, error } = commentsResult;
 
     if (error) throw error;
 
-    // Get likes counts and user's likes for all comments
-    const commentIds = comments?.map(c => c.id) || [];
-    
-    // Get likes counts
-    const { data: likesData } = await supabase
-      .from('comment_likes')
-      .select('comment_id')
-      .in('comment_id', commentIds);
+    // If no comments, return early
+    if (!comments || comments.length === 0) {
+      return NextResponse.json({ comments: [] });
+    }
 
+    // Get likes data in parallel
+    const commentIds = comments.map(c => c.id);
+    
+    const likesPromises = [
+      // Get all likes counts
+      supabase
+        .from('comment_likes')
+        .select('comment_id')
+        .in('comment_id', commentIds),
+    ];
+    
+    // Only query user likes if logged in
+    if (user) {
+      likesPromises.push(
+        supabase
+          .from('comment_likes')
+          .select('comment_id')
+          .eq('user_id', user.id)
+          .in('comment_id', commentIds)
+      );
+    }
+
+    const likesResults = await Promise.all(likesPromises);
+    const likesData = likesResults[0].data;
+    const userLikesData = user ? likesResults[1]?.data : null;
+
+    // Count likes
     const likesCounts: { [key: string]: number } = {};
     likesData?.forEach(like => {
       likesCounts[like.comment_id] = (likesCounts[like.comment_id] || 0) + 1;
     });
 
-    // Get user's likes if logged in
-    let userLikes: string[] = [];
-    if (user) {
-      const { data: userLikesData } = await supabase
-        .from('comment_likes')
-        .select('comment_id')
-        .eq('user_id', user.id)
-        .in('comment_id', commentIds);
-      userLikes = userLikesData?.map(l => l.comment_id) || [];
-    }
+    const userLikes = userLikesData?.map(l => l.comment_id) || [];
 
     // Transform the data to a cleaner format
-    const formattedComments = comments?.map(comment => {
+    const formattedComments = comments.map(comment => {
       // Type assertion to handle Supabase's type inference issue
       const commentUser = Array.isArray(comment.user) ? comment.user[0] : comment.user;
       const commentMentions = comment.mentions || [];
@@ -93,7 +110,7 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ comments: formattedComments || [] });
+    return NextResponse.json({ comments: formattedComments });
   } catch (error) {
     console.error('Error fetching comments:', error);
     return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
