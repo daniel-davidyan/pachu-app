@@ -257,11 +257,20 @@ export default function AgentPage() {
       try {
         const history = JSON.parse(stored);
         setChatHistory(history);
-        // Load the most recent chat if exists
+        
+        // Check if most recent chat is within 5 minutes
         if (history.length > 0) {
           const mostRecent = history[0];
-          setCurrentChatId(mostRecent.id);
-          setMessages(mostRecent.messages);
+          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+          
+          if (mostRecent.timestamp > fiveMinutesAgo) {
+            // Within 5 minutes - continue the conversation
+            setCurrentChatId(mostRecent.id);
+            setMessages(mostRecent.messages);
+          } else {
+            // More than 5 minutes - start fresh
+            setCurrentChatId(Date.now().toString());
+          }
         } else {
           setCurrentChatId(Date.now().toString());
         }
