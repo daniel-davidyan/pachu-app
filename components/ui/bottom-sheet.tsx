@@ -30,42 +30,42 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-  const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+  const [keyboardGap, setKeyboardGap] = useState(0);
+  const [windowHeight, setWindowHeight] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
-  const windowHeightRef = useRef<number>(0);
 
-  // Initialize window height immediately on mount (not in effect)
-  if (typeof window !== 'undefined' && windowHeightRef.current === 0) {
-    windowHeightRef.current = window.innerHeight;
-  }
+  // Initialize window height on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWindowHeight(window.innerHeight);
+    }
+  }, []);
 
   // Track visual viewport for keyboard detection
   useLayoutEffect(() => {
     if (!isOpen || typeof window === 'undefined') return;
     
     // Capture initial window height when sheet opens
-    windowHeightRef.current = window.innerHeight;
-    setVisualViewportHeight(null); // Reset - no keyboard initially
+    const initialHeight = window.innerHeight;
+    setWindowHeight(initialHeight);
+    setKeyboardGap(0);
 
     const vv = window.visualViewport;
     if (!vv) return;
 
     const handleResize = () => {
       const currentVVHeight = vv.height;
-      const windowHeight = windowHeightRef.current;
       
       // If visual viewport is significantly smaller than window, keyboard is open
-      const keyboardHeight = windowHeight - currentVVHeight;
+      const gap = initialHeight - currentVVHeight;
       
-      if (keyboardHeight > 150) {
-        // Keyboard is open - set the visual viewport height
-        setVisualViewportHeight(currentVVHeight);
+      if (gap > 150) {
+        setKeyboardGap(gap);
       } else {
-        // Keyboard is closed
-        setVisualViewportHeight(null);
+        setKeyboardGap(0);
       }
     };
 
@@ -82,7 +82,6 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
 
     scrollPositionRef.current = window.scrollY;
     
-    // Simple overflow hidden - don't use position fixed which causes issues
     const originalOverflow = document.body.style.overflow;
     const originalPosition = document.body.style.position;
     const originalTop = document.body.style.top;
@@ -191,11 +190,9 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
-  const isKeyboardOpen = visualViewportHeight !== null;
-  
-  // Calculate positioning based on keyboard state
-  const keyboardGap = isKeyboardOpen ? (windowHeightRef.current - visualViewportHeight) : 0;
+  const isKeyboardOpen = keyboardGap > 150;
   const currentHeight = isKeyboardOpen ? expandedHeight : height;
+  const visualViewportHeight = windowHeight - keyboardGap;
 
   const content = (
     <>
@@ -228,7 +225,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
         style={{
           bottom: keyboardGap,
           height: currentHeight,
-          maxHeight: isKeyboardOpen ? `${visualViewportHeight! - 40}px` : '85dvh',
+          maxHeight: isKeyboardOpen ? `${visualViewportHeight - 40}px` : '85dvh',
           transform: `translateY(${dragOffset}px)`,
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           zIndex: zIndex + 2,
@@ -265,7 +262,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
           style={{ 
             overscrollBehavior: 'contain',
             WebkitOverflowScrolling: 'touch',
-            minHeight: 0, // Important for flex children to shrink
+            minHeight: 0,
           }}
         >
           {children}

@@ -230,25 +230,25 @@ export default function AgentPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const windowHeightRef = useRef<number>(0);
+  const [windowHeight, setWindowHeight] = useState(0);
   const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
 
-  // Initialize window height immediately
-  if (typeof window !== 'undefined' && windowHeightRef.current === 0) {
-    windowHeightRef.current = window.innerHeight;
-  }
+  // Initialize window height on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWindowHeight(window.innerHeight);
+    }
+  }, []);
 
   // Track visual viewport for keyboard handling
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    windowHeightRef.current = window.innerHeight;
+    if (typeof window === 'undefined' || windowHeight === 0) return;
     
     const vv = window.visualViewport;
     if (!vv) return;
 
     const updateViewport = () => {
-      const keyboardHeight = windowHeightRef.current - vv.height;
+      const keyboardHeight = windowHeight - vv.height;
       
       // Only set if keyboard is actually open (> 150px)
       if (keyboardHeight > 150) {
@@ -263,11 +263,10 @@ export default function AgentPage() {
     return () => {
       vv.removeEventListener('resize', updateViewport);
     };
-  }, []);
+  }, [windowHeight]);
 
-  // Calculate keyboard height
+  // Calculate keyboard state
   const isKeyboardOpen = visualViewportHeight !== null;
-  const keyboardHeight = isKeyboardOpen ? (windowHeightRef.current - visualViewportHeight) : 0;
 
   // Get user location
   useEffect(() => {
