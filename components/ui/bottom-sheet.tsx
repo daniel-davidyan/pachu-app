@@ -90,14 +90,28 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     const vv = window.visualViewport;
     if (!vv) return;
 
+    // Track if this is the first update (to avoid initial flash)
+    let isFirstUpdate = true;
+
     const updateViewport = () => {
       // Use the visual viewport height directly - this shrinks when keyboard opens
       setViewportHeight(vv.height);
+      
       // Calculate keyboard gap (space between visual viewport and actual screen bottom)
+      // Only consider it a keyboard if gap > 150px (actual keyboards are ~250-350px)
       const gap = initialWindowHeightRef.current > 0 
         ? initialWindowHeightRef.current - vv.height 
         : 0;
-      setKeyboardGap(gap > 0 ? gap : 0);
+      
+      // On first update, don't set gap (avoid initial flash to expanded height)
+      // Only set gap on subsequent viewport changes (actual keyboard opening)
+      if (isFirstUpdate) {
+        isFirstUpdate = false;
+        setKeyboardGap(0);
+      } else {
+        // Only consider keyboard open if gap is significant (> 150px)
+        setKeyboardGap(gap > 150 ? gap : 0);
+      }
     };
 
     // Set initial value after a microtask to avoid sync setState
@@ -201,7 +215,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   if (!isOpen || !mounted) return null;
 
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
-  const isKeyboardOpen = keyboardGap > 50; // Keyboard is open if gap > 50px
+  const isKeyboardOpen = keyboardGap > 150; // Keyboard is open if gap > 150px (actual keyboards are ~250-350px)
   
   // Use different height based on whether keyboard is open
   const currentHeight = isKeyboardOpen ? expandedHeight : height;
