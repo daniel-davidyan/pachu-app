@@ -62,8 +62,8 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
       document.documentElement.style.overflow = '';
       document.documentElement.style.height = '';
       window.scrollTo(0, scrollY);
-      // Reset keyboard gap when closing
-      setKeyboardGap(0);
+      // Reset keyboard gap when closing (deferred to avoid sync setState in effect)
+      queueMicrotask(() => setKeyboardGap(0));
     }
     
     return () => {
