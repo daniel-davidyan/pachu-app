@@ -30,6 +30,7 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [keyboardGap, setKeyboardGap] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -78,7 +79,10 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   useEffect(() => {
     if (!isOpen) {
       // Use queueMicrotask to avoid synchronous setState in effect
-      queueMicrotask(() => setViewportHeight(null));
+      queueMicrotask(() => {
+        setViewportHeight(null);
+        setKeyboardGap(0);
+      });
       return;
     }
 
@@ -88,6 +92,11 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     const updateViewport = () => {
       // Use the visual viewport height directly - this shrinks when keyboard opens
       setViewportHeight(vv.height);
+      // Calculate keyboard gap (space between visual viewport and actual screen bottom)
+      const gap = initialWindowHeightRef.current > 0 
+        ? initialWindowHeightRef.current - vv.height 
+        : 0;
+      setKeyboardGap(gap > 0 ? gap : 0);
     };
 
     // Set initial value after a microtask to avoid sync setState
@@ -197,11 +206,6 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const maxHeightValue = viewportHeight !== null 
     ? `${Math.min(viewportHeight * 0.85, viewportHeight - 50)}px`
     : '85dvh';
-
-  // Calculate the keyboard gap (space between visual viewport and actual screen bottom)
-  const keyboardGap = viewportHeight !== null && initialWindowHeightRef.current > 0
-    ? initialWindowHeightRef.current - viewportHeight
-    : 0;
 
   const content = (
     <>
