@@ -13,14 +13,6 @@ function useIsMounted() {
   return useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
 }
 
-// Get initial window height safely
-function getInitialWindowHeight() {
-  if (typeof window !== 'undefined') {
-    return window.innerHeight;
-  }
-  return 800; // Fallback for SSR
-}
-
 interface BottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,6 +31,9 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
   const [keyboardGap, setKeyboardGap] = useState(0);
+  const [windowHeight, setWindowHeight] = useState(() => 
+    typeof window !== 'undefined' ? window.innerHeight : 800
+  );
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -50,7 +45,9 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     if (!isOpen || typeof window === 'undefined') return;
     
     // Capture initial window height when sheet opens
-    initialHeightRef.current = window.innerHeight;
+    const initialHeight = window.innerHeight;
+    initialHeightRef.current = initialHeight;
+    setWindowHeight(initialHeight);
     setKeyboardGap(0);
 
     const vv = window.visualViewport;
@@ -58,10 +55,10 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
 
     const handleResize = () => {
       const currentVVHeight = vv.height;
-      const initialHeight = initialHeightRef.current || window.innerHeight;
+      const baseHeight = initialHeightRef.current || window.innerHeight;
       
       // If visual viewport is significantly smaller than window, keyboard is open
-      const gap = initialHeight - currentVVHeight;
+      const gap = baseHeight - currentVVHeight;
       
       if (gap > 150) {
         setKeyboardGap(gap);
@@ -186,7 +183,6 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   const dragOffset = isDragging && currentY > startY ? currentY - startY : 0;
   const isKeyboardOpen = keyboardGap > 150;
   const currentHeight = isKeyboardOpen ? expandedHeight : height;
-  const windowHeight = initialHeightRef.current || getInitialWindowHeight();
   const visualViewportHeight = windowHeight - keyboardGap;
 
   const content = (
