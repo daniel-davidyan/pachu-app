@@ -231,39 +231,72 @@ export default function AgentPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialHeightRef = useRef<number>(0);
-  const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
 
   // Track visual viewport for keyboard handling
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Capture initial window height
-    initialHeightRef.current = window.innerHeight;
+    // Capture initial window height when page loads (before any keyboard)
+    const captureInitialHeight = () => {
+      if (initialHeightRef.current === 0) {
+        initialHeightRef.current = window.innerHeight;
+      }
+    };
     
+    captureInitialHeight();
+    
+    // Use visual viewport API if available (most reliable for mobile keyboards)
     const vv = window.visualViewport;
-    if (!vv) return;
-
+    
     const updateViewport = () => {
-      const initialHeight = initialHeightRef.current || window.innerHeight;
-      const keyboardHeight = initialHeight - vv.height;
+      let currentHeight: number;
       
-      // Only set if keyboard is actually open (> 150px)
-      if (keyboardHeight > 150) {
-        setVisualViewportHeight(vv.height);
+      if (vv) {
+        currentHeight = vv.height;
       } else {
-        setVisualViewportHeight(null);
+        currentHeight = window.innerHeight;
+      }
+      
+      const fullHeight = initialHeightRef.current || window.innerHeight;
+      const kbHeight = fullHeight - currentHeight;
+      
+      // Only consider keyboard open if height difference is significant (> 100px)
+      if (kbHeight > 100) {
+        setKeyboardHeight(kbHeight);
+        // Scroll to bottom when keyboard opens
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }, 50);
+        });
+      } else {
+        setKeyboardHeight(0);
       }
     };
 
-    vv.addEventListener('resize', updateViewport);
+    if (vv) {
+      vv.addEventListener('resize', updateViewport);
+      vv.addEventListener('scroll', updateViewport);
+    }
+    
+    // Fallback for browsers without visual viewport
+    window.addEventListener('resize', updateViewport);
+    
+    // Initial check
+    updateViewport();
     
     return () => {
-      vv.removeEventListener('resize', updateViewport);
+      if (vv) {
+        vv.removeEventListener('resize', updateViewport);
+        vv.removeEventListener('scroll', updateViewport);
+      }
+      window.removeEventListener('resize', updateViewport);
     };
   }, []);
 
   // Calculate keyboard state
-  const isKeyboardOpen = visualViewportHeight !== null;
+  const isKeyboardOpen = keyboardHeight > 0;
 
   // Get user location
   useEffect(() => {
@@ -345,27 +378,39 @@ export default function AgentPage() {
     });
   }, [messages, currentChatId, latestDebugData]);
 
+  // Scroll to bottom helper function
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth', delay: number = 100) => {
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+      }
+    }, delay);
+  };
+
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current && messagesContainerRef.current) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }, 100);
+    if (messages.length > 0) {
+      scrollToBottom('smooth', 100);
     }
-  }, [messages, isInputFocused]);
+  }, [messages]);
 
-  // Handle iOS keyboard behavior
+  // Scroll to bottom when keyboard state changes
   useEffect(() => {
-    const handleResize = () => {
-      if (isInputFocused && messagesEndRef.current) {
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }, 300);
-      }
-    };
+    if (isKeyboardOpen) {
+      // Multiple attempts to ensure scroll happens after resize
+      scrollToBottom('smooth', 50);
+      scrollToBottom('smooth', 200);
+      scrollToBottom('smooth', 400);
+    }
+  }, [isKeyboardOpen, keyboardHeight]);
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+  // Handle input focus - scroll to bottom
+  useEffect(() => {
+    if (isInputFocused) {
+      // Delay to allow keyboard animation
+      scrollToBottom('smooth', 150);
+      scrollToBottom('smooth', 350);
+    }
   }, [isInputFocused]);
 
   const generateChatTitle = (messages: Message[]): string => {
@@ -578,11 +623,11 @@ export default function AgentPage() {
     <div 
       className="fixed inset-0 flex flex-col overflow-hidden" 
       style={{ 
-        height: isKeyboardOpen ? `${visualViewportHeight}px` : '100dvh',
+        height: isKeyboardOpen ? `calc(100dvh - ${keyboardHeight}px)` : '100dvh',
         touchAction: 'pan-y',
         overscrollBehavior: 'none',
         background: 'linear-gradient(135deg, #FCE7F3 0%, #FDF2F8 60%, #FFFFFF 100%)',
-        transition: 'height 0.15s ease-out',
+        transition: 'height 0.1s ease-out',
       }}
     >
       {/* Global styles for animations */}
@@ -869,9 +914,9 @@ export default function AgentPage() {
               style={{
                 paddingTop: '0.75rem',
                 paddingBottom: isKeyboardOpen 
-                  ? '8px'
+                  ? '12px'
                   : 'calc(env(safe-area-inset-bottom) + 5rem)',
-                transition: 'padding-bottom 0.15s ease-out'
+                transition: 'padding-bottom 0.1s ease-out'
               }}
             >
               <div className="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-3xl px-4 py-2.5 focus-within:border-primary transition-colors shadow-md">
@@ -879,7 +924,13 @@ export default function AgentPage() {
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
+                  onFocus={() => {
+                    setIsInputFocused(true);
+                    // Scroll to bottom with multiple attempts for keyboard animation
+                    scrollToBottom('smooth', 100);
+                    scrollToBottom('smooth', 300);
+                    scrollToBottom('smooth', 500);
+                  }}
                   onBlur={() => {
                     setTimeout(() => setIsInputFocused(false), 100);
                   }}
