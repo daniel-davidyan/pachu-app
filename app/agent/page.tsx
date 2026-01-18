@@ -230,6 +230,36 @@ export default function AgentPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const initialWindowHeightRef = useRef<number>(typeof window !== 'undefined' ? window.innerHeight : 0);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  // Track visual viewport for keyboard handling
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    initialWindowHeightRef.current = window.innerHeight;
+    
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const updateViewport = () => {
+      setViewportHeight(vv.height);
+    };
+
+    vv.addEventListener('resize', updateViewport);
+    vv.addEventListener('scroll', updateViewport);
+    
+    return () => {
+      vv.removeEventListener('resize', updateViewport);
+      vv.removeEventListener('scroll', updateViewport);
+    };
+  }, []);
+
+  // Calculate keyboard height
+  const keyboardHeight = viewportHeight !== null && initialWindowHeightRef.current > 0
+    ? Math.max(0, initialWindowHeightRef.current - viewportHeight)
+    : 0;
+  const isKeyboardOpen = keyboardHeight > 150;
 
   // Get user location
   useEffect(() => {
@@ -544,10 +574,11 @@ export default function AgentPage() {
     <div 
       className="fixed inset-0 flex flex-col overflow-hidden" 
       style={{ 
-        height: '100dvh',
+        height: viewportHeight !== null ? `${viewportHeight}px` : '100dvh',
         touchAction: 'pan-y',
         overscrollBehavior: 'none',
         background: 'linear-gradient(135deg, #FCE7F3 0%, #FDF2F8 60%, #FFFFFF 100%)',
+        transition: 'height 0.15s ease-out',
       }}
     >
       {/* Global styles for animations */}
@@ -833,8 +864,8 @@ export default function AgentPage() {
               className="flex-shrink-0"
               style={{
                 paddingTop: '0.75rem',
-                paddingBottom: isInputFocused 
-                  ? '0.25rem'
+                paddingBottom: isKeyboardOpen 
+                  ? '8px'
                   : 'calc(env(safe-area-inset-bottom) + 5rem)',
                 transition: 'padding-bottom 0.15s ease-out'
               }}

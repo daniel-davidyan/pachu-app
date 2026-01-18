@@ -79,43 +79,24 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
   // Track visual viewport for keyboard - this gives us the actual visible area
   useEffect(() => {
     if (!isOpen) {
-      // Use queueMicrotask to avoid synchronous setState in effect
-      queueMicrotask(() => {
-        setViewportHeight(null);
-        setKeyboardGap(0);
-      });
       return;
     }
 
     const vv = window.visualViewport;
     if (!vv) return;
 
-    // Track if this is the first update (to avoid initial flash)
-    let isFirstUpdate = true;
-
     const updateViewport = () => {
-      // Use the visual viewport height directly - this shrinks when keyboard opens
-      setViewportHeight(vv.height);
-      
       // Calculate keyboard gap (space between visual viewport and actual screen bottom)
       // Only consider it a keyboard if gap > 150px (actual keyboards are ~250-350px)
       const gap = initialWindowHeightRef.current > 0 
         ? initialWindowHeightRef.current - vv.height 
         : 0;
       
-      // On first update, don't set gap (avoid initial flash to expanded height)
-      // Only set gap on subsequent viewport changes (actual keyboard opening)
-      if (isFirstUpdate) {
-        isFirstUpdate = false;
-        setKeyboardGap(0);
-      } else {
-        // Only consider keyboard open if gap is significant (> 150px)
-        setKeyboardGap(gap > 150 ? gap : 0);
-      }
+      // Only set gap if it's a real keyboard (> 150px)
+      const newGap = gap > 150 ? gap : 0;
+      setKeyboardGap(newGap);
+      setViewportHeight(vv.height);
     };
-
-    // Set initial value after a microtask to avoid sync setState
-    queueMicrotask(updateViewport);
 
     vv.addEventListener('resize', updateViewport);
     vv.addEventListener('scroll', updateViewport);
@@ -123,6 +104,9 @@ export function BottomSheet({ isOpen, onClose, children, footer, title, zIndex =
     return () => {
       vv.removeEventListener('resize', updateViewport);
       vv.removeEventListener('scroll', updateViewport);
+      // Reset state on cleanup
+      setKeyboardGap(0);
+      setViewportHeight(null);
     };
   }, [isOpen]);
 
